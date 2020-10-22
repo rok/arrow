@@ -76,6 +76,95 @@ class MyListType(pa.PyExtensionType):
         return MyListType, (self.storage_type,)
 
 
+def _tensor_to_array(obj, dtype):
+    batch_size = obj.shape[0]
+    element_shape = obj.shape[1:]
+    total_num_elements = obj.size
+    num_elements = 1 if len(obj.shape) == 1 else np.prod(element_shape)
+
+    child_buf = pa.py_buffer(obj)
+    child_array = pa.Array.from_buffers(
+        dtype, total_num_elements, [None, child_buf])
+
+    offset_buf = pa.py_buffer(
+        np.int32([i * num_elements for i in range(batch_size + 1)]))
+
+    storage = pa.Array.from_buffers(pa.list_(dtype), batch_size,
+                                    [None, offset_buf], children=[child_array])
+
+    typ = TensorType(element_shape, dtype)
+    return pa.ExtensionArray.from_storage(typ, storage)
+
+
+class TensorArray(pa.ExtensionArray):
+    """
+    Concrete class for Arrow arrays of Tensor data type.
+    """
+
+    @classmethod
+    def from_numpy(cls, obj):
+        """
+        Convert a single contiguous numpy.ndarray to TensorArray.
+        """
+        assert isinstance(obj, np.ndarray)
+        if not obj.flags.c_contiguous:
+            obj = np.ascontiguousarray(obj)
+        dtype = pa.from_numpy_dtype(obj.dtype)
+
+        return _tensor_to_array(obj, dtype)
+
+    @classmethod
+    def from_tensor(cls, obj):
+        """
+        Convert a single contiguous pyarrow.Tensor to a TensorArray.
+        """
+        assert isinstance(obj, pa.Tensor)
+        assert obj.is_contiguous
+        dtype = obj.type
+
+        return _tensor_to_array(obj, dtype)
+
+    def to_numpy(self):
+        """
+        Convert TensorArray to numpy.ndarray.
+        """
+        shape = (len(self),) + self.type.shape
+        buf = self.storage.buffers()[3]
+        storage_list_type = self.storage.type
+        ext_dtype = storage_list_type.value_type.to_pandas_dtype()
+
+        return np.ndarray(shape, buffer=buf, dtype=ext_dtype)
+
+    def to_tensor(self):
+        """
+        Convert TensorArray to pyarrow.Tensor.
+        """
+        return pa.Tensor.from_numpy(self.to_numpy())
+
+
+class TensorType(pa.PyExtensionType):
+    """
+    pyarrow ExtensionType definition for TensorType
+    :param element_shape: Fixed shape for each tensor element of the array, the
+                          outer dimension is the number of elements, or length,
+                          of the array.
+    """
+
+    def __init__(self, element_shape, pyarrow_dtype):
+        self._element_shape = element_shape
+        pa.PyExtensionType.__init__(self, pa.list_(pyarrow_dtype))
+
+    def __reduce__(self):
+        return TensorType, (self._element_shape, self.storage_type.value_type)
+
+    @property
+    def shape(self):
+        return self._element_shape
+
+    def __arrow_ext_class__(self):
+        return TensorArray
+
+
 def ipc_write_batch(batch):
     stream = pa.BufferOutputStream()
     writer = pa.RecordBatchStreamWriter(stream, batch.schema)
@@ -625,3 +714,18 @@ def test_to_numpy():
     for result in [np.asarray(charr), charr.to_numpy()]:
         assert result.dtype == np.int64
         np.testing.assert_array_equal(result, np.array([], dtype='int64'))
+
+
+def test_tensor_array():
+    shape = (20, 3, 3)
+    array = np.random.uniform(0, 1, size=shape)
+
+    # Tensor round trip
+    tensor = pa.Tensor.from_numpy(array)
+    tensor_array = TensorArray.from_tensor(tensor)
+    result = tensor_array.to_tensor()
+    np.testing.assert_array_equal(array, result.to_numpy())
+
+    # NDarray round trip
+    tensor_array = TensorArray.from_numpy(array)
+    np.testing.assert_array_equal(array, tensor_array.to_numpy())
