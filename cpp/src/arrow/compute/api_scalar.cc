@@ -157,5 +157,19 @@ Result<Datum> FillNull(const Datum& values, const Datum& fill_value, ExecContext
   return CallFunction("fill_null", {values, fill_value}, ctx);
 }
 
+// ----------------------------------------------------------------------
+// Temporal functions
+
+SCALAR_EAGER_UNARY(Year, "year")
+SCALAR_EAGER_UNARY(Month, "month")
+SCALAR_EAGER_UNARY(Day, "day")
+SCALAR_EAGER_UNARY(Week, "week")
+SCALAR_EAGER_UNARY(Quarter, "quarter")
+SCALAR_EAGER_UNARY(DayOfYear, "day_of_year")
+SCALAR_EAGER_UNARY(DayOfWeek, "day_of_week")
+SCALAR_EAGER_UNARY(Hour, "hour")
+SCALAR_EAGER_UNARY(Minute, "minute")
+SCALAR_EAGER_UNARY(Second, "second")
+
 }  // namespace compute
 }  // namespace arrow
