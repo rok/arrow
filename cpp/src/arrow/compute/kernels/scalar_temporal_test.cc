@@ -79,7 +79,7 @@ TEST(ScalarTemporalTest, TestSimpleTemporalComponentExtraction) {
 }
 
 TEST(ScalarTemporalTest, TestZonedTemporalComponentExtraction) {
-  std::string timezone = "Etc/UTC-2";
+  std::string timezone = "UTC-2";
   const char* times =
       R"(["1970-01-01T00:00:59.123456789","2000-02-29T23:23:23.999999999",
           "1899-01-01T00:59:20.001001001","2033-05-18T03:33:20.000000000", null])";
