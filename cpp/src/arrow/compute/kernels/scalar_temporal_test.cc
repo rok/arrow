@@ -79,29 +79,53 @@ TEST(ScalarTemporalTest, TestSimpleTemporalComponentExtraction) {
 }
 
 TEST(ScalarTemporalTest, TestZonedTemporalComponentExtraction) {
-  std::string timezone = "UTC-2";
+  std::string timezone = "Etc/GMT+2";
   const char* times =
       R"(["1970-01-01T00:00:59.123456789","2000-02-29T23:23:23.999999999",
           "1899-01-01T00:59:20.001001001","2033-05-18T03:33:20.000000000", null])";
   auto unit = timestamp(TimeUnit::NANO, timezone);
   auto timestamps = ArrayFromJSON(unit, times);
+  auto iso_calendar_type =
+      struct_({field("iso_year", int64()), field("iso_week", int64()),
+               field("weekday", int64())});
 
-  ASSERT_RAISES(Invalid, Year(timestamps));
-  ASSERT_RAISES(Invalid, Month(timestamps));
-  ASSERT_RAISES(Invalid, Day(timestamps));
-  ASSERT_RAISES(Invalid, DayOfWeek(timestamps));
-  ASSERT_RAISES(Invalid, DayOfYear(timestamps));
-  ASSERT_RAISES(Invalid, ISOYear(timestamps));
-  ASSERT_RAISES(Invalid, ISOWeek(timestamps));
+  auto year = "[1969, 2000, 1898, 2033, null]";
+  auto month = "[12, 2, 12, 5, null]";
+  auto day = "[31, 29, 31, 18, null]";
+  auto day_of_week = "[3, 2, 6, 3, null]";
+  auto day_of_year = "[366, 61, 366, 139, null]";
+  auto iso_year = "[1970, 2000, 1899, 2033, null]";
+  auto iso_week = "[1, 9, 52, 20, null]";
+  auto iso_calendar = ArrayFromJSON(iso_calendar_type,
+                                    R"([{"iso_year": 1970, "iso_week": 1, "weekday": 4},
+                        {"iso_year": 2000, "iso_week": 9, "weekday": 2},
+                        {"iso_year": 1899, "iso_week": 52, "weekday": 7},
+                        {"iso_year": 2033, "iso_week": 20, "weekday": 3}, null])");
+  auto quarter = "[4, 1, 4, 2, null]";
+  auto hour = "[0, 23, 0, 3, null]";
+  auto minute = "[0, 23, 59, 33, null]";
+  auto second = "[59.123456789, 23.999999999, 20.001001001, 20.0, null]";
+  auto millisecond = "[123, 999, 1, 0, null]";
+  auto microsecond = "[456, 999, 1, 0, null]";
+  auto nanosecond = "[789, 999, 1, 0, null]";
+  auto subsecond = "[123456789, 999999999, 1001001, 0, null]";
+
+  CheckScalarUnary("year", unit, times, int64(), year);
+  CheckScalarUnary("month", unit, times, int64(), month);
+  CheckScalarUnary("day", unit, times, int64(), day);
+  CheckScalarUnary("day_of_week", unit, times, int64(), day_of_week);
+  CheckScalarUnary("day_of_year", unit, times, int64(), day_of_year);
+  CheckScalarUnary("iso_year", unit, times, int64(), iso_year);
+  CheckScalarUnary("iso_week", unit, times, int64(), iso_week);
   ASSERT_RAISES(Invalid, ISOCalendar(timestamps));
-  ASSERT_RAISES(Invalid, Quarter(timestamps));
-  ASSERT_RAISES(Invalid, Hour(timestamps));
-  ASSERT_RAISES(Invalid, Minute(timestamps));
-  ASSERT_RAISES(Invalid, Second(timestamps));
-  ASSERT_RAISES(Invalid, Millisecond(timestamps));
-  ASSERT_RAISES(Invalid, Microsecond(timestamps));
-  ASSERT_RAISES(Invalid, Nanosecond(timestamps));
-  ASSERT_RAISES(Invalid, Subsecond(timestamps));
+  CheckScalarUnary("quarter", unit, times, int64(), quarter);
+  CheckScalarUnary("hour", unit, times, int64(), hour);
+  CheckScalarUnary("minute", unit, times, int64(), minute);
+  CheckScalarUnary("second", unit, times, float64(), second);
+  CheckScalarUnary("millisecond", unit, times, int64(), millisecond);
+  CheckScalarUnary("microsecond", unit, times, int64(), microsecond);
+  CheckScalarUnary("nanosecond", unit, times, int64(), nanosecond);
+  CheckScalarUnary("subsecond", unit, times, int64(), subsecond);
 }
 }  // namespace compute
 }  // namespace arrow
