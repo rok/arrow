@@ -333,4 +333,172 @@ TEST_F(TestExtensionType, ValidateExtensionArray) {
   ASSERT_OK(ext_arr4->ValidateFull());
 }
 
+class GeoRasterArray : public ExtensionArray {
+ public:
+  using ExtensionArray::ExtensionArray;
+};
+
+// This attempts to model GDAL Raster Band
+// https://gdal.org/user/raster_data_model.html#raster-band
+template <typename DType>
+class GeoRasterType : public ExtensionType {
+  using T = typename DType::c_type;
+
+ public:
+  enum BandColor {
+    /// the default, nothing is known.
+    GCI_Undefined = 0,
+    /// independent gray-scale image
+    GCI_GrayIndex = 1,
+    /// acts as an index into a color table
+    GCI_PaletteIndex = 2,
+    /// red portion of an RGB or RGBA image
+    GCI_RedBand = 3,
+    /// green portion of an RGB or RGBA image
+    GCI_GreenBand = 4,
+    /// blue portion of an RGB or RGBA image
+    GCI_BlueBand = 5,
+    /// alpha portion of an RGBA image
+    GCI_AlphaBand = 6,
+    /// hue of an HLS image
+    GCI_HueBand = 7,
+    /// saturation of an HLS image
+    GCI_SaturationBand = 8,
+    /// hue of an HLS image
+    GCI_LightnessBand = 9,
+    /// cyan portion of a CMY or CMYK image
+    GCI_CyanBand = 10,
+    /// magenta portion of a CMY or CMYK image
+    GCI_MagentaBand = 11,
+    /// yellow portion of a CMY or CMYK image
+    GCI_YellowBand = 12,
+    /// black portion of a CMYK image.
+    GCI_BlackBand = 13,
+  };
+
+  explicit GeoRasterType(
+      const std::shared_ptr<DataType>& type, const uint64_t width, const uint64_t height,
+      const std::string metadata = "", const std::string description = "",
+      const T nodata_value = std::numeric_limits<T>::min(),
+      const std::map<T, std::string> category_names = std::map<T, std::string>(),
+      const double minimum = std::numeric_limits<T>::min(),
+      const double maximum = std::numeric_limits<T>::max(), const T offset = 0,
+      const double scale = 1, const std::string unit = "",
+      const BandColor band_color = GCI_Undefined)
+      : ExtensionType(fixed_size_list(type, static_cast<int>(width * height))),
+        type_(type),
+        width_(width),
+        height_(height),
+        metadata_(metadata),
+        description_(description),
+        nodata_value_(nodata_value),
+        category_names_(category_names),
+        minimum_(minimum),
+        maximum_(maximum),
+        offset_(offset),
+        scale_(scale),
+        unit_(unit),
+        band_color_(band_color) {}
+
+  std::string extension_name() const override {
+    return "ARROW:extension:name: geoarrow.raster";
+  }
+
+  bool ExtensionEquals(const ExtensionType& other) const override {
+    const auto& other_ext = static_cast<const GeoRasterType&>(other);
+    if (other_ext.type_ == this->type_ && other_ext.width_ == this->width_ &&
+        other_ext.height_ == this->height_ && other_ext.metadata_ == this->metadata_ &&
+        other_ext.description_ == this->description_ &&
+        other_ext.nodata_value_ == this->nodata_value_ &&
+        other_ext.category_names_ == this->category_names_ &&
+        other_ext.minimum_ == this->minimum_ && other_ext.maximum_ == this->maximum_ &&
+        other_ext.offset_ == this->offset_ && other_ext.scale_ == this->scale_ &&
+        other_ext.unit_ == this->unit_ && other_ext.band_color_ == this->band_color_) {
+      return true;
+    }
+    return false;
+  }
+
+  std::shared_ptr<Array> MakeArray(std::shared_ptr<ArrayData> data) const override {
+    return std::make_shared<GeoRasterArray>(data);
+  }
+
+  Result<std::shared_ptr<DataType>> Deserialize(
+      std::shared_ptr<DataType> storage_type,
+      const std::string& serialized) const override {
+    if (serialized != extension_name()) {
+      return Status::Invalid("Type identifier did not match");
+    }
+    return std::make_shared<GeoRasterType>(type_, width_, height_);
+  }
+
+  std::shared_ptr<DataType> type() const { return type_; }
+
+  std::string Serialize() const override { return extension_name(); }
+
+ private:
+  // Byte, UInt16, Int16, UInt32, Int32, UInt64, Int64, Float32, Float64, CInt16, CInt32,
+  // CFloat32, and CFloat64.
+  const std::shared_ptr<DataType>& type_;
+
+  // Height and width and of raster band.
+  const uint64_t width_;
+  const uint64_t height_;
+
+  // A list of name/value pair metadata in the same format as the dataset, but of
+  // information that is potentially specific to this band.
+  // Optional statistics stored in metadata:
+  // * STATISTICS_MEAN: mean
+  // * STATISTICS_MINIMUM: minimum
+  // * STATISTICS_MAXIMUM: maximum
+  // * STATISTICS_STDDEV: standard deviation
+  // * STATISTICS_APPROXIMATE: only present if GDAL has computed approximate statistics
+  // * STATISTICS_VALID_PERCENT: percentage of valid (not nodata) pixel
+  const std::string metadata_;
+
+  // An optional description string.
+  const std::string description_;
+
+  // An optional single nodata pixel value (see also NODATA_VALUES metadata on the dataset
+  // for multi-band style nodata values).
+  const T nodata_value_;
+
+  // An optional list of category names (effectively class names in a thematic image).
+  const std::map<T, std::string> category_names_;
+
+  // An optional minimum and maximum value.
+  const double minimum_, maximum_;
+
+  // An optional offset and scale for transforming raster values into meaning full values
+  // (i.e. translate height to meters).
+  // Units value = (raw value * scale) + offset
+  const T offset_;
+  const double scale_;
+
+  // An optional raster unit name. For instance, this might indicate linear units for
+  // elevation data.
+  const std::string unit_;
+
+  // Color interpretation for the band.
+  const BandColor band_color_;
+};
+
+TEST_F(TestExtensionType, GeoRasterType) {
+  std::vector<int64_t> values = {0,  1,  2,  3,  4,  5,  6,  7,  8,  9,  10, 11,
+                                 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23,
+                                 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35};
+  int width = 3;
+  int height = 4;
+  auto band_size = width * height;
+  int length = static_cast<int>(values.size() / band_size);
+
+  auto storage_type = fixed_size_list(int64(), band_size);
+  auto ext_type = std::make_shared<GeoRasterType<Int64Type>>(int64(), width, height);
+
+  auto data = ArrayData::Make(int64(), values.size(), {nullptr, Buffer::Wrap(values)});
+  auto storage_arr =
+      std::make_shared<FixedSizeListArray>(storage_type, length, MakeArray(data));
+  auto raster_arr = std::make_shared<GeoRasterArray>(ext_type, storage_arr);
+}
+
 }  // namespace arrow
