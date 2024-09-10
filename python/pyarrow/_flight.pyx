@@ -742,9 +742,8 @@ cdef class FlightEndpoint(_Weakrefable):
                     CLocation.Parse(tobytes(location)).Value(&c_location))
             self.endpoint.locations.push_back(c_location)
 
-        if expiration_time is not None:
-            self.endpoint.expiration_time = TimePoint_from_ns(
-                expiration_time.cast(timestamp("ns")).value)
+        self.endpoint.expiration_time = <optional[CTimePoint]>nullopt if expiration_time is None else \
+            <optional[CTimePoint]>(TimePoint_from_ns(expiration_time.cast(timestamp("ns")).value))
 
         self.endpoint.app_metadata = tobytes(app_metadata)
 
