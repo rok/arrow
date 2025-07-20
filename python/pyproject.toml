@@ -105,7 +105,6 @@ environment.root = [
 rules.invalid-argument-type = "ignore"
 rules.invalid-assignment = "ignore"
 rules.invalid-context-manager = "ignore"
-rules.invalid-return-type = "ignore"
 rules.invalid-type-form = "ignore"
 rules.no-matching-overload = "ignore"
 rules.non-subscriptable = "ignore"
