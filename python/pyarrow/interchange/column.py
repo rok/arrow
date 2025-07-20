@@ -314,7 +314,13 @@ class _PyArrowColumn:
             kind = DtypeKind.CATEGORICAL
             arr = self._col
             indices_dtype = arr.indices.type
-            _, f_string = _PYARROW_KINDS.get(indices_dtype)
+            mapping = _PYARROW_KINDS.get(indices_dtype)
+            if mapping is None:
+                raise ValueError(
+                    f"Dictionary index data type {indices_dtype} "
+                    "not supported by interchange protocol"
+                )
+            _, f_string = mapping
             return kind, bit_width, f_string, Endianness.NATIVE
         else:
             kind, f_string = _PYARROW_KINDS.get(dtype, (None, None))
