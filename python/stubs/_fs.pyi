@@ -19,8 +19,6 @@ from fsspec import AbstractFileSystem  # type: ignore[import-untyped]
 
 from .lib import NativeFile, _Weakrefable
 
-SupportedFileSystem: TypeAlias = Union[AbstractFileSystem, FileSystem]
-
 class FileType(enum.IntFlag):
     NotFound = enum.auto()
     Unknown = enum.auto()
@@ -617,6 +615,8 @@ class FileSystem(_Weakrefable):
         normalized_path : str
             The normalized path
         """
+
+SupportedFileSystem: TypeAlias = Union[AbstractFileSystem, FileSystem]
 
 class LocalFileSystem(FileSystem):
     """
