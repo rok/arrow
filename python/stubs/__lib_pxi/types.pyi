@@ -29,6 +29,7 @@ from .io import Buffer
 from .scalar import ExtensionScalar
 
 _AsPyType = TypeVar("_AsPyType")
+_DataTypeT = TypeVar("_DataTypeT", bound=DataType)
 
 class _Weakrefable: ...
 class _Metadata(_Weakrefable): ...
@@ -184,8 +185,6 @@ class DataType(_Weakrefable):
             A valid PyCapsule with name 'arrow_schema' containing an
             ArrowSchema pointer.
         """
-
-_DataTypeT = TypeVar("_DataTypeT", bound=DataType)
 
 class _BasicDataType(DataType, Generic[_AsPyType]): ...
 class NullType(_BasicDataType[None]): ...
