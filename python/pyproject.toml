@@ -102,19 +102,15 @@ fallback_version = '21.0.0a0'
 environment.root = [
     "./pyarrow",
 ]
-rules.call-non-callable = "ignore"
 rules.invalid-argument-type = "ignore"
 rules.invalid-assignment = "ignore"
 rules.invalid-context-manager = "ignore"
-rules.invalid-ignore-comment = "ignore"
 rules.invalid-return-type = "ignore"
 rules.invalid-type-form = "ignore"
-rules.missing-argument = "ignore"
 rules.no-matching-overload = "ignore"
 rules.non-subscriptable = "ignore"
 rules.not-iterable = "ignore"
 rules.possibly-unbound-attribute = "ignore"
-rules.possibly-unbound-import = "ignore"
 rules.too-many-positional-arguments = "ignore"
 rules.unknown-argument = "ignore"
 rules.unresolved-attribute = "ignore"
