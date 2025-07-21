@@ -230,11 +230,11 @@ def test_empty_table_no_columns():
 
 def test_write_nested_zero_length_array_chunk_failure():
     # Bug report in ARROW-3792
-    cols = OrderedDict(
+    cols = dict(
         int32=pa.int32(),
         list_string=pa.list_(pa.string())
     )
-    data = [[], [OrderedDict(int32=1, list_string=('G',)), ]]
+    data = [[], [dict(int32=1, list_string=('G',)), ]]
 
     # This produces a table with a column like
     # <Column name='list_string' type=ListType(list<item: string>)>

@@ -2561,12 +2561,13 @@ def test_assume_timezone():
                              f"timezone '{timezone}'"):
         pc.assume_timezone(ambiguous_array, options=options_ambiguous_raise)
 
-    expected = ambiguous.tz_localize(timezone, ambiguous=[True, True, True])
+    expected = ambiguous.tz_localize(timezone, ambiguous=np.array([True, True, True]))
     result = pc.assume_timezone(
         ambiguous_array, options=options_ambiguous_earliest)
     result.equals(pa.array(expected))
 
-    expected = ambiguous.tz_localize(timezone, ambiguous=[False, False, False])
+    expected = ambiguous.tz_localize(
+        timezone, ambiguous=np.array([False, False, False]))
     result = pc.assume_timezone(
         ambiguous_array, options=options_ambiguous_latest)
     result.equals(pa.array(expected))
