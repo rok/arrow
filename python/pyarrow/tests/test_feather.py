@@ -590,7 +590,7 @@ def test_sparse_dataframe(version):
     # GH #221
     data = {'A': [0, 1, 2],
             'B': [1, 0, 1]}
-    df = pd.DataFrame(data).to_sparse(fill_value=1)
+    df = pd.DataFrame(data).to_sparse(fill_value=1) # type: ignore[call-non-callable]
     expected = df.to_dense()
     _check_pandas_roundtrip(df, expected, version=version)
 
