@@ -98,6 +98,10 @@ version_scheme = 'guess-next-dev'
 git_describe_command = 'git describe --dirty --tags --long --match "apache-arrow-[0-9]*.*"'
 fallback_version = '21.0.0a0'
 
+[tool.ty.src]
+# TODO: these should probably be included
+exclude = ["pyarrow/tests", "benchmarks"]
+
 [tool.ty]
 environment.root = [
     "./pyarrow",
@@ -110,7 +114,6 @@ rules.invalid-type-form = "ignore"
 rules.no-matching-overload = "ignore"
 rules.non-subscriptable = "ignore"
 rules.not-iterable = "ignore"
-rules.possibly-unbound-attribute = "ignore"
 rules.too-many-positional-arguments = "ignore"
 rules.unknown-argument = "ignore"
 rules.unresolved-attribute = "ignore"
