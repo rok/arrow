@@ -26,7 +26,8 @@ import tempfile
 import threading
 import time
 import traceback
-import json
+from json import dumps as json_dumps
+from json import dumps as json_loads
 from datetime import datetime
 
 try:
@@ -50,7 +51,26 @@ try:
     )
 except ImportError:
     flight = None
-    FlightClient, FlightServerBase = object, object
+    class MockContextManager:
+        def __enter__(self):
+            return self
+        def __exit__(self, exc_type, exc_val, exc_tb):
+            pass
+    class FlightServerBase(MockContextManager):
+        def serve(self):
+            pass
+    class FlightClient(MockContextManager):
+        def get_flight_info(self, **kwargs):
+            pass
+        def do_action(self, **kwargs):
+            pass
+        def do_get(self, **kwargs):
+            pass
+        def do_put(self, **kwargs):
+            pass
+        def close(self):
+            pass
+    FlightClient = object
     ServerAuthHandler, ClientAuthHandler = object, object
     ServerMiddleware, ServerMiddlewareFactory = object, object
     ClientMiddleware, ClientMiddlewareFactory = object, object
@@ -314,7 +334,7 @@ class InvalidStreamFlightServer(FlightServerBase):
     def do_get(self, context, ticket):
         data1 = [pa.array([-10, -5, 0, 5, 10], type=pa.int32())]
         data2 = [pa.array([-10.0, -5.0, 0.0, 5.0, 10.0], type=pa.float64())]
-        assert data1.type != data2.type
+        assert data1[0].type != data2[0].type
         table1 = pa.Table.from_arrays(data1, names=['a'])
         table2 = pa.Table.from_arrays(data2, names=['a'])
         assert table1.schema == self.schema
@@ -1741,7 +1761,7 @@ def test_flight_do_put_limit():
             with pytest.raises(flight.FlightWriteSizeExceededError,
                                match="exceeded soft limit") as excinfo:
                 writer.write_batch(large_batch)
-            assert excinfo.value.limit == 4096
+            assert excinfo.value.limit == 4096 #  type: ignore[unresolved-attribute]
             smaller_batches = [
                 large_batch.slice(0, 384),
                 large_batch.slice(384),
@@ -2355,7 +2375,7 @@ class ActionNoneFlightServer(EchoFlightServer):
 
     def do_action(self, context, action):
         if action.type == "get_value":
-            return [json.dumps(self.VALUES).encode('utf-8')]
+            return [json_dumps(self.VALUES).encode('utf-8')]
         elif action.type == "append":
             self.VALUES.append(True)
             return None
@@ -2372,7 +2392,7 @@ def test_none_action_side_effect():
             FlightClient(('localhost', server.port)) as client:
         client.do_action(flight.Action("append", b""))
         r = client.do_action(flight.Action("get_value", b""))
-        assert json.loads(next(r).body.to_pybytes()) == [True]
+        assert json_loads(next(r).body.to_pybytes()) == [True]
 
 
 @pytest.mark.slow  # Takes a while for gRPC to "realize" writes fail

@@ -21,7 +21,7 @@ from contextlib import nullcontext
 from functools import reduce
 
 import inspect
-import json
+from json import loads as json_loads
 import os
 import re
 import operator
@@ -1192,7 +1192,7 @@ Examples
 
 
 def _get_pandas_index_columns(keyvalues):
-    return (json.loads(keyvalues[b'pandas'].decode('utf8'))
+    return (json_loads(keyvalues[b'pandas'].decode('utf8'))
             ['index_columns'])
 
 

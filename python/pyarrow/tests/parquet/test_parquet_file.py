@@ -408,7 +408,7 @@ def test_parquet_file_hugginface_support():
         pytest.skip("fsspec is not installed, skipping Hugging Face test")
 
     fake_hf_module = types.ModuleType("huggingface_hub")
-    fake_hf_module.HfFileSystem = MemoryFileSystem
+    fake_hf_module.HfFileSystem = MemoryFileSystem #  type: ignore[unresolved-attribute]
     with mock.patch.dict("sys.modules", {"huggingface_hub": fake_hf_module}):
         uri = "hf://datasets/apache/arrow/test.parquet"
         table = pa.table({"a": range(10)})
