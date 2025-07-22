@@ -50,7 +50,15 @@ try:
     )
 except ImportError:
     flight = None
-    FlightClient, FlightServerBase = object, object
+    class MockContextManager:
+        def __enter__(self):
+            return self
+        def __exit__(self, exc_type, exc_val, exc_tb):
+            pass
+    class FlightServerBase(MockContextManager):
+        pass
+    class FlightClient(MockContextManager):
+        pass
     ServerAuthHandler, ClientAuthHandler = object, object
     ServerMiddleware, ServerMiddlewareFactory = object, object
     ClientMiddleware, ClientMiddlewareFactory = object, object
