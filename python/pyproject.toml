@@ -113,8 +113,11 @@ too-many-positional-arguments = "ignore"
 unknown-argument = "ignore"
 unresolved-attribute = "ignore"
 unresolved-global = "ignore"
-unresolved-import = "ignore"
+#unresolved-import = "ignore"
 unresolved-reference = "ignore"
 unsupported-operator = "ignore"
 missing-argument = "ignore"
 call-non-callable = "ignore"
+
+[tool.ty.src]
+exclude = ["stubs", "pyarrow/tests"]
