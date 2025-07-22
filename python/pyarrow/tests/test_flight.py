@@ -50,7 +50,13 @@ try:
     )
 except ImportError:
     flight = None
-    FlightClient, FlightServerBase = object, object
+    class MockContextManager:
+        def __init__(self, *args, **kwargs):
+            pass
+    class FlightServerBase(MockContextManager):
+        pass
+    class FlightClient(MockContextManager):
+        pass
     ServerAuthHandler, ClientAuthHandler = object, object
     ServerMiddleware, ServerMiddlewareFactory = object, object
     ClientMiddleware, ClientMiddlewareFactory = object, object
