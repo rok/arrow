@@ -49,6 +49,12 @@ try:
         ClientMiddleware, ClientMiddlewareFactory,
     )
 except ImportError:
+    class context_like(object):
+        def __enter__(self):
+            return self
+        def __exit__(self, exc_type, exc_value, traceback):
+            pass
+
     flight = None
     class MockContextManager:
         def __enter__(self):
