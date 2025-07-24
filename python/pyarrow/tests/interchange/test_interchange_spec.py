@@ -18,15 +18,15 @@
 import ctypes
 import hypothesis as h
 import hypothesis.strategies as st
-
+import pyarrow as pa
+import pyarrow.tests.strategies as past
 import pytest
+
 np = None
 try:
     import numpy as np
 except ImportError:
     pass
-import pyarrow as pa
-import pyarrow.tests.strategies as past
 
 
 all_types = st.deferred(

@@ -16,6 +16,7 @@
 # under the License.
 
 from json import dumps as json_dumps
+from json import loads as json_loads
 import os
 import pyarrow as pa
 import pyarrow.jvm as pa_jvm
@@ -171,7 +172,7 @@ def test_jvm_types(root_allocator, pa_type, jvm_spec, nullable):
     spec = {
         'name': 'field_name',
         'nullable': nullable,
-        'type': json.loads(jvm_spec),
+        'type': json_loads(jvm_spec),
         # TODO: This needs to be set for complex types
         'children': []
     }
@@ -375,7 +376,7 @@ def test_jvm_record_batch(root_allocator, pa_type, py_data, jvm_type,
     spec = {
         'name': 'field_name',
         'nullable': False,
-        'type': json.loads(jvm_spec),
+        'type': json_loads(jvm_spec),
         # TODO: This needs to be set for complex types
         'children': []
     }

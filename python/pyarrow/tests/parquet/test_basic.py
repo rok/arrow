@@ -16,7 +16,6 @@
 # under the License.
 
 import os
-from collections import OrderedDict
 import io
 import warnings
 from shutil import copytree

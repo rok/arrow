@@ -4428,7 +4428,8 @@ def test_convert_to_extension_array(monkeypatch):
             integer._IntegerDtype, "__from_arrow__")
     else:
         monkeypatch.delattr(
-            pd.core.arrays.integer.NumericDtype, "__from_arrow__") #  type: ignore[unresolved-attribute]
+            # type: ignore[unresolved-attribute]
+            pd.core.arrays.integer.NumericDtype, "__from_arrow__")
     # Int64Dtype has no __from_arrow__ -> use normal conversion
     result = table.to_pandas()
     assert len(_get_mgr(result).blocks) == 1
@@ -4474,7 +4475,8 @@ def test_conversion_extensiontype_to_extensionarray(monkeypatch):
             integer._IntegerDtype, "__from_arrow__")
     else:
         monkeypatch.delattr(
-            pd.core.arrays.integer.NumericDtype, "__from_arrow__") #  type: ignore[unresolved-attribute]
+            # type: ignore[unresolved-attribute]
+            pd.core.arrays.integer.NumericDtype, "__from_arrow__")
 
     result = arr.to_pandas()
     assert _get_mgr(result).blocks[0].values.dtype == np.dtype("int64")

@@ -171,54 +171,54 @@ _Scalar_CoT = TypeVar("_Scalar_CoT", bound=lib.Scalar, covariant=True)
 _ScalarT = TypeVar("_ScalarT", bound=lib.Scalar)
 _ArrayT = TypeVar("_ArrayT", bound=lib.Array | lib.ChunkedArray)
 _ScalarOrArrayT = TypeVar("_ScalarOrArrayT", bound=lib.Array | lib.Scalar | lib.ChunkedArray)
-ArrayOrChunkedArray: TypeAlias = lib.Array[_Scalar_CoT] | lib.ChunkedArray[_Scalar_CoT]
+ArrayOrChunkedArray: TypeAlias = Union[lib.Array[_Scalar_CoT], lib.ChunkedArray[_Scalar_CoT]]
 ScalarOrArray: TypeAlias = ArrayOrChunkedArray[_Scalar_CoT] | _Scalar_CoT
 
-SignedIntegerScalar: TypeAlias = (
-    lib.Scalar[lib.Int8Type]
-    | lib.Scalar[lib.Int16Type]
-    | lib.Scalar[lib.Int32Type]
-    | lib.Scalar[lib.Int64Type]
-)
-UnsignedIntegerScalar: TypeAlias = (
-    lib.Scalar[lib.UInt8Type]
-    | lib.Scalar[lib.UInt16Type]
-    | lib.Scalar[lib.Uint32Type]
-    | lib.Scalar[lib.UInt64Type]
-)
+SignedIntegerScalar: TypeAlias = Union[
+    lib.Scalar[lib.Int8Type],
+    lib.Scalar[lib.Int16Type],
+    lib.Scalar[lib.Int32Type],
+    lib.Scalar[lib.Int64Type],
+]
+UnsignedIntegerScalar: TypeAlias = Union[
+    lib.Scalar[lib.UInt8Type],
+    lib.Scalar[lib.UInt16Type],
+    lib.Scalar[lib.Uint32Type],
+    lib.Scalar[lib.UInt64Type],
+]
 IntegerScalar: TypeAlias = SignedIntegerScalar | UnsignedIntegerScalar
-FloatScalar: TypeAlias = (
-    lib.Scalar[lib.Float16Type] | lib.Scalar[lib.Float32Type] | lib.Scalar[lib.Float64Type]
-)
-DecimalScalar: TypeAlias = (
-    lib.Scalar[lib.Decimal32Type]
-    | lib.Scalar[lib.Decimal64Type]
-    | lib.Scalar[lib.Decimal128Type]
-    | lib.Scalar[lib.Decimal256Type]
-)
+FloatScalar: TypeAlias = Union[
+    lib.Scalar[lib.Float16Type], lib.Scalar[lib.Float32Type], lib.Scalar[lib.Float64Type],
+]
+DecimalScalar: TypeAlias = Union[
+    lib.Scalar[lib.Decimal32Type],
+    lib.Scalar[lib.Decimal64Type],
+    lib.Scalar[lib.Decimal128Type],
+    lib.Scalar[lib.Decimal256Type],
+]
 NonFloatNumericScalar: TypeAlias = IntegerScalar | DecimalScalar
 NumericScalar: TypeAlias = IntegerScalar | FloatScalar | DecimalScalar
-BinaryScalar: TypeAlias = (
-    lib.Scalar[lib.BinaryType]
-    | lib.Scalar[lib.LargeBinaryType]
-    | lib.Scalar[lib.FixedSizeBinaryType]
-)
-StringScalar: TypeAlias = lib.Scalar[lib.StringType] | lib.Scalar[lib.LargeStringType]
+BinaryScalar: TypeAlias = Union[
+    lib.Scalar[lib.BinaryType],
+    lib.Scalar[lib.LargeBinaryType],
+    lib.Scalar[lib.FixedSizeBinaryType],
+]
+StringScalar: TypeAlias = Union[lib.Scalar[lib.StringType], lib.Scalar[lib.LargeStringType]]
 StringOrBinaryScalar: TypeAlias = StringScalar | BinaryScalar
 _ListScalar: TypeAlias = lib.ListViewScalar[_DataTypeT] | lib.FixedSizeListScalar[_DataTypeT, Any]
 _LargeListScalar: TypeAlias = lib.LargeListScalar[_DataTypeT] | lib.LargeListViewScalar[_DataTypeT]
 ListScalar: TypeAlias = (
     lib.ListScalar[_DataTypeT] | _ListScalar[_DataTypeT] | _LargeListScalar[_DataTypeT]
 )
-TemporalScalar: TypeAlias = (
-    lib.Date32Scalar
-    | lib.Date64Scalar
-    | lib.Time32Scalar[Any]
-    | lib.Time64Scalar[Any]
-    | lib.TimestampScalar[Any]
-    | lib.DurationScalar[Any]
-    | lib.MonthDayNanoIntervalScalar
-)
+TemporalScalar: TypeAlias = Union[
+    lib.Date32Scalar,
+    lib.Date64Scalar,
+    lib.Time32Scalar[Any],
+    lib.Time64Scalar[Any],
+    lib.TimestampScalar[Any],
+    lib.DurationScalar[Any],
+    lib.MonthDayNanoIntervalScalar
+]
 NumericOrDurationScalar: TypeAlias = NumericScalar | lib.DurationScalar
 NumericOrTemporalScalar: TypeAlias = NumericScalar | TemporalScalar
 
