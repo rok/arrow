@@ -27,13 +27,13 @@ import hypothesis.strategies as st
 try:
     import hypothesis.extra.pytz as tzst
 except ImportError:
-    tzst = None
+    tzst = None  # type: ignore[assignment]
 import weakref
 
 try:
     import numpy as np
 except ImportError:
-    np = None
+    pass
 import pyarrow as pa
 import pyarrow.types as types
 import pyarrow.tests.strategies as past
@@ -1322,6 +1322,7 @@ def test_field_modified_copies():
     assert f0.equals(f0_)
 
 
+@pytest.mark.numpy
 def test_is_integer_value():
     assert pa.types.is_integer_value(1)
     if np is not None:

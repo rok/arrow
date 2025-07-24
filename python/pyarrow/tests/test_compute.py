@@ -31,12 +31,12 @@ import textwrap
 try:
     import numpy as np
 except ImportError:
-    np = None
+    np = None  # type: ignore[assignment]
 
 try:
     import pandas as pd
 except ImportError:
-    pd = None
+    pd = None  # type: ignore[assignment]
 
 import pyarrow as pa
 import pyarrow.compute as pc

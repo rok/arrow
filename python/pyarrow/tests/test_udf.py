@@ -21,7 +21,7 @@ import pytest
 try:
     import numpy as np
 except ImportError:
-    np = None
+    np = None  # type: ignore[assignment]
 
 import pyarrow as pa
 from pyarrow import compute as pc

@@ -32,7 +32,7 @@ from urllib.parse import quote
 try:
     import numpy as np
 except ImportError:
-    np = None
+    np = None  # type: ignore[assignment]
 import pytest
 
 import pyarrow as pa
@@ -49,7 +49,7 @@ from pyarrow.tests.util import (FSProtocolClass, ProxyHandler,
 try:
     import pandas as pd
 except ImportError:
-    pd = None
+    pd = None  # type: ignore[assignment]
 
 try:
     import pyarrow.dataset as ds

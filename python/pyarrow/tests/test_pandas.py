@@ -38,7 +38,7 @@ try:
             VisibleDeprecationWarning as _np_VisibleDeprecationWarning
         )
 except ImportError:
-    np = None
+    np = None  # type: ignore[assignment]
 
 from pyarrow.pandas_compat import get_logical_type, _pandas_api
 from pyarrow.tests.util import invoke_script, random_ascii, rands

@@ -24,7 +24,7 @@ import sys
 try:
     import numpy as np
 except ImportError:
-    np = None
+    np = None  # type: ignore[assignment]
 import pytest
 import unittest.mock as mock
 
@@ -48,7 +48,7 @@ try:
     import pandas.testing as tm
 
 except ImportError:
-    pd = tm = None
+    pd = tm = None  # type: ignore[assignment]
 
 
 # Marks all of the tests in this module
