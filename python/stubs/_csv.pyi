@@ -96,7 +96,7 @@ class ReadOptions(lib._Weakrefable):
     3: [[2022-03-03,2022-03-04]]
     """
 
-    use_threads: bool = field(default=True)
+    use_threads: bool = field(default=True, kw_only=False)
     block_size: int | None = None
     skip_rows: int = 0
     skip_rows_after_names: int = 0
@@ -182,7 +182,7 @@ class ParseOptions(lib._Weakrefable):
     entry: [[2022-03-01,2022-03-02,2022-03-03,2022-03-04]]
     """
 
-    delimiter: str = field(default=",")
+    delimiter: str = field(default=",", kw_only=False)
     quote_char: str | Literal[False] = '"'
     double_quote: bool = True
     escape_char: str | Literal[False] = False
@@ -397,7 +397,7 @@ class ConvertOptions(lib._Weakrefable):
     fast: [[true,true,false,false,null]]
     """
 
-    check_utf8: bool = field(default=True)
+    check_utf8: bool = field(default=True, kw_only=False)
     column_types: lib.Schema | dict | None = None
     null_values: list[str] | None = None
     true_values: list[str] | None = None
@@ -438,7 +438,7 @@ class WriteOptions(lib._Weakrefable):
           will raise an error.
     """
 
-    include_header: bool = field(default=True)
+    include_header: bool = field(default=True, kw_only=False)
     batch_size: int = 1024
     delimiter: str = ","
     quoting_style: Literal["needed", "all_valid", "none"] = "needed"
