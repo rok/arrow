@@ -65,16 +65,16 @@ except ImportError:
             pass
 
     class FlightClient(MockContextManager):
-        def get_flight_info(self, **kwargs):
+        def get_flight_info(self, *args, **kwargs):
             pass
 
-        def do_action(self, **kwargs):
+        def do_action(self, *args, **kwargs):
             pass
 
-        def do_get(self, **kwargs):
+        def do_get(self, *args, **kwargs):
             pass
 
-        def do_put(self, **kwargs):
+        def do_put(self, *args, **kwargs):
             pass
 
         def close(self):
