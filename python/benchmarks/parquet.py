@@ -21,7 +21,7 @@ import pyarrow as pa
 try:
     import pyarrow.parquet as pq
 except ImportError:
-    pq = None
+    pass
 from pyarrow.tests.util import rands
 
 

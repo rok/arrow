@@ -38,7 +38,7 @@ try:
 
     from pyarrow.tests.parquet.common import alltypes_sample
 except ImportError:
-    pd = tm = None  # type: ignore[assignment]
+    pass
 
 
 # Marks all of the tests in this module

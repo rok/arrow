@@ -31,12 +31,12 @@ import textwrap
 try:
     import numpy as np
 except ImportError:
-    np = None  # type: ignore[assignment]
+    pass
 
 try:
     import pandas as pd
 except ImportError:
-    pd = None  # type: ignore[assignment]
+    pass
 
 import pyarrow as pa
 import pyarrow.compute as pc
@@ -45,7 +45,7 @@ from pyarrow.lib import ArrowNotImplementedError  # type: ignore[unresolved_impo
 try:
     import pyarrow.substrait as pas
 except ImportError:
-    pas = None
+    pass
 
 exported_functions = [
     func for (name, func) in sorted(pc.__dict__.items())

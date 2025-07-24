@@ -29,12 +29,12 @@ try:
     import scipy
     from scipy.sparse import csr_array, coo_array, csr_matrix, coo_matrix
 except ImportError:
-    scipy = None  # type: ignore[assignment]
+    pass
 
 try:
     import sparse  # type: ignore[unresolved_import]
 except ImportError:
-    sparse = None
+    pass
 
 
 tensor_type_pairs = [

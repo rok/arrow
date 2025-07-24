@@ -24,7 +24,7 @@ import pyarrow as pa
 try:
     from pyarrow.cffi import ffi
 except ImportError:
-    ffi = None  # type: ignore[assignment]
+    pass
 
 import pytest
 
@@ -32,7 +32,7 @@ try:
     import pandas as pd
     import pandas.testing as tm
 except ImportError:
-    pd = tm = None  # type: ignore[assignment]
+    pass
 
 
 needs_cffi = pytest.mark.skipif(ffi is None,

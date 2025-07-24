@@ -24,7 +24,7 @@ from collections.abc import Sequence, Mapping
 try:
     import numpy as np
 except ImportError:
-    np = None  # type: ignore[assignment]
+    pass
 
 import pyarrow as pa
 import pyarrow.compute as pc

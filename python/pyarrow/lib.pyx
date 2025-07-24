@@ -24,7 +24,7 @@ import decimal as _pydecimal
 try:
     import numpy as np
 except ImportError:
-    np = None
+    pass
 import os
 import sys
 
