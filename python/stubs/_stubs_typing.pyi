@@ -2,7 +2,7 @@ import datetime as dt
 
 from collections.abc import Sequence
 from decimal import Decimal
-from typing import Any, Collection, Literal, Protocol, TypeAlias, TypeVar
+from typing import Any, Collection, Literal, Protocol, TypeAlias, TypeVar, Union
 
 import numpy as np
 
@@ -30,12 +30,12 @@ NullEncoding: TypeAlias = Literal["mask", "encode"]
 NullSelectionBehavior: TypeAlias = Literal["drop", "emit_null"]
 Mask: TypeAlias = Sequence[bool | None] | NDArray[np.bool_] | BooleanArray
 Indices: TypeAlias = Sequence[int] | NDArray[np.integer[Any]] | IntegerArray
-PyScalar: TypeAlias = (
-    bool | int | float | Decimal | str | bytes | dt.date | dt.datetime | dt.time | dt.timedelta
-)
+PyScalar: TypeAlias = Union[
+    bool, int, float, Decimal, str, bytes, dt.date, dt.datetime, dt.time, dt.timedelta
+]
 
 _T = TypeVar("_T")
-SingleOrList: TypeAlias = list[_T] | _T
+SingleOrList: TypeAlias = Union[list[_T], _T]
 
 class SupportEq(Protocol):
     def __eq__(self, other) -> bool: ...
@@ -52,14 +52,14 @@ class SupportLe(Protocol):
 class SupportGe(Protocol):
     def __ge__(self, other) -> bool: ...
 
-FilterTuple: TypeAlias = (
-    tuple[str, Literal["=", "==", "!="], SupportEq]
-    | tuple[str, Literal["<"], SupportLt]
-    | tuple[str, Literal[">"], SupportGt]
-    | tuple[str, Literal["<="], SupportLe]
-    | tuple[str, Literal[">="], SupportGe]
-    | tuple[str, Literal["in", "not in"], Collection]
-)
+FilterTuple: TypeAlias = Union[
+    tuple[str, Literal["=", "==", "!="], SupportEq],
+    tuple[str, Literal["<"], SupportLt],
+    tuple[str, Literal[">"], SupportGt],
+    tuple[str, Literal["<="], SupportLe],
+    tuple[str, Literal[">="], SupportGe],
+    tuple[str, Literal["in", "not in"], Collection]
+]
 
 class Buffer(Protocol):
     def __buffer__(self, flags: int, /) -> memoryview: ...
