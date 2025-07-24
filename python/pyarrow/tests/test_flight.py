@@ -49,8 +49,14 @@ try:
         ClientMiddleware, ClientMiddlewareFactory,
     )
 except ImportError:
+    class context_like(object):
+        def __enter__(self):
+            return self
+        def __exit__(self, exc_type, exc_value, traceback):
+            pass
+
     flight = None
-    FlightClient, FlightServerBase = object, object
+    FlightClient, FlightServerBase = context_like, context_like
     ServerAuthHandler, ClientAuthHandler = object, object
     ServerMiddleware, ServerMiddlewareFactory = object, object
     ClientMiddleware, ClientMiddlewareFactory = object, object
