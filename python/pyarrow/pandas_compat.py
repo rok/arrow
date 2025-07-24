@@ -25,7 +25,7 @@ import concurrent.futures.thread  # noqa
 from copy import deepcopy
 import decimal
 from itertools import zip_longest
-import json
+from json import dumps as json_dumps
 import operator
 import re
 import warnings
@@ -276,7 +276,7 @@ def construct_metadata(columns_to_convert, df, column_names, index_levels,
         index_descriptors = index_column_metadata = column_indexes = []
 
     return {
-        b'pandas': json.dumps({
+        b'pandas': json_dumps({
             'index_columns': index_descriptors,
             'column_indexes': column_indexes,
             'columns': column_metadata + index_column_metadata,
@@ -511,7 +511,7 @@ def _get_index_level(df, name):
 def _level_name(name):
     # preserve type when default serializable, otherwise str it
     try:
-        json.dumps(name)
+        json_dumps(name)
         return name
     except TypeError:
         return str(name)
@@ -755,8 +755,8 @@ def _reconstruct_block(item, columns=None, extension_columns=None, return_block=
         # create ExtensionBlock
         arr = item['py_array']
         assert len(placement) == 1
-        name = columns[placement[0]]
-        pandas_dtype = extension_columns[name]
+        name = columns.get(placement[0], None)
+        pandas_dtype = extension_columns.get(name, None)
         if not hasattr(pandas_dtype, '__from_arrow__'):
             raise ValueError("This column does not support to be converted "
                              "to a pandas ExtensionArray")
@@ -826,7 +826,7 @@ def table_to_dataframe(
         axes = [columns, index]
         mgr = BlockManager(blocks, axes)
         if _pandas_api.is_ge_v21():
-            df = DataFrame._from_mgr(mgr, mgr.axes)
+            df = DataFrame._from_mgr(mgr, mgr.axes)  # type: ignore[unresolved-attribute]
         else:
             df = DataFrame(mgr)
         return df

@@ -1,4 +1,4 @@
-import cffi
+from cffi import FFI
 
 c_source: str
-ffi: cffi.FFI
+ffi: FFI
