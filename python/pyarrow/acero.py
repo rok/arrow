@@ -22,11 +22,11 @@
 # distutils: language = c++
 # cython: language_level = 3
 
-from pyarrow.lib import Table, RecordBatch, array
+from pyarrow.lib import Table, RecordBatch, array  # type: ignore[unresolved_import]
 from pyarrow.compute import Expression, field
 
 try:
-    from pyarrow._acero import (  # noqa
+    from pyarrow._acero import (  # type: ignore[unresolved_import]  # noqa
         Declaration,
         ExecNodeOptions,
         TableSourceNodeOptions,
@@ -45,7 +45,7 @@ except ImportError as exc:
 
 try:
     import pyarrow.dataset as ds
-    from pyarrow._dataset import ScanNodeOptions
+    from pyarrow._dataset import ScanNodeOptions  # type: ignore[unresolved_import]
 except ImportError:
     class DatasetModuleStub:
         class Dataset:

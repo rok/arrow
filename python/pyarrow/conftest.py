@@ -21,7 +21,7 @@ import os
 import pyarrow as pa
 from pyarrow import Codec
 from pyarrow import fs
-from pyarrow.lib import is_threading_enabled
+from pyarrow.lib import is_threading_enabled  # type: ignore[unresolved_import]
 from pyarrow.tests.util import windows_has_tzdata
 import sys
 
@@ -120,13 +120,13 @@ except ImportError:
     pass
 
 try:
-    import fastparquet  # noqa
+    import fastparquet  # type: ignore[unresolved_import]  # noqa
     defaults['fastparquet'] = True
 except ImportError:
     pass
 
 try:
-    import pyarrow.gandiva  # noqa
+    import pyarrow.gandiva  # type: ignore[unresolved_import]  # noqa
     defaults['gandiva'] = True
 except ImportError:
     pass

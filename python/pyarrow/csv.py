@@ -16,7 +16,7 @@
 # under the License.
 
 
-from pyarrow._csv import (  # noqa
+from pyarrow._csv import (  # type: ignore[unresolved_import]  # noqa
     ReadOptions, ParseOptions, ConvertOptions, ISO8601,
     open_csv, read_csv, CSVStreamingReader, write_csv,
     WriteOptions, CSVWriter, InvalidRow)

@@ -34,7 +34,7 @@ except ImportError:
     coo_array = None
 
 try:
-    import sparse
+    import sparse  # type: ignore[unresolved_import]
 except ImportError:
     sparse = None
 

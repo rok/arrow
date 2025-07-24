@@ -120,4 +120,4 @@ missing-argument = "ignore"
 call-non-callable = "ignore"
 
 [tool.ty.src]
-exclude = ["stubs", "pyarrow/tests"]
+exclude = ["stubs"]
