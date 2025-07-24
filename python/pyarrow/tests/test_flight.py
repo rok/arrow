@@ -50,8 +50,16 @@ try:
         ClientMiddleware, ClientMiddlewareFactory,
     )
 except ImportError:
+    class context_like(object):
+        def __enter__(self):
+            return self
+        def __exit__(self, exc_type, exc_value, traceback):
+            pass
+
     flight = None
     class MockContextManager:
+        def __init__(self, *args, **kwargs):
+          pass
         def __enter__(self):
             return self
         def __exit__(self, exc_type, exc_val, exc_tb):
@@ -70,7 +78,6 @@ except ImportError:
             pass
         def close(self):
             pass
-    FlightClient = object
     ServerAuthHandler, ClientAuthHandler = object, object
     ServerMiddleware, ServerMiddlewareFactory = object, object
     ClientMiddleware, ClientMiddlewareFactory = object, object

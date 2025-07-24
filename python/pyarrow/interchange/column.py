@@ -20,7 +20,6 @@ from __future__ import annotations
 import enum
 from typing import (
     Any,
-    Dict,
     Iterable,
     Optional,
     Tuple,
@@ -314,7 +313,13 @@ class _PyArrowColumn:
             kind = DtypeKind.CATEGORICAL
             arr = self._col
             indices_dtype = arr.indices.type
-            _, f_string = _PYARROW_KINDS.get(indices_dtype)
+            mapping = _PYARROW_KINDS.get(indices_dtype)
+            if mapping is None:
+                raise ValueError(
+                    f"Dictionary index data type {indices_dtype} "
+                    "not supported by interchange protocol"
+                )
+            _, f_string = mapping
             return kind, bit_width, f_string, Endianness.NATIVE
         else:
             kind, f_string = _PYARROW_KINDS.get(dtype, (None, None))
@@ -379,7 +384,7 @@ class _PyArrowColumn:
             return ColumnNullType.USE_BITMASK, 0
 
     @property
-    def null_count(self) -> int:
+    def null_count(self) -> int | None:
         """
         Number of null elements, if known.
 
@@ -390,7 +395,7 @@ class _PyArrowColumn:
         return n
 
     @property
-    def metadata(self) -> Dict[str, Any]:
+    def metadata(self) -> None:
         """
         The metadata for the column. See `DataFrame.metadata` for more details.
         """
@@ -466,7 +471,7 @@ class _PyArrowColumn:
 
     def _get_data_buffer(
         self,
-    ) -> Tuple[_PyArrowBuffer, Any]:  # Any is for self.dtype tuple
+    ) -> Tuple[_PyArrowBuffer, Any] | None:  # Any is for self.dtype tuple
         """
         Return the buffer containing the data and the buffer's
         associated dtype.
@@ -505,7 +510,7 @@ class _PyArrowColumn:
                 "There are no missing values so "
                 "does not have a separate mask")
 
-    def _get_offsets_buffer(self) -> Tuple[_PyArrowBuffer, Any]:
+    def _get_offsets_buffer(self) -> Tuple[_PyArrowBuffer, Any] | None:
         """
         Return the buffer containing the offset values for variable-size binary
         data (e.g., variable-length strings) and the buffer's associated dtype.
