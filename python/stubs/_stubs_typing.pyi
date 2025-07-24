@@ -2,7 +2,10 @@ import datetime as dt
 
 from collections.abc import Sequence
 from decimal import Decimal
-from typing import Any, Collection, Literal, Protocol, TypeAlias, TypeVar
+from typing import (
+    Any, Collection, Literal, Protocol, TypeVar,
+    TypeAlias  # type: ignore[unresolved_import]
+)
 
 import numpy as np
 

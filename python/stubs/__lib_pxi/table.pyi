@@ -29,7 +29,7 @@ import numpy as np
 import pandas as pd
 
 from numpy.typing import NDArray
-from pyarrow._compute import (
+from pyarrow._compute import (  # type: ignore[unresolved_import]
     CastOptions,
     CountOptions,
     FunctionOptions,
@@ -37,7 +37,7 @@ from pyarrow._compute import (
     TDigestOptions,
     VarianceOptions,
 )
-from pyarrow._stubs_typing import (
+from pyarrow._stubs_typing import (  # type: ignore[unresolved_import]
     Indices,
     Mask,
     NullEncoding,
@@ -47,12 +47,15 @@ from pyarrow._stubs_typing import (
     SupportArrowDeviceArray,
     SupportArrowStream,
 )
-from pyarrow.compute import ArrayOrChunkedArray, Expression
+from pyarrow.compute import ArrayOrChunkedArray, Expression  # type: ignore[unresolved_import]
 from pyarrow.interchange.dataframe import _PyArrowDataFrame
-from pyarrow.lib import Device, Field, MemoryManager, MemoryPool, MonthDayNano, Schema
+from pyarrow.lib import Device, Field, MemoryManager, MemoryPool, MonthDayNano, Schema  # type: ignore[unresolved_import]
 
 from . import array, scalar, types
-from .array import Array, NullableCollection, StructArray, _CastAs, _PandasConvertible
+from .array import (
+    Array, StructArray, _CastAs, _PandasConvertible,
+    NullableCollection,  # type: ignore[unresolved_import]
+)
 from .device import DeviceAllocationType
 from .io import Buffer
 from .ipc import RecordBatchReader

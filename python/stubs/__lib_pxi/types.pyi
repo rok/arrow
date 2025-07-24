@@ -14,8 +14,8 @@ from typing import Any, Generic, Iterable, Iterator, Literal, overload
 import numpy as np
 import pandas as pd
 
-from pyarrow._stubs_typing import SupportArrowSchema
-from pyarrow.lib import (
+from pyarrow._stubs_typing import SupportArrowSchema  # type: ignore[unresolved_import]
+from pyarrow.lib import (  # type: ignore[unresolved_import]
     Array,
     ChunkedArray,
     ExtensionArray,

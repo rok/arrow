@@ -11,7 +11,7 @@ if sys.version_info >= (3, 10):
 else:
     from typing_extensions import TypeAlias
 
-from pyarrow.lib import (
+from pyarrow.lib import (  # type: ignore[unresolved_import]
     BinaryType,
     BinaryViewType,
     BoolType,

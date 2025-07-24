@@ -7,7 +7,7 @@ else:
 from typing import Any, Iterable, Sequence
 
 from pyarrow.interchange.column import _PyArrowColumn
-from pyarrow.lib import RecordBatch, Table
+from pyarrow.lib import RecordBatch, Table  # type: ignore[unresolved_import]
 
 class _PyArrowDataFrame:
     """

@@ -1,6 +1,6 @@
 import enum
 
-from pyarrow.lib import _Weakrefable
+from pyarrow.lib import _Weakrefable  # type: ignore[unresolved_import]
 
 class DeviceAllocationType(enum.Flag):
     CPU = enum.auto()

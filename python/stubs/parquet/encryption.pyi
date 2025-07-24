@@ -1,4 +1,4 @@
-from pyarrow._parquet_encryption import (
+from pyarrow._parquet_encryption import (  # type: ignore[unresolved_import]
     CryptoFactory,
     DecryptionConfiguration,
     EncryptionConfiguration,

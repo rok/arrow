@@ -1,4 +1,4 @@
-from pyarrow._fs import (  # noqa
+from pyarrow._fs import (  # type: ignore[unresolved_import]  # noqa
     FileSelector,
     FileType,
     FileInfo,
@@ -10,10 +10,10 @@ from pyarrow._fs import (  # noqa
     PyFileSystem,
     SupportedFileSystem,
 )
-from pyarrow._azurefs import AzureFileSystem
-from pyarrow._hdfs import HadoopFileSystem
-from pyarrow._gcsfs import GcsFileSystem
-from pyarrow._s3fs import (  # noqa
+from pyarrow._azurefs import AzureFileSystem  # type: ignore[unresolved_import]
+from pyarrow._hdfs import HadoopFileSystem  # type: ignore[unresolved_import]
+from pyarrow._gcsfs import GcsFileSystem  # type: ignore[unresolved_import]
+from pyarrow._s3fs import (  # type: ignore[unresolved_import]  # noqa
     AwsDefaultS3RetryStrategy,
     AwsStandardS3RetryStrategy,
     S3FileSystem,

@@ -1,8 +1,8 @@
 import enum
 
-from typing import Any, Iterable, TypeAlias, TypedDict
+from typing import Any, Iterable, TypeAlias, TypedDict  # type: ignore[unresolved_import]
 
-from pyarrow.lib import Array, ChunkedArray
+from pyarrow.lib import Array, ChunkedArray  # type: ignore[unresolved_import]
 
 from .buffer import _PyArrowBuffer
 

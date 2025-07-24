@@ -11,8 +11,8 @@ from typing import Iterable, Iterator, Literal, Mapping, NamedTuple
 
 import pandas as pd
 
-from pyarrow._stubs_typing import SupportArrowStream, SupportPyBuffer
-from pyarrow.lib import MemoryPool, RecordBatch, Schema, Table, Tensor, _Weakrefable
+from pyarrow._stubs_typing import SupportArrowStream, SupportPyBuffer  # type: ignore[unresolved_import]
+from pyarrow.lib import MemoryPool, RecordBatch, Schema, Table, Tensor, _Weakrefable  # type: ignore[unresolved_import]
 
 from .io import Buffer, Codec, NativeFile
 from .types import DictionaryMemo, KeyValueMetadata

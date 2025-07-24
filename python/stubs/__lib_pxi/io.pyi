@@ -16,8 +16,8 @@ else:
 
 from typing import Any, Literal, SupportsIndex, overload
 
-from pyarrow._stubs_typing import Compression, SupportPyBuffer
-from pyarrow.lib import MemoryPool, _Weakrefable
+from pyarrow._stubs_typing import Compression, SupportPyBuffer  # type: ignore[unresolved_import]
+from pyarrow.lib import MemoryPool, _Weakrefable  # type: ignore[unresolved_import]
 
 from .device import Device, DeviceAllocationType, MemoryManager
 from .types import KeyValueMetadata

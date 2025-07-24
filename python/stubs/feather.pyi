@@ -3,8 +3,8 @@ from typing import IO, Literal
 import pandas as pd
 
 from _typeshed import StrPath
-from pyarrow._feather import FeatherError
-from pyarrow.lib import Table
+from pyarrow._feather import FeatherError  # type: ignore[unresolved_import]
+from pyarrow.lib import Table  # type: ignore[unresolved_import]
 
 __all__ = [
     "FeatherError",

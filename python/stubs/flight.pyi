@@ -1,4 +1,4 @@
-from pyarrow._flight import (
+from pyarrow._flight import (  # type: ignore[unresolved_import]
     Action,
     ActionType,
     BasicAuth,
