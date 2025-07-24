@@ -27,7 +27,7 @@ import pytest
 try:
     import numpy as np
 except ImportError:
-    np = None  # type: ignore[assignment]
+    pass
 
 import pyarrow as pa
 from pyarrow.vendored.version import Version
@@ -1882,7 +1882,7 @@ def test_bool8_from_numpy_conversion():
         ValueError,
         match="Cannot convert 0-D array to bool8 array",
     ):
-        pa.Bool8Array.from_numpy(np.bool_())
+        pa.Bool8Array.from_numpy(np.bool_())  # type: ignore[no-matching-overload]
 
     # must use compatible storage type
     with pytest.raises(

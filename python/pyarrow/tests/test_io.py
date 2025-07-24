@@ -33,7 +33,7 @@ import weakref
 try:
     import numpy as np
 except ImportError:
-    np = None  # type: ignore[assignment]
+    pass
 
 from pyarrow.util import guid
 from pyarrow import Codec

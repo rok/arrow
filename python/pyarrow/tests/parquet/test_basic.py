@@ -33,7 +33,7 @@ try:
     import pyarrow.parquet as pq
     from pyarrow.tests.parquet.common import _read_table, _write_table
 except ImportError:
-    pq = None
+    pass
 
 
 try:
@@ -43,12 +43,12 @@ try:
     from pyarrow.tests.pandas_examples import dataframe_with_lists
     from pyarrow.tests.parquet.common import alltypes_sample
 except ImportError:
-    pd = tm = None  # type: ignore[assignment]
+    pass
 
 try:
     import numpy as np
 except ImportError:
-    np = None  # type: ignore[assignment]
+    pass
 
 # Marks all of the tests in this module
 # Ignore these with pytest ... -m 'not parquet'

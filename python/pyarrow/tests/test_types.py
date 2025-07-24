@@ -27,7 +27,7 @@ import hypothesis.strategies as st
 try:
     import hypothesis.extra.pytz as tzst
 except ImportError:
-    tzst = None  # type: ignore[assignment]
+    pass
 import weakref
 
 try:

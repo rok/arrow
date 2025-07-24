@@ -29,8 +29,7 @@ try:
     import pyarrow.parquet as pq
     import pyarrow.dataset as ds
 except ImportError:
-    pq = None
-    ds = None
+    pass
 
 try:
     from pyarrow.tests.parquet.encryption import InMemoryKmsClient

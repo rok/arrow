@@ -39,7 +39,7 @@ try:
     import pyarrow.dataset as ds
     from pyarrow.acero import ScanNodeOptions
 except ImportError:
-    ds = None
+    pass
 
 pytestmark = pytest.mark.acero
 

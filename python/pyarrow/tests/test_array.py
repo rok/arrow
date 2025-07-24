@@ -30,7 +30,7 @@ import weakref
 try:
     import numpy as np
 except ImportError:
-    np = None  # type: ignore[assignment]
+    pass
 
 import pyarrow as pa
 import pyarrow.tests.strategies as past
@@ -551,8 +551,8 @@ def test_arange():
         result = pa.arange(*case)
         result.validate(full=True)
 
-        # type: ignore[no-matching-overload]
-        assert result.equals(pa.array(list(range(*case)), type=pa.int64()))
+        assert result.equals(pa.array(list(range(*case)), type=pa.int64())) \
+            # type: ignore[no-matching-overload]
 
     # Validate memory_pool keyword argument
     result = pa.arange(-1, 101, memory_pool=pa.default_memory_pool())
