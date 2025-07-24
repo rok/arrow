@@ -2216,7 +2216,8 @@ def test_dictionary_partitioning_outer_nulls_raises(tempdir):
 def test_positional_keywords_raises(tempdir):
     table = pa.table({'a': ['x', 'y', None], 'b': ['x', 'y', 'z']})
     with pytest.raises(TypeError):
-        ds.write_dataset(table, tempdir, "basename-{i}.arrow")
+        ds.write_dataset(table, tempdir, "basename-{i}.arrow") \
+            # type: ignore[too-many-positional-arguments]
 
 
 @pytest.mark.parquet
