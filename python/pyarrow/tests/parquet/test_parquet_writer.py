@@ -25,7 +25,7 @@ try:
     from pyarrow.tests.parquet.common import (_read_table, _test_dataframe,
                                               _range_integers)
 except ImportError:
-    pq = None
+    pass
 
 
 try:

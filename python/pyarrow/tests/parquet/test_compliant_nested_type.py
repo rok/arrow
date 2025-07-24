@@ -28,8 +28,6 @@ except ImportError:
 
 try:
     import pandas as pd
-    import pandas.testing as tm
-
     from pyarrow.tests.parquet.common import _roundtrip_pandas_dataframe
 except ImportError:
     pass

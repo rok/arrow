@@ -30,12 +30,10 @@ try:
     import pyarrow.parquet as pq
     from pyarrow.tests.parquet.common import _write_table
 except ImportError:
-    pq = None
+    pass
 
 try:
-    import pandas as pd
     import pandas.testing as tm
-
     from pyarrow.tests.parquet.common import alltypes_sample
 except ImportError:
     pass
