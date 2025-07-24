@@ -191,7 +191,7 @@ def test_visit_strings(tmpdir):
 
     strings = ['a', 'b', 'c']
     visited = []
-    mod._visit_strings(strings, visited.append) #  type: ignore[unresolved-attribute]
+    mod._visit_strings(strings, visited.append)  # type: ignore[unresolved-attribute]
 
     assert visited == strings
 
@@ -200,4 +200,4 @@ def test_visit_strings(tmpdir):
             if s == 'b':
                 raise ValueError('wtf')
 
-        mod._visit_strings(strings, raise_on_b) #  type: ignore[unresolved-attribute]
+        mod._visit_strings(strings, raise_on_b)  # type: ignore[unresolved-attribute]

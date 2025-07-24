@@ -1353,11 +1353,11 @@ def test_cpp_extension_in_python(tmpdir):
     sys.path.insert(0, str(tmpdir))
     mod = __import__('extensions')
 
-    uuid_type = mod._make_uuid_type() #  type: ignore[unresolved-attribute]
+    uuid_type = mod._make_uuid_type()  # type: ignore[unresolved-attribute]
     assert uuid_type.extension_name == "example-uuid"
     assert uuid_type.storage_type == pa.binary(16)
 
-    array = mod._make_uuid_array() #  type: ignore[unresolved-attribute]
+    array = mod._make_uuid_array()  # type: ignore[unresolved-attribute]
     assert array.type == uuid_type
     assert array.to_pylist() == [b'abcdefghijklmno0', b'0onmlkjihgfedcba']
     assert array[0].as_py() == b'abcdefghijklmno0'

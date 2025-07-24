@@ -53,29 +53,39 @@ except ImportError:
     class context_like(object):
         def __enter__(self):
             return self
+
         def __exit__(self, exc_type, exc_value, traceback):
             pass
 
     flight = None
+
     class MockContextManager:
         def __init__(self, *args, **kwargs):
-          pass
+            pass
+
         def __enter__(self):
             return self
+
         def __exit__(self, exc_type, exc_val, exc_tb):
             pass
+
     class FlightServerBase(MockContextManager):
         def serve(self):
             pass
+
     class FlightClient(MockContextManager):
         def get_flight_info(self, **kwargs):
             pass
+
         def do_action(self, **kwargs):
             pass
+
         def do_get(self, **kwargs):
             pass
+
         def do_put(self, **kwargs):
             pass
+
         def close(self):
             pass
     ServerAuthHandler, ClientAuthHandler = object, object
@@ -1770,7 +1780,7 @@ def test_flight_do_put_limit():
             with pytest.raises(flight.FlightWriteSizeExceededError,
                                match="exceeded soft limit") as excinfo:
                 writer.write_batch(large_batch)
-            assert excinfo.value.limit == 4096 #  type: ignore[unresolved-attribute]
+            assert excinfo.value.limit == 4096  # type: ignore[unresolved-attribute]
             smaller_batches = [
                 large_batch.slice(0, 384),
                 large_batch.slice(384),

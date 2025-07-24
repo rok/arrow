@@ -828,7 +828,8 @@ def table_to_dataframe(
         axes = [columns, index]
         mgr = BlockManager(blocks, axes)
         if _pandas_api.is_ge_v21():
-            df = DataFrame._from_mgr(mgr, mgr.axes)  # type: ignore[unresolved-attribute]
+            # type: ignore[unresolved-attribute]
+            df = DataFrame._from_mgr(mgr, mgr.axes)
         else:
             df = DataFrame(mgr)
         return df
