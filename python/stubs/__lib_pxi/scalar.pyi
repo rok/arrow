@@ -16,8 +16,8 @@ from typing import Any, Generic, Iterator, Literal, Mapping, overload
 
 import numpy as np
 
-from pyarrow._compute import CastOptions
-from pyarrow.lib import Array, Buffer, MemoryPool, MonthDayNano, Tensor, _Weakrefable
+from pyarrow._compute import CastOptions  # type: ignore[unresolved_import]
+from pyarrow.lib import Array, Buffer, MemoryPool, MonthDayNano, Tensor, _Weakrefable  # type: ignore[unresolved_import]
 from typing_extensions import Protocol, TypeVar
 
 from . import types

@@ -1,4 +1,4 @@
-from pyarrow._csv import (
+from pyarrow._csv import (  # type: ignore[unresolved_import]
     ISO8601,
     ConvertOptions,
     CSVStreamingReader,

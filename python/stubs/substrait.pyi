@@ -1,4 +1,4 @@
-from pyarrow._substrait import (
+from pyarrow._substrait import (  # type: ignore[unresolved_import]
     BoundExpressions,
     SubstraitSchema,
     deserialize_expressions,

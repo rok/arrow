@@ -1,5 +1,5 @@
 from types import ModuleType
-from typing import Any, Iterable, TypeGuard
+from typing import Any, Iterable, TypeGuard  # type: ignore[unresolved_import]
 
 import pandas
 

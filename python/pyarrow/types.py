@@ -20,11 +20,11 @@
 
 from enum import IntEnum
 
-from pyarrow.lib import (is_boolean_value,  # noqa
+from pyarrow.lib import (is_boolean_value,  # type: ignore[unresolved_import]  # noqa
                          is_integer_value,
                          is_float_value)
 
-import pyarrow.lib as lib
+import pyarrow.lib as lib  # type: ignore[unresolved_import]
 from pyarrow.util import doc
 
 

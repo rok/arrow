@@ -32,7 +32,7 @@ except ImportError:
     scipy = None  # type: ignore[assignment]
 
 try:
-    import sparse
+    import sparse  # type: ignore[unresolved_import]
 except ImportError:
     sparse = None
 

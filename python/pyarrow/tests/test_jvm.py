@@ -76,8 +76,8 @@ def test_jvm_buffer(root_allocator):
 
 
 def test_jvm_buffer_released(root_allocator):
-    import jpype.imports  # noqa
-    from java.lang import IllegalArgumentException
+    import jpype.imports  # type: ignore[unresolved_import]  # noqa
+    from java.lang import IllegalArgumentException  # type: ignore[unresolved_import]
 
     jvm_buffer = root_allocator.buffer(8)
     jvm_buffer.release()

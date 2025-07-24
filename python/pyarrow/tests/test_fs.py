@@ -2168,7 +2168,7 @@ def test_fsspec_filesystem_from_uri():
 def test_huggingface_filesystem_from_uri():
     pytest.importorskip("fsspec")
     try:
-        from huggingface_hub import HfFileSystem
+        from huggingface_hub import HfFileSystem  # type: ignore[unresolved_import]
     except ImportError:
         pytest.skip("huggingface_hub not installed")
 

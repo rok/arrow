@@ -39,7 +39,7 @@ except ImportError:
 
 
 def mock_udf_context(batch_length=10):
-    from pyarrow._compute import _get_udf_context
+    from pyarrow._compute import _get_udf_context  # type: ignore[unresolved_import]
     return _get_udf_context(pa.default_memory_pool(), batch_length)
 
 

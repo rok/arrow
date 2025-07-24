@@ -1,4 +1,7 @@
-from typing import IO, Any, Iterable, Iterator, Literal, Sequence, TypeAlias, TypedDict
+from typing import (
+    IO, Any, Iterable, Iterator, Literal, Sequence, TypedDict,
+    TypeAlias,  # type: ignore[unresolved_import]
+)
 
 from _typeshed import StrPath
 
