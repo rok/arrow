@@ -93,6 +93,7 @@ from . import lib
 
 _P = ParamSpec("_P")
 _R = TypeVar("_R")
+_CallableType = Callable[_P, _R]
 
 def field(*name_or_index: str | tuple[str, ...] | int) -> Expression:
     """Reference a column of the dataset.
@@ -156,7 +157,7 @@ def scalar(value: bool | float | str) -> Expression:
         An Expression representing the scalar value
     """
 
-def _clone_signature(f: Callable[_P, _R]) -> Callable[_P, _R]: ...
+def _clone_signature(f: _CallableType) -> _CallableType: ...
 
 # ============= compute functions =============
 _DataTypeT = TypeVar("_DataTypeT", bound=lib.DataType)
