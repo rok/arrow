@@ -72,11 +72,12 @@ def setup_module(module):
 
 
 def teardown_module(module):
-    for path in TEST_FILES:
-        try:
-            os.remove(path)
-        except os.error:
-            pass
+    if TEST_FILES is not None:
+        for path in TEST_FILES:
+            try:
+                os.remove(path)
+            except os.error:
+                pass
 
 
 @pytest.mark.pandas

@@ -1,3 +1,4 @@
+import builtins
 import datetime as dt
 import sys
 
@@ -1990,7 +1991,7 @@ class Array(_PandasConvertible[pd.Series], Generic[_Scalar_co]):
     @overload
     def __getitem__(self, key: int) -> _Scalar_co: ...
     @overload
-    def __getitem__(self, key: slice) -> Self: ...
+    def __getitem__(self, key: builtins.slice) -> Self: ...
     def __getitem__(self, key):
         """
         Slice or return value at given index
