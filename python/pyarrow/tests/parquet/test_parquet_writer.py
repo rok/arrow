@@ -33,7 +33,7 @@ try:
     import pandas.testing as tm
 
 except ImportError:
-    pd = tm = None
+    pd = tm = None  # type: ignore[assignment]
 
 
 # Marks all of the tests in this module

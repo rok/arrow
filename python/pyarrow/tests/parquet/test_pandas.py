@@ -21,7 +21,7 @@ from json import loads as json_loads
 try:
     import numpy as np
 except ImportError:
-    np = None
+    np = None  # type: ignore[assignment]
 import pytest
 
 import pyarrow as pa
@@ -44,7 +44,7 @@ try:
     from pyarrow.tests.parquet.common import (_roundtrip_pandas_dataframe,
                                               alltypes_sample)
 except ImportError:
-    pd = tm = None
+    pd = tm = None  # type: ignore[assignment]
 
 
 # Marks all of the tests in this module

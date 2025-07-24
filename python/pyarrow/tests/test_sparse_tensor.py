@@ -26,12 +26,10 @@ except ImportError:
 import pyarrow as pa
 
 try:
+    import scipy
     from scipy.sparse import csr_array, coo_array, csr_matrix, coo_matrix
 except ImportError:
-    coo_matrix = None
-    csr_matrix = None
-    csr_array = None
-    coo_array = None
+    scipy = None  # type: ignore[assignment]
 
 try:
     import sparse
@@ -401,7 +399,7 @@ def test_dense_to_sparse_tensor(dtype_str, arrow_type, sparse_tensor_type):
     assert np.array_equal(array, result_array)
 
 
-@pytest.mark.skipif(not coo_matrix, reason="requires scipy")
+@pytest.mark.skipif(not scipy, reason="requires scipy")
 @pytest.mark.parametrize('sparse_object', (coo_array, coo_matrix))
 @pytest.mark.parametrize('dtype_str,arrow_type', scipy_type_pairs)
 def test_sparse_coo_tensor_scipy_roundtrip(dtype_str, arrow_type,
@@ -443,7 +441,7 @@ def test_sparse_coo_tensor_scipy_roundtrip(dtype_str, arrow_type,
     assert out_scipy_matrix.has_canonical_format
 
 
-@pytest.mark.skipif(not csr_matrix, reason="requires scipy")
+@pytest.mark.skipif(not scipy, reason="requires scipy")
 @pytest.mark.parametrize('sparse_object', (csr_array, csr_matrix))
 @pytest.mark.parametrize('dtype_str,arrow_type', scipy_type_pairs)
 def test_sparse_csr_matrix_scipy_roundtrip(dtype_str, arrow_type,
