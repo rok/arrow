@@ -1,5 +1,5 @@
 # ruff: noqa: I001
-from typing import Literal, TypeAlias, TypeVar, overload, Any, Iterable, ParamSpec, Sequence  # type: ignore[unresolved_import]
+from typing import Literal, TypeAlias, TypeVar, overload, Any, Iterable, ParamSpec, Sequence, Union  # type: ignore[unresolved_import]
 from collections.abc import Callable
 
 # Option classes
@@ -205,8 +205,8 @@ BinaryScalar: TypeAlias = Union[
 ]
 StringScalar: TypeAlias = Union[lib.Scalar[lib.StringType], lib.Scalar[lib.LargeStringType]]
 StringOrBinaryScalar: TypeAlias = StringScalar | BinaryScalar
-_ListScalar: TypeAlias = lib.ListViewScalar[_DataTypeT] | lib.FixedSizeListScalar[_DataTypeT, Any]
-_LargeListScalar: TypeAlias = lib.LargeListScalar[_DataTypeT] | lib.LargeListViewScalar[_DataTypeT]
+_ListScalar: TypeAlias = Union[lib.ListViewScalar[_DataTypeT], lib.FixedSizeListScalar[_DataTypeT, Any]]
+_LargeListScalar: TypeAlias = Union[lib.LargeListScalar[_DataTypeT], lib.LargeListViewScalar[_DataTypeT]]
 ListScalar: TypeAlias = (
     lib.ListScalar[_DataTypeT] | _ListScalar[_DataTypeT] | _LargeListScalar[_DataTypeT]
 )

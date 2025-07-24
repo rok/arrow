@@ -29,7 +29,6 @@ from .io import Buffer
 from .scalar import ExtensionScalar
 
 _AsPyType = TypeVar("_AsPyType")
-_DataTypeT = TypeVar("_DataTypeT", bound=DataType)
 
 class _Weakrefable: ...
 class _Metadata(_Weakrefable): ...
