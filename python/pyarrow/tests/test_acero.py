@@ -37,7 +37,7 @@ except ImportError:
 
 try:
     import pyarrow.dataset as ds
-    from pyarrow.acero import ScanNodeOptions
+    from pyarrow.acero import ScanNodeOptions  # type: ignore[possibly-unbound-import]
 except ImportError:
     pass
 

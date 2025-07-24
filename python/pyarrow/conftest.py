@@ -186,25 +186,25 @@ except ImportError:
     pass
 
 try:
-    from pyarrow.fs import AzureFileSystem  # noqa
+    from pyarrow.fs import AzureFileSystem  # type: ignore[possibly-unbound-import]  # noqa
     defaults['azure'] = True
 except ImportError:
     pass
 
 try:
-    from pyarrow.fs import GcsFileSystem  # noqa
+    from pyarrow.fs import GcsFileSystem  # type: ignore[possibly-unbound-import]  # noqa
     defaults['gcs'] = True
 except ImportError:
     pass
 
 try:
-    from pyarrow.fs import S3FileSystem  # noqa
+    from pyarrow.fs import S3FileSystem  # type: ignore[possibly-unbound-import]  # noqa
     defaults['s3'] = True
 except ImportError:
     pass
 
 try:
-    from pyarrow.fs import HadoopFileSystem  # noqa
+    from pyarrow.fs import HadoopFileSystem  # type: ignore[possibly-unbound-import]  # noqa
     defaults['hdfs'] = True
 except ImportError:
     pass
@@ -250,7 +250,7 @@ def pytest_ignore_collect(collection_path, config):
 
         if 'pyarrow/fs' in str(collection_path):
             try:
-                from pyarrow.fs import S3FileSystem  # noqa
+                from pyarrow.fs import S3FileSystem  # type: ignore[possibly-unbound-import]  # noqa
                 return False
             except ImportError:
                 return True

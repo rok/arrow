@@ -30,7 +30,7 @@ from pyarrow._parquet import (  # type: ignore[unresolved_import]
     Statistics,
 )
 from pyarrow._stubs_typing import FilterTuple, SingleOrList  # type: ignore[unresolved_import]
-from pyarrow.dataset import ParquetFileFragment, Partitioning
+from pyarrow.dataset import ParquetFileFragment, Partitioning  # type: ignore[possibly-unbound-import]
 from pyarrow.lib import NativeFile, RecordBatch, Schema, Table  # type: ignore[unresolved_import]
 from typing_extensions import deprecated
 
