@@ -1,3 +1,4 @@
+import builtins
 import datetime as dt
 import sys
 
@@ -295,7 +296,7 @@ class ChunkedArray(_PandasConvertible[pd.Series], Generic[_Scalar_co]):
         """
     def __sizeof__(self) -> int: ...
     @overload
-    def __getitem__(self, key: slice) -> Self: ...
+    def __getitem__(self, key: builtins.slice) -> Self: ...
     @overload
     def __getitem__(self, key: int) -> _Scalar_co: ...
     def __getitem__(self, key):

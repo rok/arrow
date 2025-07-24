@@ -93,6 +93,7 @@ from . import lib
 
 _P = ParamSpec("_P")
 _R = TypeVar("_R")
+_CallableType = Callable[_P, _R]
 
 def field(*name_or_index: str | tuple[str, ...] | int) -> Expression:
     """Reference a column of the dataset.
@@ -156,7 +157,7 @@ def scalar(value: bool | float | str) -> Expression:
         An Expression representing the scalar value
     """
 
-def _clone_signature(f: Callable[_P, _R]) -> Callable[_P, _R]: ...
+def _clone_signature(f: _CallableType) -> _CallableType: ...
 
 # ============= compute functions =============
 _DataTypeT = TypeVar("_DataTypeT", bound=lib.DataType)
@@ -216,9 +217,9 @@ NumericOrDurationScalar: TypeAlias = NumericScalar | lib.DurationScalar
 NumericOrTemporalScalar: TypeAlias = NumericScalar | TemporalScalar
 
 _NumericOrTemporalScalarT = TypeVar("_NumericOrTemporalScalarT", bound=NumericOrTemporalScalar)
+_NumericScalarT = TypeVar("_NumericScalarT", bound=NumericScalar)
 NumericArray: TypeAlias = ArrayOrChunkedArray[_NumericScalarT]
 _NumericArrayT = TypeVar("_NumericArrayT", bound=NumericArray)
-_NumericScalarT = TypeVar("_NumericScalarT", bound=NumericScalar)
 _NumericOrDurationT = TypeVar("_NumericOrDurationT", bound=NumericOrDurationScalar)
 NumericOrDurationArray: TypeAlias = ArrayOrChunkedArray[NumericOrDurationScalar]
 _NumericOrDurationArrayT = TypeVar("_NumericOrDurationArrayT", bound=NumericOrDurationArray)

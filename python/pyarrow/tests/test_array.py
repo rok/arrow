@@ -550,7 +550,8 @@ def test_arange():
     for case in cases:
         result = pa.arange(*case)
         result.validate(full=True)
-        assert result.equals(pa.array(list(range(*case)), type=pa.int64()))
+
+        assert result.equals(pa.array(list(range(*case)), type=pa.int64()))  # type: ignore[no-matching-overload]
 
     # Validate memory_pool keyword argument
     result = pa.arange(-1, 101, memory_pool=pa.default_memory_pool())
