@@ -1737,10 +1737,10 @@ def test_arithmetic_multiply():
 @pytest.mark.parametrize("ty", ["round", "round_to_multiple"])
 def test_round_to_integer(ty):
     if ty == "round":
-        round = pc.round
+        round_func = pc.round
         RoundOptions = partial(pc.RoundOptions, ndigits=0)
     elif ty == "round_to_multiple":
-        round = pc.round_to_multiple
+        round_func = pc.round_to_multiple
         RoundOptions = partial(pc.RoundToMultipleOptions, multiple=1)
 
     values = [3.2, 3.5, 3.7, 4.5, -3.2, -3.5, -3.7, None]
@@ -1758,7 +1758,7 @@ def test_round_to_integer(ty):
     }
     for round_mode, expected in rmode_and_expected.items():
         options = RoundOptions(round_mode=round_mode)
-        result = round(values, options=options)
+        result = round_func(values, options=options)
         expected_array = pa.array(expected, type=pa.float64())
         assert expected_array.equals(result)
 
@@ -2561,12 +2561,13 @@ def test_assume_timezone():
                              f"timezone '{timezone}'"):
         pc.assume_timezone(ambiguous_array, options=options_ambiguous_raise)
 
-    expected = ambiguous.tz_localize(timezone, ambiguous=[True, True, True])
+    expected = ambiguous.tz_localize(timezone, ambiguous=np.array([True, True, True]))
     result = pc.assume_timezone(
         ambiguous_array, options=options_ambiguous_earliest)
     result.equals(pa.array(expected))
 
-    expected = ambiguous.tz_localize(timezone, ambiguous=[False, False, False])
+    expected = ambiguous.tz_localize(
+        timezone, ambiguous=np.array([False, False, False]))
     result = pc.assume_timezone(
         ambiguous_array, options=options_ambiguous_latest)
     result.equals(pa.array(expected))
