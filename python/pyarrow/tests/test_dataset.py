@@ -3437,7 +3437,7 @@ def test_orc_scan_options(tempdir, dataset_reader):
 
 def test_orc_format_not_supported():
     try:
-        from pyarrow.dataset import OrcFileFormat  # noqa
+        from pyarrow.dataset import OrcFileFormat  # type: ignore[possibly-unbound-import]  # noqa
     except ImportError:
         # ORC is not available, test error message
         with pytest.raises(
@@ -5138,7 +5138,7 @@ def test_write_dataset_s3_put_only(s3_server):
     # required while writing a dataset in s3 where we have very
     # limited permissions and thus we can directly write the dataset
     # without creating a directory.
-    from pyarrow.fs import S3FileSystem
+    from pyarrow.fs import S3FileSystem  # type: ignore[possibly-unbound-import]
 
     # write dataset with s3 filesystem
     host, port, _, _ = s3_server['connection']
