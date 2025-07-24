@@ -616,7 +616,6 @@ class FileSystem(_Weakrefable):
             The normalized path
         """
 
-
 SupportedFileSystem: TypeAlias = Union[AbstractFileSystem, FileSystem]
 
 class LocalFileSystem(FileSystem):

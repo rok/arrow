@@ -23,6 +23,7 @@ from typing import (
     Mapping,
     Sequence,
     TypeVar,
+    Union,
     overload,
 )
 
@@ -117,8 +118,8 @@ AggregateOptions: TypeAlias = (
 
 UnarySelector: TypeAlias = str
 NullarySelector: TypeAlias = tuple[()]
-NarySelector: TypeAlias = list[str] | tuple[str, ...]
-ColumnSelector: TypeAlias = UnarySelector | NullarySelector | NarySelector
+NarySelector: TypeAlias = Union[list[str], tuple[str, ...]]
+ColumnSelector: TypeAlias = Union[UnarySelector, NullarySelector, NarySelector]
 
 class ChunkedArray(_PandasConvertible[pd.Series], Generic[_Scalar_co]):
     """
