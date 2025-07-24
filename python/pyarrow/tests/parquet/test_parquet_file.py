@@ -325,7 +325,7 @@ def test_parquet_file_with_filesystem(s3_example_fs, use_uri):
     table = pa.table({"a": range(10)})
     pq.write_table(table, s3_path, filesystem=s3_fs)
 
-    parquet_file = pq.ParquetFile(*args, **kwargs)
+    parquet_file = pq.ParquetFile(*args, **kwargs)  # type: ignore[missing-argument]
     assert parquet_file.read() == table
     assert not parquet_file.closed
     parquet_file.close()

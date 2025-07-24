@@ -425,7 +425,8 @@ def test_backwards_compatible_column_metadata_handling(datadir):
     table = _read_table(
         path, columns=['a'])
     result = table.to_pandas()
-    tm.assert_frame_equal(result, expected[['a']].reset_index(drop=True))  # type: ignore[invalid-argument-type]
+    tm.assert_frame_equal(result, expected[['a']].reset_index(
+        drop=True))  # type: ignore[invalid-argument-type]
 
 
 @pytest.mark.pandas
@@ -530,15 +531,18 @@ def test_write_to_dataset_pandas_preserve_extensiondtypes(tempdir):
         table, str(tempdir / "case1"), partition_cols=['part'],
     )
     result = pq.read_table(str(tempdir / "case1")).to_pandas()
-    tm.assert_frame_equal(result[["col"]], df[["col"]])  # type: ignore[invalid-argument-type]
+    tm.assert_frame_equal(result[["col"]], df[["col"]]) \
+        # type: ignore[invalid-argument-type]
 
     pq.write_to_dataset(table, str(tempdir / "case2"))
     result = pq.read_table(str(tempdir / "case2")).to_pandas()
-    tm.assert_frame_equal(result[["col"]], df[["col"]])  # type: ignore[invalid-argument-type]
+    tm.assert_frame_equal(result[["col"]], df[["col"]]) \
+        # type: ignore[invalid-argument-type]
 
     pq.write_table(table, str(tempdir / "data.parquet"))
     result = pq.read_table(str(tempdir / "data.parquet")).to_pandas()
-    tm.assert_frame_equal(result[["col"]], df[["col"]])  # type: ignore[invalid-argument-type]
+    tm.assert_frame_equal(result[["col"]], df[["col"]]) \
+        # type: ignore[invalid-argument-type]
 
 
 @pytest.mark.pandas
