@@ -4963,7 +4963,7 @@ def test_does_not_mutate_timedelta_dtype():
 
     assert np.dtype(np.timedelta64) == expected
 
-    df = pd.DataFrame({"a": [np.timedelta64()]})
+    df = pd.DataFrame({"a": [np.timedelta64("s")]})
     t = pa.Table.from_pandas(df)
     t.to_pandas()
 
