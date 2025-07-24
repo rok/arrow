@@ -21,7 +21,7 @@ import pyarrow as pa
 from pyarrow.util import _is_iterable, _stringify_path, _is_path_like
 
 try:
-    from pyarrow._dataset import (  # noqa
+    from pyarrow._dataset import (  # type: ignore[unresolved_import]  # noqa
         CsvFileFormat,
         CsvFragmentScanOptions,
         JsonFileFormat,
@@ -70,7 +70,7 @@ _orc_msg = (
 )
 
 try:
-    from pyarrow._dataset_orc import OrcFileFormat
+    from pyarrow._dataset_orc import OrcFileFormat  # type: ignore[unresolved_import]
     _orc_available = True
 except ImportError:
     pass
@@ -82,7 +82,7 @@ _parquet_msg = (
 )
 
 try:
-    from pyarrow._dataset_parquet import (  # noqa
+    from pyarrow._dataset_parquet import (  # type: ignore[unresolved_import]  # noqa
         ParquetDatasetFactory,
         ParquetFactoryOptions,
         ParquetFileFormat,
@@ -98,7 +98,7 @@ except ImportError:
 
 
 try:
-    from pyarrow._dataset_parquet_encryption import (  # noqa
+    from pyarrow._dataset_parquet_encryption import (  # type: ignore[unresolved_import]  # noqa
         ParquetDecryptionConfig,
         ParquetEncryptionConfig,
     )

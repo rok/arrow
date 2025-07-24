@@ -1,4 +1,4 @@
-from pyarrow.lib import _Weakrefable
+from pyarrow.lib import _Weakrefable  # type: ignore[unresolved_import]
 
 class MemoryPool(_Weakrefable):
     """

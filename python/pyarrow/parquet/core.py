@@ -29,14 +29,14 @@ import operator
 import pyarrow as pa
 
 try:
-    import pyarrow._parquet as _parquet
+    import pyarrow._parquet as _parquet  # type: ignore[unresolved_import]
 except ImportError as exc:
     raise ImportError(
         "The pyarrow installation is not built with support "
         f"for the Parquet file format ({str(exc)})"
     ) from None
 
-from pyarrow._parquet import (ParquetReader, Statistics,  # noqa
+from pyarrow._parquet import (ParquetReader, Statistics,  # type: ignore[unresolved_import]  # noqa
                               FileMetaData, RowGroupMetaData,
                               ColumnChunkMetaData,
                               ParquetSchema, ColumnSchema,

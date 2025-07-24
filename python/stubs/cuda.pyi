@@ -1,4 +1,4 @@
-from pyarrow._cuda import (
+from pyarrow._cuda import (  # type: ignore[unresolved_import]
     BufferReader,
     BufferWriter,
     Context,

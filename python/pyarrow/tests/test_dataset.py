@@ -41,7 +41,7 @@ import pyarrow.csv
 import pyarrow.feather
 import pyarrow.fs as fs
 import pyarrow.json
-from pyarrow.lib import is_threading_enabled
+from pyarrow.lib import is_threading_enabled  # type: ignore[unresolved_import]
 from pyarrow.tests.util import (FSProtocolClass, ProxyHandler,
                                 _configure_s3_limited_user, _filesystem_uri,
                                 change_cwd)

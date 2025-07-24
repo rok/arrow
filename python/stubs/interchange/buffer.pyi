@@ -1,6 +1,6 @@
 import enum
 
-from pyarrow.lib import Buffer
+from pyarrow.lib import Buffer  # type: ignore[unresolved_import]
 
 class DlpackDeviceType(enum.IntEnum):
     """Integer enum for device type codes matching DLPack."""

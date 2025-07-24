@@ -1,6 +1,6 @@
 from typing import Iterable
 
-from pyarrow.lib import MemoryPool, _Weakrefable
+from pyarrow.lib import MemoryPool, _Weakrefable  # type: ignore[unresolved_import]
 
 from .array import StringArray, StringViewArray
 

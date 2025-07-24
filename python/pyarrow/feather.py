@@ -20,11 +20,12 @@ from collections.abc import Sequence
 import os
 
 from pyarrow.pandas_compat import _pandas_api  # noqa
-from pyarrow.lib import (Codec, Table,  # noqa
+from pyarrow.lib import (Codec, Table,  # type: ignore[unresolved_import]  # noqa
                          concat_tables, schema)
-import pyarrow.lib as ext
-from pyarrow import _feather
-from pyarrow._feather import FeatherError  # noqa: F401
+import pyarrow.lib as ext  # type: ignore[unresolved_import]
+from pyarrow import _feather  # type: ignore[unresolved_import]
+from pyarrow._feather import FeatherError \
+    # type: ignore[unresolved_import]  # noqa: F401
 
 
 class FeatherDataset:

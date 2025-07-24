@@ -1,7 +1,7 @@
-from typing import Callable, Iterable, Literal, Sequence, TypeAlias, overload
+from typing import Callable, Iterable, Literal, Sequence, TypeAlias, overload  # type: ignore[unresolved_import]
 
 from _typeshed import StrPath
-from pyarrow._dataset import (
+from pyarrow._dataset import (  # type: ignore[unresolved_import]
     CsvFileFormat,
     CsvFragmentScanOptions,
     Dataset,
@@ -32,8 +32,8 @@ from pyarrow._dataset import (
     WrittenFile,
     get_partition_keys,
 )
-from pyarrow._dataset_orc import OrcFileFormat
-from pyarrow._dataset_parquet import (
+from pyarrow._dataset_orc import OrcFileFormat  # type: ignore[unresolved_import]
+from pyarrow._dataset_parquet import (  # type: ignore[unresolved_import]
     ParquetDatasetFactory,
     ParquetFactoryOptions,
     ParquetFileFormat,
@@ -43,12 +43,12 @@ from pyarrow._dataset_parquet import (
     ParquetReadOptions,
     RowGroupInfo,
 )
-from pyarrow._dataset_parquet_encryption import (
+from pyarrow._dataset_parquet_encryption import (  # type: ignore[unresolved_import]
     ParquetDecryptionConfig,
     ParquetEncryptionConfig,
 )
 from pyarrow.compute import Expression, field, scalar
-from pyarrow.lib import Array, RecordBatch, RecordBatchReader, Schema, Table
+from pyarrow.lib import Array, RecordBatch, RecordBatchReader, Schema, Table  # type: ignore[unresolved_import]
 
 from ._fs import SupportedFileSystem
 

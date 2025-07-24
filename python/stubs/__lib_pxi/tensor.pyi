@@ -7,9 +7,9 @@ else:
 
 import numpy as np
 
-from pyarrow.lib import _Weakrefable
+from pyarrow.lib import _Weakrefable  # type: ignore[unresolved_import]
 from scipy.sparse import coo_matrix, csr_matrix
-from sparse import COO
+from sparse import COO  # type: ignore[unresolved_import]
 
 class Tensor(_Weakrefable):
     """

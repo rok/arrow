@@ -1,9 +1,9 @@
 from io import IOBase
 
 import pandas as pd
-import pyarrow.lib as lib
+import pyarrow.lib as lib  # type: ignore[unresolved_import]
 
-from pyarrow.lib import (
+from pyarrow.lib import (  # type: ignore[unresolved_import]
     IpcReadOptions,
     IpcWriteOptions,
     Message,

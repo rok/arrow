@@ -40,7 +40,7 @@ except ImportError:
 
 import pyarrow as pa
 import pyarrow.compute as pc
-from pyarrow.lib import ArrowNotImplementedError
+from pyarrow.lib import ArrowNotImplementedError  # type: ignore[unresolved_import]
 
 try:
     import pyarrow.substrait as pas

@@ -1,94 +1,100 @@
 # ruff: noqa: I001
-from typing import Literal, TypeAlias, TypeVar, overload, Any, Iterable, ParamSpec, Sequence
+from typing import Literal, TypeAlias, TypeVar, overload, Any, Iterable, ParamSpec, Sequence  # type: ignore[unresolved_import]
 from collections.abc import Callable
 
 # Option classes
-from pyarrow._compute import ArraySortOptions as ArraySortOptions
-from pyarrow._compute import AssumeTimezoneOptions as AssumeTimezoneOptions
-from pyarrow._compute import CastOptions as CastOptions
-from pyarrow._compute import CountOptions as CountOptions
-from pyarrow._compute import CumulativeOptions as CumulativeOptions
-from pyarrow._compute import CumulativeSumOptions as CumulativeSumOptions
-from pyarrow._compute import DayOfWeekOptions as DayOfWeekOptions
-from pyarrow._compute import DictionaryEncodeOptions as DictionaryEncodeOptions
-from pyarrow._compute import ElementWiseAggregateOptions as ElementWiseAggregateOptions
+from pyarrow._compute import (  # type: ignore[unresolved_import]
+	ArraySortOptions as ArraySortOptions,
+	AssumeTimezoneOptions as AssumeTimezoneOptions,
+	CastOptions as CastOptions,
+	CountOptions as CountOptions,
+	CumulativeOptions as CumulativeOptions,
+	CumulativeSumOptions as CumulativeSumOptions,
+	DayOfWeekOptions as DayOfWeekOptions,
+	DictionaryEncodeOptions as DictionaryEncodeOptions,
+	ElementWiseAggregateOptions as ElementWiseAggregateOptions,
+)
 
 # Expressions
-from pyarrow._compute import Expression as Expression
-from pyarrow._compute import ExtractRegexOptions as ExtractRegexOptions
-from pyarrow._compute import ExtractRegexSpanOptions as ExtractRegexSpanOptions
-from pyarrow._compute import FilterOptions as FilterOptions
-from pyarrow._compute import Function as Function
-from pyarrow._compute import FunctionOptions as FunctionOptions
-from pyarrow._compute import FunctionRegistry as FunctionRegistry
-from pyarrow._compute import HashAggregateFunction as HashAggregateFunction
-from pyarrow._compute import HashAggregateKernel as HashAggregateKernel
-from pyarrow._compute import IndexOptions as IndexOptions
-from pyarrow._compute import JoinOptions as JoinOptions
-from pyarrow._compute import Kernel as Kernel
-from pyarrow._compute import ListFlattenOptions as ListFlattenOptions
-from pyarrow._compute import ListSliceOptions as ListSliceOptions
-from pyarrow._compute import MakeStructOptions as MakeStructOptions
-from pyarrow._compute import MapLookupOptions as MapLookupOptions
-from pyarrow._compute import MatchSubstringOptions as MatchSubstringOptions
-from pyarrow._compute import ModeOptions as ModeOptions
-from pyarrow._compute import NullOptions as NullOptions
-from pyarrow._compute import PadOptions as PadOptions
-from pyarrow._compute import PairwiseOptions as PairwiseOptions
-from pyarrow._compute import PartitionNthOptions as PartitionNthOptions
-from pyarrow._compute import PivotWiderOptions as PivotWiderOptions
-from pyarrow._compute import QuantileOptions as QuantileOptions
-from pyarrow._compute import RandomOptions as RandomOptions
-from pyarrow._compute import RankOptions as RankOptions
-from pyarrow._compute import RankQuantileOptions as RankQuantileOptions
-from pyarrow._compute import ReplaceSliceOptions as ReplaceSliceOptions
-from pyarrow._compute import ReplaceSubstringOptions as ReplaceSubstringOptions
-from pyarrow._compute import RoundBinaryOptions as RoundBinaryOptions
-from pyarrow._compute import RoundOptions as RoundOptions
-from pyarrow._compute import RoundTemporalOptions as RoundTemporalOptions
-from pyarrow._compute import RoundToMultipleOptions as RoundToMultipleOptions
-from pyarrow._compute import RunEndEncodeOptions as RunEndEncodeOptions
-from pyarrow._compute import ScalarAggregateFunction as ScalarAggregateFunction
-from pyarrow._compute import ScalarAggregateKernel as ScalarAggregateKernel
-from pyarrow._compute import ScalarAggregateOptions as ScalarAggregateOptions
-from pyarrow._compute import ScalarFunction as ScalarFunction
-from pyarrow._compute import ScalarKernel as ScalarKernel
-from pyarrow._compute import SelectKOptions as SelectKOptions
-from pyarrow._compute import SetLookupOptions as SetLookupOptions
-from pyarrow._compute import SkewOptions as SkewOptions
-from pyarrow._compute import SliceOptions as SliceOptions
-from pyarrow._compute import SortOptions as SortOptions
-from pyarrow._compute import SplitOptions as SplitOptions
-from pyarrow._compute import SplitPatternOptions as SplitPatternOptions
-from pyarrow._compute import StrftimeOptions as StrftimeOptions
-from pyarrow._compute import StrptimeOptions as StrptimeOptions
-from pyarrow._compute import StructFieldOptions as StructFieldOptions
-from pyarrow._compute import TakeOptions as TakeOptions
-from pyarrow._compute import TDigestOptions as TDigestOptions
-from pyarrow._compute import TrimOptions as TrimOptions
-from pyarrow._compute import UdfContext as UdfContext
-from pyarrow._compute import Utf8NormalizeOptions as Utf8NormalizeOptions
-from pyarrow._compute import VarianceOptions as VarianceOptions
-from pyarrow._compute import VectorFunction as VectorFunction
-from pyarrow._compute import VectorKernel as VectorKernel
-from pyarrow._compute import WeekOptions as WeekOptions
-from pyarrow._compute import WinsorizeOptions as WinsorizeOptions
+from pyarrow._compute import (  # type: ignore[unresolved_import]
+    Expression as Expression,
+	ExtractRegexOptions as ExtractRegexOptions,
+	ExtractRegexSpanOptions as ExtractRegexSpanOptions,
+	FilterOptions as FilterOptions,
+	Function as Function,
+	FunctionOptions as FunctionOptions,
+	FunctionRegistry as FunctionRegistry,
+	HashAggregateFunction as HashAggregateFunction,
+	HashAggregateKernel as HashAggregateKernel,
+	IndexOptions as IndexOptions,
+	JoinOptions as JoinOptions,
+	Kernel as Kernel,
+	ListFlattenOptions as ListFlattenOptions,
+	ListSliceOptions as ListSliceOptions,
+	MakeStructOptions as MakeStructOptions,
+	MapLookupOptions as MapLookupOptions,
+	MatchSubstringOptions as MatchSubstringOptions,
+	ModeOptions as ModeOptions,
+	NullOptions as NullOptions,
+	PadOptions as PadOptions,
+	PairwiseOptions as PairwiseOptions,
+	PartitionNthOptions as PartitionNthOptions,
+	PivotWiderOptions as PivotWiderOptions,
+	QuantileOptions as QuantileOptions,
+	RandomOptions as RandomOptions,
+	RankOptions as RankOptions,
+	RankQuantileOptions as RankQuantileOptions,
+	ReplaceSliceOptions as ReplaceSliceOptions,
+	ReplaceSubstringOptions as ReplaceSubstringOptions,
+	RoundBinaryOptions as RoundBinaryOptions,
+	RoundOptions as RoundOptions,
+	RoundTemporalOptions as RoundTemporalOptions,
+	RoundToMultipleOptions as RoundToMultipleOptions,
+	RunEndEncodeOptions as RunEndEncodeOptions,
+	ScalarAggregateFunction as ScalarAggregateFunction,
+	ScalarAggregateKernel as ScalarAggregateKernel,
+	ScalarAggregateOptions as ScalarAggregateOptions,
+	ScalarFunction as ScalarFunction,
+	ScalarKernel as ScalarKernel,
+	SelectKOptions as SelectKOptions,
+	SetLookupOptions as SetLookupOptions,
+	SkewOptions as SkewOptions,
+	SliceOptions as SliceOptions,
+	SortOptions as SortOptions,
+	SplitOptions as SplitOptions,
+	SplitPatternOptions as SplitPatternOptions,
+	StrftimeOptions as StrftimeOptions,
+	StrptimeOptions as StrptimeOptions,
+	StructFieldOptions as StructFieldOptions,
+	TakeOptions as TakeOptions,
+	TDigestOptions as TDigestOptions,
+	TrimOptions as TrimOptions,
+	UdfContext as UdfContext,
+	Utf8NormalizeOptions as Utf8NormalizeOptions,
+	VarianceOptions as VarianceOptions,
+	VectorFunction as VectorFunction,
+	VectorKernel as VectorKernel,
+	WeekOptions as WeekOptions,
+	WinsorizeOptions as WinsorizeOptions,
+)
 
 # Functions
-from pyarrow._compute import call_function as call_function
+from pyarrow._compute import call_function as call_function  # type: ignore[unresolved_import]
 
 # Udf
-from pyarrow._compute import call_tabular_function as call_tabular_function
-from pyarrow._compute import function_registry as function_registry
-from pyarrow._compute import get_function as get_function
-from pyarrow._compute import list_functions as list_functions
-from pyarrow._compute import register_aggregate_function as register_aggregate_function
-from pyarrow._compute import register_scalar_function as register_scalar_function
-from pyarrow._compute import register_tabular_function as register_tabular_function
-from pyarrow._compute import register_vector_function as register_vector_function
+from pyarrow._compute import (  # type: ignore[unresolved_import]
+    call_tabular_function as call_tabular_function,
+    function_registry as function_registry,
+    get_function as get_function,
+    list_functions as list_functions,
+    register_aggregate_function as register_aggregate_function,
+    register_scalar_function as register_scalar_function,
+    register_tabular_function as register_tabular_function,
+    register_vector_function as register_vector_function,
+)
 
-from pyarrow._compute import _Order, _Placement
-from pyarrow._stubs_typing import ArrayLike, ScalarLike
+from pyarrow._compute import _Order, _Placement  # type: ignore[unresolved_import]
+from pyarrow._stubs_typing import ArrayLike, ScalarLike  # type: ignore[unresolved_import]
 from . import lib
 
 _P = ParamSpec("_P")

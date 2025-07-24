@@ -22,8 +22,9 @@ import pytest
 
 import pyarrow as pa
 import pyarrow.compute as pc
-from pyarrow.lib import tobytes
-from pyarrow.lib import ArrowInvalid, ArrowNotImplementedError
+from pyarrow.lib import tobytes  # type: ignore[unresolved_import]
+from pyarrow.lib import ArrowInvalid, ArrowNotImplementedError \
+    # type: ignore[unresolved_import]
 
 try:
     import pyarrow.substrait as substrait
@@ -36,7 +37,7 @@ pytestmark = pytest.mark.substrait
 
 
 def mock_udf_context(batch_length=10):
-    from pyarrow._compute import _get_udf_context
+    from pyarrow._compute import _get_udf_context  # type: ignore[unresolved_import]
     return _get_udf_context(pa.default_memory_pool(), batch_length)
 
 

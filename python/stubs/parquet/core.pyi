@@ -13,10 +13,10 @@ if sys.version_info >= (3, 10):
 else:
     from typing_extensions import TypeAlias
 
-from pyarrow import _parquet
-from pyarrow._compute import Expression
-from pyarrow._fs import FileSystem, SupportedFileSystem
-from pyarrow._parquet import (
+from pyarrow import _parquet  # type: ignore[unresolved_import]
+from pyarrow._compute import Expression  # type: ignore[unresolved_import]
+from pyarrow._fs import FileSystem, SupportedFileSystem  # type: ignore[unresolved_import]
+from pyarrow._parquet import (  # type: ignore[unresolved_import]
     ColumnChunkMetaData,
     ColumnSchema,
     FileDecryptionProperties,
@@ -29,9 +29,9 @@ from pyarrow._parquet import (
     SortingColumn,
     Statistics,
 )
-from pyarrow._stubs_typing import FilterTuple, SingleOrList
+from pyarrow._stubs_typing import FilterTuple, SingleOrList  # type: ignore[unresolved_import]
 from pyarrow.dataset import ParquetFileFragment, Partitioning
-from pyarrow.lib import NativeFile, RecordBatch, Schema, Table
+from pyarrow.lib import NativeFile, RecordBatch, Schema, Table  # type: ignore[unresolved_import]
 from typing_extensions import deprecated
 
 __all__ = (

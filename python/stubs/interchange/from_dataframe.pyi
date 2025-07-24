@@ -1,6 +1,6 @@
-from typing import Any, Protocol, TypeAlias
+from typing import Any, Protocol, TypeAlias  # type: ignore[unresolved_import]
 
-from pyarrow.lib import Array, Buffer, DataType, DictionaryArray, RecordBatch, Table
+from pyarrow.lib import Array, Buffer, DataType, DictionaryArray, RecordBatch, Table  # type: ignore[unresolved_import]
 
 from .column import (
     ColumnBuffers,

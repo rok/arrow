@@ -23,8 +23,8 @@ import numpy as np
 import pandas as pd
 
 from pandas.core.dtypes.base import ExtensionDtype
-from pyarrow._compute import CastOptions
-from pyarrow._stubs_typing import (
+from pyarrow._compute import CastOptions  # type: ignore[unresolved_import]
+from pyarrow._stubs_typing import (  # type: ignore[unresolved_import]
     ArrayLike,
     Indices,
     Mask,
@@ -32,7 +32,7 @@ from pyarrow._stubs_typing import (
     SupportArrowArray,
     SupportArrowDeviceArray,
 )
-from pyarrow.lib import (
+from pyarrow.lib import (  # type: ignore[unresolved_import]
     Buffer,
     Device,
     MemoryManager,

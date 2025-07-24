@@ -1,11 +1,11 @@
 # ruff: noqa: F401, I001, E402
 __version__: str
 
-import pyarrow.lib as _lib
+import pyarrow.lib as _lib  # type: ignore[unresolved_import]
 
 _gc_enabled: bool
 
-from pyarrow.lib import (
+from pyarrow.lib import (  # type: ignore[unresolved_import]
     BuildInfo,
     RuntimeInfo,
     set_timezone_db_path,
@@ -27,7 +27,7 @@ def show_info() -> None: ...
 def _module_is_available(module: str) -> bool: ...
 def _filesystem_is_available(fs: str) -> bool: ...
 
-from pyarrow.lib import (
+from pyarrow.lib import (  # type: ignore[unresolved_import]
     null,
     bool_,
     int8,
@@ -233,9 +233,9 @@ from pyarrow.lib import (
 )
 
 # Buffers, allocation
-from pyarrow.lib import DeviceAllocationType, Device, MemoryManager, default_cpu_memory_manager
+from pyarrow.lib import DeviceAllocationType, Device, MemoryManager, default_cpu_memory_manager # type: ignore[unresolved_import]
 
-from pyarrow.lib import (
+from pyarrow.lib import (  # type: ignore[unresolved_import]
     Buffer,
     ResizableBuffer,
     foreign_buffer,
@@ -246,7 +246,7 @@ from pyarrow.lib import (
     allocate_buffer,
 )
 
-from pyarrow.lib import (
+from pyarrow.lib import (  # type: ignore[unresolved_import]
     MemoryPool,
     LoggingMemoryPool,
     ProxyMemoryPool,
@@ -264,7 +264,7 @@ from pyarrow.lib import (
 )
 
 # I/O
-from pyarrow.lib import (
+from pyarrow.lib import (  # type: ignore[unresolved_import]
     NativeFile,
     PythonFile,
     BufferedInputStream,
@@ -287,7 +287,7 @@ from pyarrow.lib import (
     have_libhdfs,
 )
 
-from pyarrow.lib import (
+from pyarrow.lib import (  # type: ignore[unresolved_import]
     ChunkedArray,
     RecordBatch,
     Table,
@@ -299,7 +299,7 @@ from pyarrow.lib import (
 )
 
 # Exceptions
-from pyarrow.lib import (
+from pyarrow.lib import (  # type: ignore[unresolved_import]
     ArrowCancelled,
     ArrowCapacityError,
     ArrowException,

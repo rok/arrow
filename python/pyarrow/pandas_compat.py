@@ -35,7 +35,7 @@ try:
 except ImportError:
     np = None  # type: ignore[assignment]
 import pyarrow as pa
-from pyarrow.lib import _pandas_api, frombytes, is_threading_enabled  # noqa
+from pyarrow.lib import _pandas_api, frombytes, is_threading_enabled  # type: ignore[unresolved_import]  # noqa
 
 
 _logical_type_map = {}
@@ -729,7 +729,7 @@ def _reconstruct_block(item, columns=None, extension_columns=None, return_block=
     pandas Block
 
     """
-    import pandas.core.internals as _int
+    import pandas.core.internals as _int  # type: ignore[unresolved_import]
 
     block_arr = item.get('block', None)
     placement = item['placement']
@@ -806,7 +806,8 @@ def table_to_dataframe(
     result = pa.lib.table_to_blocks(options, table, categories,
                                     list(ext_columns_dtypes.keys()))
     if _pandas_api.is_ge_v3():
-        from pandas.api.internals import create_dataframe_from_blocks
+        from pandas.api.internals import create_dataframe_from_blocks \
+            # type: ignore[unresolved_import]
 
         blocks = [
             _reconstruct_block(
@@ -816,7 +817,8 @@ def table_to_dataframe(
         df = create_dataframe_from_blocks(blocks, index=index, columns=columns)
         return df
     else:
-        from pandas.core.internals import BlockManager
+        from pandas.core.internals import BlockManager \
+            # type: ignore[unresolved_import]
         from pandas import DataFrame
 
         blocks = [

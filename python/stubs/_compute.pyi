@@ -1,12 +1,6 @@
 from typing import (
-    Any,
-    Callable,
-    Iterable,
-    Literal,
-    Sequence,
-    TypeAlias,
-    TypedDict,
-    overload,
+    Any, Callable, Iterable, Literal, Sequence, TypedDict, overload,
+    TypeAlias,  # type: ignore[unresolved_import]
 )
 
 from . import lib

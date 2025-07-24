@@ -1,6 +1,9 @@
 import enum
 
-from typing import Literal, NotRequired, Required, TypedDict
+from typing import (
+    Literal, TypedDict,
+    NotRequired, Required,  # type: ignore[unresolved_import]
+)
 
 from ._fs import FileSystem
 from .lib import KeyValueMetadata
