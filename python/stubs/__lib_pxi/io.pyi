@@ -1,3 +1,4 @@
+import builtins
 import sys
 
 from collections.abc import Callable
@@ -578,7 +579,7 @@ class Buffer(_Weakrefable):
     @property
     def parent(self) -> Buffer | None: ...
     @overload
-    def __getitem__(self, key: slice) -> Self: ...
+    def __getitem__(self, key: builtins.slice) -> Self: ...
     @overload
     def __getitem__(self, key: int) -> int: ...
     def slice(self, offset: int = 0, length: int | None = None) -> Self:
