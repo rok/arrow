@@ -21,7 +21,7 @@ from json import loads as json_loads
 try:
     import numpy as np
 except ImportError:
-    pss
+    pass
 import pytest
 
 import pyarrow as pa
@@ -34,7 +34,7 @@ try:
     from pyarrow.tests.parquet.common import (_read_table, _test_dataframe,
                                               _write_table)
 except ImportError:
-    pq = None
+    pass
 
 
 try:

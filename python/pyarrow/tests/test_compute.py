@@ -42,10 +42,6 @@ import pyarrow as pa
 import pyarrow.compute as pc
 from pyarrow.lib import ArrowNotImplementedError  # type: ignore[unresolved_import]
 
-try:
-    import pyarrow.substrait as pas
-except ImportError:
-    pass
 
 exported_functions = [
     func for (name, func) in sorted(pc.__dict__.items())
