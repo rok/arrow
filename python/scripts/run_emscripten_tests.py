@@ -130,7 +130,7 @@ def launch_server(dist_dir):
     address = q.get(timeout=50)
     time.sleep(0.1)  # wait to make sure server is started
     yield address
-    p.terminate()
+    p.join()
 
 
 class NodeDriver:

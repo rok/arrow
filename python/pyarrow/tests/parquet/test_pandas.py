@@ -16,7 +16,7 @@
 # under the License.
 
 import io
-import json
+from json import loads as json_loads
 
 try:
     import numpy as np
@@ -65,7 +65,7 @@ def test_pandas_parquet_custom_metadata(tempdir):
     metadata = pq.read_metadata(filename).metadata
     assert b'pandas' in metadata
 
-    js = json.loads(metadata[b'pandas'].decode('utf8'))
+    js = json_loads(metadata[b'pandas'].decode('utf8'))
     assert js['index_columns'] == [{'kind': 'range',
                                     'name': None,
                                     'start': 0, 'stop': 10000,
