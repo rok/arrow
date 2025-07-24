@@ -418,7 +418,7 @@ def test_to_pandas_empty_table():
     table = pa.table(df)
     result = table.schema.empty_table().to_pandas()
     assert result.shape == (0, 2)
-    tm.assert_frame_equal(result, df.iloc[:0])
+    tm.assert_frame_equal(result, df.iloc[:0])  # type: ignore[invalid-argument-type]
 
 
 @pytest.mark.pandas

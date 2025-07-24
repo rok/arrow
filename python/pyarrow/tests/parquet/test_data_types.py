@@ -390,7 +390,7 @@ def test_parquet_nested_convenience(tempdir):
 
     read = pq.read_table(
         path, columns=['a'])
-    tm.assert_frame_equal(read.to_pandas(), df[['a']])
+    tm.assert_frame_equal(read.to_pandas(), df[['a']])  # type: ignore[invalid-argument-type]
 
     read = pq.read_table(
         path, columns=['a', 'b'])

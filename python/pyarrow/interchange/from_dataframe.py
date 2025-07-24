@@ -346,7 +346,7 @@ def buffers_to_array(
     buffers: ColumnBuffers,
     data_type: Tuple[DtypeKind, int, str, str],
     length: int,
-    describe_null: ColumnNullType,
+    describe_null: Tuple[ColumnNullType, Any],
     offset: int = 0,
     allow_copy: bool = True,
 ) -> pa.Array:
