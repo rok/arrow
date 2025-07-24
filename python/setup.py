@@ -48,7 +48,7 @@ is_emscripten = (
 )
 
 
-if Cython.__version__ < '3':
+if Cython.__version__ < '3': #  type: ignore[unresolved-attribute]
     raise Exception(
         'Please update your Cython version. Supported Cython >= 3')
 
