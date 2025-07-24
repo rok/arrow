@@ -3266,7 +3266,7 @@ class TestConvertMisc:
             df = pd.DataFrame({'a': pd.arrays.SparseArray([1, np.nan, 3])})
         except AttributeError:
             # pandas.arrays module introduced in pandas 0.24
-            from pandas import SparseArray
+            from pandas import SparseArray  # type: ignore[unresolved-import]
             df = pd.DataFrame({'a': SparseArray([1, np.nan, 3])})
         with pytest.raises(TypeError, match="Sparse pandas data"):
             pa.Table.from_pandas(df)
@@ -4427,12 +4427,11 @@ def test_convert_to_extension_array(monkeypatch):
 
     # monkeypatch pandas Int64Dtype to *not* have the protocol method
     if Version(pd.__version__) < Version("1.3.0.dev"):
-        from pandas.core import integer
+        from pandas.core import integer   # type: ignore[unresolved-import]
         monkeypatch.delattr(
             integer._IntegerDtype, "__from_arrow__")
     else:
         monkeypatch.delattr(
-            # type: ignore[unresolved-attribute]
             pd.core.arrays.integer.NumericDtype, "__from_arrow__")
     # Int64Dtype has no __from_arrow__ -> use normal conversion
     result = table.to_pandas()
@@ -4474,12 +4473,11 @@ def test_conversion_extensiontype_to_extensionarray(monkeypatch):
     # monkeypatch pandas Int64Dtype to *not* have the protocol method
     # (remove the version added above and the actual version for recent pandas)
     if Version(pd.__version__) < Version("1.3.0.dev"):
-        from pandas.core import integer
+        from pandas.core import integer  # type: ignore[unresolved-import]
         monkeypatch.delattr(
             integer._IntegerDtype, "__from_arrow__")
     else:
         monkeypatch.delattr(
-            # type: ignore[unresolved-attribute]
             pd.core.arrays.integer.NumericDtype, "__from_arrow__")
 
     result = arr.to_pandas()
