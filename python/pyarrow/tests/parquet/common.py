@@ -41,7 +41,7 @@ def _write_table(table, path, **kwargs):
 def _read_table(*args, **kwargs):
     import pyarrow.parquet as pq
 
-    table = pq.read_table(*args, **kwargs)
+    table = pq.read_table(*args, **kwargs)  # type: ignore[missing-argument]
     table.validate(full=True)
     return table
 

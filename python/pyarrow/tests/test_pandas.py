@@ -627,11 +627,13 @@ class TestConvertMetadata:
             expected = df[['a']]
             if isinstance(df.index, pd.DatetimeIndex):
                 df.index.freq = None
-            tm.assert_frame_equal(result, expected)  # type: ignore[invalid-argument-type]
+            tm.assert_frame_equal(result, expected) \
+                # type: ignore[invalid-argument-type]
 
             table_subset2 = table_subset.remove_column(1)
             result = table_subset2.to_pandas()
-            tm.assert_frame_equal(result, df[['a']].reset_index(drop=True))  # type: ignore[invalid-argument-type]
+            tm.assert_frame_equal(result, df[['a']].reset_index(drop=True)) \
+                # type: ignore[invalid-argument-type]
 
     def test_to_pandas_column_subset_multiindex(self):
         # ARROW-10122
