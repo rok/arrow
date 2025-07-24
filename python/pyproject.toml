@@ -99,7 +99,7 @@ git_describe_command = 'git describe --dirty --tags --long --match "apache-arrow
 fallback_version = '22.0.0a0'
 
 [tool.ty.rules]
-invalid-argument-type = "ignore"
+#invalid-argument-type = "ignore"
 #invalid-assignment = "ignore"
 #invalid-context-manager = "ignore"
 #invalid-return-type = "ignore"

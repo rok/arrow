@@ -627,11 +627,11 @@ class TestConvertMetadata:
             expected = df[['a']]
             if isinstance(df.index, pd.DatetimeIndex):
                 df.index.freq = None
-            tm.assert_frame_equal(result, expected)
+            tm.assert_frame_equal(result, expected)  # type: ignore[invalid-argument-type]
 
             table_subset2 = table_subset.remove_column(1)
             result = table_subset2.to_pandas()
-            tm.assert_frame_equal(result, df[['a']].reset_index(drop=True))
+            tm.assert_frame_equal(result, df[['a']].reset_index(drop=True))  # type: ignore[invalid-argument-type]
 
     def test_to_pandas_column_subset_multiindex(self):
         # ARROW-10122
@@ -3720,7 +3720,9 @@ def test_table_from_pandas_schema_field_order_metadata():
         coerce_cols_to_types["datetime"] = "datetime64[s, UTC]"
     expected = df[["float", "datetime"]].astype(coerce_cols_to_types)
 
-    tm.assert_frame_equal(result, expected)
+    # TODO: result and expected should have the same type,
+    #  see other ignore[invalid-argument-type] involving assert_frame_equal
+    tm.assert_frame_equal(result, expected)  # type: ignore[invalid-argument-type]
 
 
 # ----------------------------------------------------------------------
