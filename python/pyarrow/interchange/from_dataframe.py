@@ -450,7 +450,7 @@ def buffers_to_array(
 def validity_buffer_from_mask(
     validity_buff: BufferObject,
     validity_dtype: Dtype,
-    describe_null: ColumnNullType,
+    describe_null: Tuple[ColumnNullType, Any],
     length: int,
     offset: int = 0,
     allow_copy: bool = True,
@@ -529,7 +529,7 @@ def validity_buffer_from_mask(
 def validity_buffer_nan_sentinel(
     data_pa_buffer: BufferObject,
     data_type: Dtype,
-    describe_null: ColumnNullType,
+    describe_null: Tuple[ColumnNullType, Any],
     length: int,
     offset: int = 0,
     allow_copy: bool = True,
