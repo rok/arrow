@@ -1118,7 +1118,7 @@ def test_client_wait_for_available():
     server = None
 
     def serve():
-        global server
+        nonlocal server
         time.sleep(0.5)
         server = FlightServerBase(location)
         server.serve()

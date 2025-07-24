@@ -114,7 +114,7 @@ class TemplateOverrider(http.server.SimpleHTTPRequestHandler):
 
 
 def run_server_thread(dist_dir, q):
-    global _SERVER_ADDRESS
+    global _SERVER_ADDRESS  # type: ignore[unresolved-global]
     os.chdir(dist_dir)
     server = http.server.HTTPServer(("", 0), TemplateOverrider)
     q.put(server.server_address)
