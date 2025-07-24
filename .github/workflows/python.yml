@@ -138,6 +138,12 @@ jobs:
         continue-on-error: true
         run: archery docker push ${{ matrix.image }}
 
+      - name: Type check with ty
+        working-directory: python
+        run: |-
+            python -m pip install ty
+            python -m ty check
+
   macos:
     name: ${{ matrix.architecture }} macOS ${{ matrix.macos-version }} Python 3
     runs-on: macos-${{ matrix.macos-version }}
