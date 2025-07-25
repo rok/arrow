@@ -41,6 +41,9 @@ import pyarrow.csv
 import pyarrow.feather
 import pyarrow.fs as fs
 import pyarrow.json
+from pyarrow import lib  # type: ignore[unresolved-attribute]
+from pyarrow.compute import (is_in, hour, days_between, sort_indices, unique) \
+    # type: ignore[unresolved-attribute]
 from pyarrow.lib import is_threading_enabled  # type: ignore[unresolved_import]
 from pyarrow.tests.util import (FSProtocolClass, ProxyHandler,
                                 _configure_s3_limited_user, _filesystem_uri,
@@ -53,24 +56,21 @@ except ImportError:
 
 try:
     import pyarrow.dataset as ds
-    from pyarrow.dataset import (
-        ParquetFragmentScanOptions, ParquetReadOptions, ParquetFileFragment \
-        # type: ignore[possibly-unbound-attribute]
-    )
+    from pyarrow.dataset import ParquetFragmentScanOptions, ParquetReadOptions, \
+        ParquetFileFragment, ParquetFileFormat  # type: ignore[possibly-unbound-attribute]
 except ImportError:
     pass
 
 try:
     from pyarrow.dataset import (
-        OrcFileFormat  # type: ignore[possibly-unbound-attribute]
+        OrcFileFormat  # type: ignore[possibly-unbound-import]
     )
 except ImportError:
     pass
 
 try:
-    import pyarrow.parquet as pq
-    from pyarrow.parquet import ParquetFileFormat \
-        # type: ignore[possibly-unbound-attribute]
+    import pyarrow.parquet as pq \
+        # type: ignore[unresolved-import]
 except ImportError:
     pass
 
@@ -1276,7 +1276,7 @@ def test_make_fragment_with_size(s3_example_simple):
         fragments_with_size, format=file_format, schema=table.schema, filesystem=fs
     )
 
-    with pytest.raises(pyarrow.lib.ArrowInvalid, match='Parquet file size is 1 bytes'):
+    with pytest.raises(lib.ArrowInvalid, match='Parquet file size is 1 bytes'):
         table = dataset_with_size.to_table()
 
     # too large sizes -> error
@@ -3158,13 +3158,13 @@ def test_filter_compute_expression(tempdir, dataset_reader):
     _, path = _create_single_file(tempdir, table)
     dataset = ds.dataset(str(path))
 
-    filter_ = pc.is_in(ds.field('A'), pa.array(["a", "b"]))
+    filter_ = is_in(ds.field('A'), pa.array(["a", "b"]))
     assert dataset_reader.to_table(dataset, filter=filter_).num_rows == 3
 
-    filter_ = pc.hour(ds.field('B')) >= 3
+    filter_ = hour(ds.field('B')) >= 3
     assert dataset_reader.to_table(dataset, filter=filter_).num_rows == 2
 
-    days = pc.days_between(ds.field('B'), ds.field("C"))
+    days = days_between(ds.field('B'), ds.field("C"))
     result = dataset_reader.to_table(dataset, columns={"days": days})
     assert result["days"].to_pylist() == [0, 1, 2, 3, 4]
 
@@ -3687,7 +3687,7 @@ def test_column_names_encoding(tempdir, dataset_reader):
 
     # Reading as string without specifying encoding should produce an error
     dataset = ds.dataset(path, format='csv', schema=expected_schema)
-    with pytest.raises(pyarrow.lib.ArrowInvalid, match="invalid UTF8"):
+    with pytest.raises(lib.ArrowInvalid, match="invalid UTF8"):
         dataset_reader.to_table(dataset)
 
     # Setting the encoding in the read_options should transcode the data
@@ -4189,7 +4189,7 @@ def test_write_to_dataset_given_null_just_works(tempdir):
 
 def _sort_table(tab, sort_col):
     import pyarrow.compute as pc
-    sorted_indices = pc.sort_indices(
+    sorted_indices = sort_indices(
         tab, options=pc.SortOptions([(sort_col, 'ascending')]))
     return pc.take(tab, sorted_indices)
 
@@ -4637,7 +4637,7 @@ def test_write_dataset_max_open_files(tempdir):
     def _get_compare_pair(data_source, record_batch, file_format, col_id):
         num_of_files_generated = _get_num_of_files_generated(
             base_directory=data_source, file_format=file_format)
-        number_of_partitions = len(pa.compute.unique(record_batch[col_id]))
+        number_of_partitions = len(unique(record_batch[col_id]))
         return num_of_files_generated, number_of_partitions
 
     # CASE 1: when max_open_files=default & max_open_files >= num_of_partitions

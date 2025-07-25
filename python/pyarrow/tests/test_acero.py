@@ -19,7 +19,8 @@ import pytest
 
 import pyarrow as pa
 import pyarrow.compute as pc
-from pyarrow.compute import field
+from pyarrow.compute import field, multiply, sum, equal, all as pc_all \
+    # type: ignore[unresolved-import]
 
 try:
     from pyarrow.acero import (
@@ -121,7 +122,7 @@ def test_filter(table_source):
 ])
 def test_filter_all_rows(source):
     # GH-46057: filtering all rows should return empty RecordBatch with same schema
-    result_expr = source.filter(pc.field("number") < 0)
+    result_expr = source.filter(field("number") < 0)
 
     assert result_expr.num_rows == 0
     assert type(result_expr) is type(source)
@@ -138,7 +139,7 @@ def test_project(table_source):
     # default name from expression
     decl = Declaration.from_sequence([
         table_source,
-        Declaration("project", ProjectNodeOptions([pc.multiply(field("a"), 2)]))
+        Declaration("project", ProjectNodeOptions([multiply(field("a"), 2)]))
     ])
     result = decl.to_table()
     assert result.schema.names == ["multiply(a, 2)"]
@@ -147,7 +148,7 @@ def test_project(table_source):
     # provide name
     decl = Declaration.from_sequence([
         table_source,
-        Declaration("project", ProjectNodeOptions([pc.multiply(field("a"), 2)], ["a2"]))
+        Declaration("project", ProjectNodeOptions([multiply(field("a"), 2)], ["a2"]))
     ])
     result = decl.to_table()
     assert result.schema.names == ["a2"]
@@ -155,12 +156,12 @@ def test_project(table_source):
 
     # input validation
     with pytest.raises(ValueError):
-        ProjectNodeOptions([pc.multiply(field("a"), 2)], ["a2", "b2"])
+        ProjectNodeOptions([multiply(field("a"), 2)], ["a2", "b2"])
 
     # no scalar expression
     decl = Declaration.from_sequence([
         table_source,
-        Declaration("project", ProjectNodeOptions([pc.sum(field("a"))]))
+        Declaration("project", ProjectNodeOptions([sum(field("a"))]))
     ])
     with pytest.raises(ValueError, match="cannot Execute non-scalar expression"):
         _ = decl.to_table()
@@ -370,7 +371,7 @@ def test_hash_join_with_residual_filter():
 
     join_opts = HashJoinNodeOptions(
         "inner", left_keys="key", right_keys="key",
-        filter_expression=pc.equal(pc.field('a'), 5))
+        filter_expression=equal(field('a'), 5))
     joined = Declaration(
         "hashjoin", options=join_opts, inputs=[left_source, right_source])
     result = joined.to_table()
@@ -382,7 +383,7 @@ def test_hash_join_with_residual_filter():
     # test filter expression referencing columns from both side
     join_opts = HashJoinNodeOptions(
         "left outer", left_keys="key", right_keys="key",
-        filter_expression=pc.equal(pc.field("a"), 5) | pc.equal(pc.field("b"), 10)
+        filter_expression=equal(field("a"), 5) | equal(field("b"), 10)
     )
     joined = Declaration(
         "hashjoin", options=join_opts, inputs=[left_source, right_source])
@@ -487,10 +488,10 @@ def test_scan(tempdir):
 
     # projection scan option
 
-    scan_opts = ScanNodeOptions(dataset, columns={"a2": pc.multiply(field("a"), 2)})
+    scan_opts = ScanNodeOptions(dataset, columns={"a2": multiply(field("a"), 2)})
     decl = Declaration("scan", scan_opts)
     result = decl.to_table()
     # "a" is included in the result (needed later on for the actual projection)
     assert result["a"].to_pylist() == [1, 2, 3]
     # "b" is still included, but without data as it will be removed by the projection
-    assert pc.all(result["b"].is_null()).as_py()
+    assert pc_all(result["b"].is_null()).as_py()

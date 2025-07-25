@@ -1989,7 +1989,8 @@ def test_write_quoting_style():
     buf = io.BytesIO()
     for write_options, res in [
         (WriteOptions(quoting_style='needed'), b'"c1"\n","\n""""\n'),
-        (WriteOptions(quoting_style='none'), pa.lib.ArrowInvalid),
+        (WriteOptions(quoting_style='none'), pa.lib.ArrowInvalid), \
+            # type: ignore[unresolved-attribute]
     ]:
         with CSVWriter(buf, t.schema, write_options=write_options) as writer:
             try:

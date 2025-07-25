@@ -158,10 +158,10 @@ class GdbSession:
         m = re.search(pat, out)
         if m is None:
             pytest.fail(f"Could not select frame for function {func_name}")
-
-        frame_num = int(m.get(1, None))
-        out = self.run_command(f"frame {frame_num}")
-        assert f"in {func_name}" in out
+        else:
+            frame_num = int(m[1])
+            out = self.run_command(f"frame {frame_num}")
+            assert f"in {func_name}" in out
 
     def join(self):
         if self.proc is not None:

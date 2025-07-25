@@ -201,7 +201,7 @@ def test_timestamp_scalar():
     assert b == "<pyarrow.TimestampScalar: '2015-01-01T00:00:00+0000'>"
     c = repr(pa.scalar(datetime.datetime(2015, 1, 1), type=pa.timestamp('us')))
     assert c == "<pyarrow.TimestampScalar: '2015-01-01T00:00:00.000000'>"
-    d = repr(pc.assume_timezone(
+    d = repr(pc.assume_timezone(  # type: ignore[unresolved-attribute]
         pa.scalar("2000-01-01").cast(pa.timestamp("s")), "America/New_York"))
     assert d == "<pyarrow.TimestampScalar: '2000-01-01T00:00:00-0500'>"
 

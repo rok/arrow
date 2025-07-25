@@ -26,6 +26,7 @@ except ImportError:
     pass
 import pytest
 import pyarrow as pa
+from pyarrow import lib  # type: ignore[unresolved-import]
 import pyarrow.compute as pc
 from pyarrow.interchange import from_dataframe
 from pyarrow.vendored.version import Version
@@ -49,8 +50,8 @@ def test_chunked_array_basics():
         [7, 8, 9]
     ])
     assert isinstance(data.chunks, list)
-    assert all(isinstance(c, pa.lib.Int64Array) for c in data.chunks)
-    assert all(isinstance(c, pa.lib.Int64Array) for c in data.iterchunks())
+    assert all(isinstance(c, lib.Int64Array) for c in data.chunks)
+    assert all(isinstance(c, lib.Int64Array) for c in data.iterchunks())
     assert len(data.chunks) == 3
     assert data.get_total_buffer_size() == sum(c.get_total_buffer_size()
                                                for c in data.iterchunks())
@@ -650,7 +651,7 @@ def test_table_c_stream_interface():
 
     # If schema doesn't match, raises NotImplementedError
     with pytest.raises(
-        pa.lib.ArrowTypeError, match="Field 0 cannot be cast"
+        lib.ArrowTypeError, match="Field 0 cannot be cast"
     ):
         pa.table(
             wrapper, schema=pa.schema([pa.field('a', pa.list_(pa.int32()))])
@@ -2230,7 +2231,7 @@ def test_invalid_table_construct():
     u8 = pa.uint8()
     arrays = [pa.array(array, type=u8), pa.array(array[1:], type=u8)]
 
-    with pytest.raises(pa.lib.ArrowInvalid):
+    with pytest.raises(lib.ArrowInvalid):
         pa.Table.from_arrays(arrays, names=["a1", "a2"])
 
 
@@ -3299,7 +3300,7 @@ def test_table_join_asof_by_length_mismatch():
     })
 
     msg = "inconsistent size of by-key across inputs"
-    with pytest.raises(pa.lib.ArrowInvalid, match=msg):
+    with pytest.raises(lib.ArrowInvalid, match=msg):
         t1.join_asof(
             t2, on="on", by=["colA", "colB"], tolerance=1,
             right_on="on", right_by=["colA"],
@@ -3321,7 +3322,7 @@ def test_table_join_asof_by_type_mismatch():
     })
 
     msg = "Expected by-key type int64 but got double for field colA in input 1"
-    with pytest.raises(pa.lib.ArrowInvalid, match=msg):
+    with pytest.raises(lib.ArrowInvalid, match=msg):
         t1.join_asof(
             t2, on="on", by=["colA"], tolerance=1,
             right_on="on", right_by=["colA"],
@@ -3343,7 +3344,7 @@ def test_table_join_asof_on_type_mismatch():
     })
 
     msg = "Expected on-key type int64 but got double for field on in input 1"
-    with pytest.raises(pa.lib.ArrowInvalid, match=msg):
+    with pytest.raises(lib.ArrowInvalid, match=msg):
         t1.join_asof(
             t2, on="on", by=["colA"], tolerance=1,
             right_on="on", right_by=["colA"],
@@ -3470,14 +3471,14 @@ def test_invalid_non_join_column():
     })
 
     # check as left table
-    with pytest.raises(pa.lib.ArrowInvalid) as excinfo:
+    with pytest.raises(lib.ArrowInvalid) as excinfo:
         t1.join(t2, 'id', join_type='inner')
     exp_error_msg = "Data type list<item: int64> is not supported " \
         + "in join non-key field array_column"
     assert exp_error_msg in str(excinfo.value)
 
     # check as right table
-    with pytest.raises(pa.lib.ArrowInvalid) as excinfo:
+    with pytest.raises(lib.ArrowInvalid) as excinfo:
         t2.join(t1, 'id', join_type='inner')
     assert exp_error_msg in str(excinfo.value)
 

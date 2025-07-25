@@ -627,11 +627,11 @@ def test_type_schema_pickling(pickle_module):
         pa.union([
             pa.field('a', pa.int8()),
             pa.field('b', pa.int16())
-        ], pa.lib.UnionMode_SPARSE),
+        ], pa.lib.UnionMode_SPARSE),  # type: ignore[unresolved-attribute]
         pa.union([
             pa.field('a', pa.int8()),
             pa.field('b', pa.int16())
-        ], pa.lib.UnionMode_DENSE),
+        ], pa.lib.UnionMode_DENSE),  # type: ignore[unresolved-attribute]
         pa.time32('s'),
         pa.time64('us'),
         pa.date32(),

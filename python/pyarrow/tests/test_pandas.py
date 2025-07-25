@@ -32,7 +32,8 @@ try:
     import numpy as np
     import numpy.testing as npt
     try:
-        _np_VisibleDeprecationWarning = np.VisibleDeprecationWarning
+        _np_VisibleDeprecationWarning = np.VisibleDeprecationWarning \
+            # type: ignore[unresolved-attribute]
     except AttributeError:
         from numpy.exceptions import (
             VisibleDeprecationWarning as _np_VisibleDeprecationWarning
@@ -47,6 +48,7 @@ import pyarrow.tests.util as test_util
 from pyarrow.vendored.version import Version
 
 import pyarrow as pa
+from pyarrow import lib  # type: ignore[unresolved-attribute]
 try:
     from pyarrow import parquet as pq
 except ImportError:
@@ -1939,7 +1941,7 @@ class TestConvertStringLikeTypes:
     # cannot be converted to utf-8
     def test_array_of_bytes_to_strings_bad_data(self):
         with pytest.raises(
-                pa.lib.ArrowInvalid,
+                lib.ArrowInvalid,
                 match="was not a utf8 string"):
             pa.array(np.array([b'\x80\x81'], dtype=object), pa.string())
 
@@ -1955,13 +1957,13 @@ class TestConvertStringLikeTypes:
         expected = pa.array([b'foo', None, b'baz'], type=pa.binary(3))
         assert converted.equals(expected)
 
-        with pytest.raises(pa.lib.ArrowInvalid,
+        with pytest.raises(lib.ArrowInvalid,
                            match=r'Got bytestring of length 3 \(expected 4\)'):
             arr = np.array([b'foo', b'bar', b'baz'], dtype='|S3')
             pa.array(arr, type=pa.binary(4))
 
         with pytest.raises(
-                pa.lib.ArrowInvalid,
+                lib.ArrowInvalid,
                 match=r'Got bytestring of length 12 \(expected 3\)'):
             arr = np.array([b'foo', b'bar', b'baz'], dtype='|U3')
             pa.array(arr, type=pa.binary(3))
@@ -4432,7 +4434,8 @@ def test_convert_to_extension_array(monkeypatch):
             integer._IntegerDtype, "__from_arrow__")
     else:
         monkeypatch.delattr(
-            pd.core.arrays.integer.NumericDtype, "__from_arrow__")
+            pd.core.arrays.integer.NumericDtype, "__from_arrow__") \
+            # type: ignore[unresolved-attribute]
     # Int64Dtype has no __from_arrow__ -> use normal conversion
     result = table.to_pandas()
     assert len(_get_mgr(result).blocks) == 1
@@ -4478,7 +4481,8 @@ def test_conversion_extensiontype_to_extensionarray(monkeypatch):
             integer._IntegerDtype, "__from_arrow__")
     else:
         monkeypatch.delattr(
-            pd.core.arrays.integer.NumericDtype, "__from_arrow__")
+            pd.core.arrays.integer.NumericDtype, "__from_arrow__") \
+            # type: ignore[unresolved-attribute]
 
     result = arr.to_pandas()
     assert _get_mgr(result).blocks[0].values.dtype == np.dtype("int64")
@@ -5122,7 +5126,7 @@ def test_roundtrip_map_array_with_pydicts_duplicate_keys():
 
     # ------------------------
     # With maps as pydicts
-    with pytest.raises(pa.lib.ArrowException):
+    with pytest.raises(lib.ArrowException):
         # raises because of duplicate keys
         maps.to_pandas(maps_as_pydicts="strict")
     series_pydicts = maps.to_pandas(maps_as_pydicts="lossy")
