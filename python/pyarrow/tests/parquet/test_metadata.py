@@ -494,12 +494,12 @@ def test_multi_dataset_metadata(tempdir):
 
     # Write merged metadata-only file
     with open(metapath, "wb") as f:
-        _meta.write_metadata_file(f)
+        _meta.write_metadata_file(f)  # type: ignore[possibly-unbound-attribute]
 
     # Read back the metadata
     meta = pq.read_metadata(metapath)
     md = meta.to_dict()
-    _md = _meta.to_dict()
+    _md = _meta.to_dict()  # type: ignore[possibly-unbound-attribute]
     for key in _md:
         if key != 'serialized_size':
             assert _md[key] == md[key]

@@ -67,16 +67,19 @@ def kms_factory(kms_connection_configuration):
 
 
 crypto_factory = pe.CryptoFactory(kms_factory)
-parquet_encryption_cfg = ds.ParquetEncryptionConfig(
+parquet_encryption_cfg = ds.ParquetEncryptionConfig( \
+    # type: ignore[possibly-unbound-attribute]
     crypto_factory, kms_connection_config, encryption_config)
-parquet_decryption_cfg = ds.ParquetDecryptionConfig(crypto_factory,
-                                                    kms_connection_config,
-                                                    decryption_config)
+parquet_decryption_cfg = ds.ParquetDecryptionConfig( \
+    # type: ignore[possibly-unbound-attribute]
+    crypto_factory, kms_connection_config, decryption_config)
 
 # set encryption config for parquet fragment scan options
-pq_scan_opts = ds.ParquetFragmentScanOptions()
+pq_scan_opts = ds.ParquetFragmentScanOptions() \
+    # type: ignore[possibly-unbound-attribute]
 pq_scan_opts.parquet_decryption_config = parquet_decryption_cfg
-pformat = pa.dataset.ParquetFileFormat(default_fragment_scan_options=pq_scan_opts)
+pformat = pa.dataset.ParquetFileFormat(default_fragment_scan_options=pq_scan_opts) \
+    # type: ignore[possibly-unbound-attribute]
 
 if os.path.exists('sample_dataset'):
     shutil.rmtree('sample_dataset')

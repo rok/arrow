@@ -63,7 +63,7 @@ def compression(request):
     yield request.param
 
 
-TEST_FILES = None
+TEST_FILES = []
 
 
 def setup_module(module):

@@ -30,7 +30,7 @@ from numba.cuda.cudadrv.devicearray import DeviceNDArray \
     # type: ignore[unresolved_import]  # noqa: E402
 
 
-context_choices = None
+context_choices = {}
 context_choice_ids = ['pyarrow.cuda', 'numba.cuda']
 
 
@@ -73,7 +73,8 @@ def make_random_buffer(size, target='host', dtype='uint8', ctx=None):
         return arr, buf
     elif target == 'device':
         arr, buf = make_random_buffer(size, target='host', dtype=dtype)
-        dbuf = ctx.new_buffer(size * dtype.itemsize)
+        dbuf = ctx.new_buffer(size * dtype.itemsize) \
+            # type: ignore[possibly-unbound-attribute]
         dbuf.copy_from_host(buf, position=0, nbytes=buf.size)
         return arr, dbuf
     raise ValueError('invalid target value')
