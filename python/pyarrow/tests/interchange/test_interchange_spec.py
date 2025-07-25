@@ -22,7 +22,6 @@ import pyarrow as pa
 import pyarrow.tests.strategies as past
 import pytest
 
-np = None
 try:
     import numpy as np
 except ImportError:

@@ -1404,7 +1404,8 @@ Examples
             else:
                 single_file = path_or_paths
 
-        parquet_format = ds.ParquetFileFormat(**read_options)
+        parquet_format = ds.ParquetFileFormat(**read_options) \
+            # type: ignore[possibly-unbound-attribute]
 
         if single_file is not None:
             fragment = parquet_format.make_fragment(single_file, filesystem)
@@ -2200,7 +2201,7 @@ def write_to_dataset(table, root_path, partition_cols=None,
             metadata_collector.append(written_file.metadata)
 
     # map format arguments
-    parquet_format = ds.ParquetFileFormat()
+    parquet_format = ds.ParquetFileFormat()  # type: ignore[possibly-unbound-attribute]
     write_options = parquet_format.make_write_options(**kwargs)
 
     # map old filesystems to new one

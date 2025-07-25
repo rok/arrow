@@ -755,8 +755,10 @@ def _reconstruct_block(item, columns=None, extension_columns=None, return_block=
         # create ExtensionBlock
         arr = item['py_array']
         assert len(placement) == 1
-        name = columns.get(placement[0], None)
-        pandas_dtype = extension_columns.get(name, None)
+        name = columns.get(placement[0], None) \
+            # type: ignore[possibly-unbound-attribute]
+        pandas_dtype = extension_columns.get(name, None) \
+            # type: ignore[possibly-unbound-attribute]
         if not hasattr(pandas_dtype, '__from_arrow__'):
             raise ValueError("This column does not support to be converted "
                              "to a pandas ExtensionArray")

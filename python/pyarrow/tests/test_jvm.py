@@ -43,7 +43,7 @@ def root_allocator():
         'POM:version',
         namespaces={
             'POM': 'http://maven.apache.org/POM/4.0.0'
-        }).text
+        }).text  # type: ignore[possibly-unbound-attribute]
     jar_path = os.path.join(
         arrow_dir, 'java', 'tools', 'target',
         f'arrow-tools-{version}-jar-with-dependencies.jar')
