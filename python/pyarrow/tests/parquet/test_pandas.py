@@ -260,7 +260,8 @@ def test_pandas_parquet_configuration_options(tempdir):
 
     for compression in ['NONE', 'SNAPPY', 'GZIP', 'LZ4', 'ZSTD']:
         if (compression != 'NONE' and
-                not pa.lib.Codec.is_available(compression)):
+                not pa.lib.Codec.is_available(compression)): \
+                # type: ignore[unresolved-attribute]
             continue
         _write_table(arrow_table, filename, version='2.6',
                      compression=compression)

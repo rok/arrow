@@ -70,7 +70,7 @@ def do_action(args, client, connection_args={}):
         print('Running action', args.action_type)
         for result in client.do_action(action):
             print("Got result", result.body.to_pybytes())
-    except pyarrow.lib.ArrowIOError as e:
+    except pyarrow.lib.ArrowIOError as e:  # type: ignore[unresolved-attribute]
         print("Error calling action:", e)
 
 
