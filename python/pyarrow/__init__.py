@@ -37,11 +37,12 @@ import sys as _sys
 import warnings as _warnings
 
 try:
-    from ._generated_version import version as __version__
+    from ._generated_version import version as __version__ \
+        # type: ignore[unresolved-import]
 except ImportError:
     # Package is not installed, parse git tag at runtime
     try:
-        import setuptools_scm
+        import setuptools_scm  # type: ignore[unresolved-import]
         # Code duplicated from setup.py to avoid a dependency on each other
 
         def parse_git(root, **kwargs):
@@ -49,17 +50,17 @@ except ImportError:
             Parse function for setuptools_scm that ignores tags for non-C++
             subprojects, e.g. apache-arrow-js-XXX tags.
             """
-            from setuptools_scm.git import parse
+            from setuptools_scm.git import parse  # type: ignore[unresolved-import]
             kwargs['describe_command'] = \
                 "git describe --dirty --tags --long --match 'apache-arrow-[0-9]*.*'"
-            return parse(root, **kwargs)
+            return parse(root, **kwargs)  # type: ignore[missing-argument]
         __version__ = setuptools_scm.get_version('../',
                                                  parse=parse_git)
     except ImportError:
-        __version__ = None
+        __version__ = None  # type: ignore[invalid-assignment]
 
-import pyarrow.lib as _lib
-from pyarrow.lib import (BuildInfo, CppBuildInfo, RuntimeInfo, set_timezone_db_path,
+import pyarrow.lib as _lib  # type: ignore[unresolved_import]
+from pyarrow.lib import (BuildInfo, CppBuildInfo, RuntimeInfo, set_timezone_db_path,  # type: ignore[unresolved_import]
                          MonthDayNano, VersionInfo, build_info, cpp_build_info,
                          cpp_version, cpp_version_info, runtime_info,
                          cpu_count, set_cpu_count, enable_signal_handlers,
@@ -153,7 +154,7 @@ def show_info():
         print(f"  {codec: <20}: {status: <8}")
 
 
-from pyarrow.lib import (null, bool_,
+from pyarrow.lib import (null, bool_,  # type: ignore[unresolved_import]
                          int8, int16, int32, int64,
                          uint8, uint16, uint32, uint64,
                          time32, time64, timestamp, date32, date64, duration,
@@ -237,13 +238,13 @@ from pyarrow.lib import (null, bool_,
                          FixedShapeTensorScalar, JsonScalar, OpaqueScalar, UuidScalar)
 
 # Buffers, allocation
-from pyarrow.lib import (DeviceAllocationType, Device, MemoryManager,
+from pyarrow.lib import (DeviceAllocationType, Device, MemoryManager,  # type: ignore[unresolved_import]
                          default_cpu_memory_manager)
 
-from pyarrow.lib import (Buffer, ResizableBuffer, foreign_buffer, py_buffer,
+from pyarrow.lib import (Buffer, ResizableBuffer, foreign_buffer, py_buffer,  # type: ignore[unresolved_import]
                          Codec, compress, decompress, allocate_buffer)
 
-from pyarrow.lib import (MemoryPool, LoggingMemoryPool, ProxyMemoryPool,
+from pyarrow.lib import (MemoryPool, LoggingMemoryPool, ProxyMemoryPool,  # type: ignore[unresolved_import]
                          total_allocated_bytes, set_memory_pool,
                          default_memory_pool, system_memory_pool,
                          jemalloc_memory_pool, mimalloc_memory_pool,
@@ -252,7 +253,7 @@ from pyarrow.lib import (MemoryPool, LoggingMemoryPool, ProxyMemoryPool,
                          supported_memory_backends)
 
 # I/O
-from pyarrow.lib import (NativeFile, PythonFile,
+from pyarrow.lib import (NativeFile, PythonFile,  # type: ignore[unresolved_import]
                          BufferedInputStream, BufferedOutputStream, CacheOptions,
                          CompressedInputStream, CompressedOutputStream,
                          TransformInputStream, transcoding_input_stream,
@@ -263,12 +264,12 @@ from pyarrow.lib import (NativeFile, PythonFile,
                          input_stream, output_stream,
                          have_libhdfs)
 
-from pyarrow.lib import (ChunkedArray, RecordBatch, Table, table,
+from pyarrow.lib import (ChunkedArray, RecordBatch, Table, table,  # type: ignore[unresolved_import]
                          concat_arrays, concat_tables, TableGroupBy,
                          RecordBatchReader, concat_batches)
 
 # Exceptions
-from pyarrow.lib import (ArrowCancelled,
+from pyarrow.lib import (ArrowCancelled,  # type: ignore[unresolved_import]
                          ArrowCapacityError,
                          ArrowException,
                          ArrowKeyError,

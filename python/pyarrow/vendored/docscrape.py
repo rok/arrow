@@ -105,6 +105,10 @@ class Reader:
 
 
 class ParseError(Exception):
+    def __init__(self, *args, docstring=None, **kwargs):
+        self.__init__(*args, **kwargs)
+        self.docstring = docstring
+
     def __str__(self):
         message = self.args[0]
         if hasattr(self, 'docstring'):
@@ -153,7 +157,7 @@ class NumpyDocString(Mapping):
         try:
             self._parse()
         except ParseError as e:
-            e.docstring = orig_docstring
+            e.docstring = orig_docstring #  type: ignore[unresolved-attribute]
             raise
 
     def __getitem__(self, key):
@@ -618,7 +622,7 @@ class ClassDoc(NumpyDocString):
         self._cls = cls
 
         if 'sphinx' in sys.modules:
-            from sphinx.ext.autodoc import ALL
+            from sphinx.ext.autodoc import ALL  # type: ignore[unresolved-import]
         else:
             ALL = object()
 

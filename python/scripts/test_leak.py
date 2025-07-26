@@ -71,7 +71,7 @@ def test_leak2():
         writer.close()
 
         buf_reader = pa.BufferReader(sink.getvalue())
-        reader = pa.open_file(buf_reader)
+        reader = pa.ipc.open_file(buf_reader)
         reader.read_all()
 
     assert_does_not_leak(func, iterations=50, tolerance=50)

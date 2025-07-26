@@ -25,17 +25,23 @@ import concurrent.futures.thread  # noqa
 from copy import deepcopy
 import decimal
 from itertools import zip_longest
-import json
+from json import dumps as json_dumps
 import operator
 import re
 import warnings
 
 try:
-    import numpy as np
+    import numpy as np  # type: ignore[unresolved-import]
 except ImportError:
-    np = None
+    pass
+
+try:
+    from pyarrow import lib  # type: ignore[unresolved-attribute]
+except ImportError:
+    pass
+
 import pyarrow as pa
-from pyarrow.lib import _pandas_api, frombytes, is_threading_enabled  # noqa
+from pyarrow.lib import _pandas_api, frombytes, is_threading_enabled  # type: ignore[unresolved_import]  # noqa
 
 
 _logical_type_map = {}
@@ -48,26 +54,26 @@ def get_logical_type_map():
 
     if not _logical_type_map:
         _logical_type_map.update({
-            pa.lib.Type_NA: 'empty',
-            pa.lib.Type_BOOL: 'bool',
-            pa.lib.Type_INT8: 'int8',
-            pa.lib.Type_INT16: 'int16',
-            pa.lib.Type_INT32: 'int32',
-            pa.lib.Type_INT64: 'int64',
-            pa.lib.Type_UINT8: 'uint8',
-            pa.lib.Type_UINT16: 'uint16',
-            pa.lib.Type_UINT32: 'uint32',
-            pa.lib.Type_UINT64: 'uint64',
-            pa.lib.Type_HALF_FLOAT: 'float16',
-            pa.lib.Type_FLOAT: 'float32',
-            pa.lib.Type_DOUBLE: 'float64',
-            pa.lib.Type_DATE32: 'date',
-            pa.lib.Type_DATE64: 'date',
-            pa.lib.Type_TIME32: 'time',
-            pa.lib.Type_TIME64: 'time',
-            pa.lib.Type_BINARY: 'bytes',
-            pa.lib.Type_FIXED_SIZE_BINARY: 'bytes',
-            pa.lib.Type_STRING: 'unicode',
+            lib.Type_NA: 'empty',
+            lib.Type_BOOL: 'bool',
+            lib.Type_INT8: 'int8',
+            lib.Type_INT16: 'int16',
+            lib.Type_INT32: 'int32',
+            lib.Type_INT64: 'int64',
+            lib.Type_UINT8: 'uint8',
+            lib.Type_UINT16: 'uint16',
+            lib.Type_UINT32: 'uint32',
+            lib.Type_UINT64: 'uint64',
+            lib.Type_HALF_FLOAT: 'float16',
+            lib.Type_FLOAT: 'float32',
+            lib.Type_DOUBLE: 'float64',
+            lib.Type_DATE32: 'date',
+            lib.Type_DATE64: 'date',
+            lib.Type_TIME32: 'time',
+            lib.Type_TIME64: 'time',
+            lib.Type_BINARY: 'bytes',
+            lib.Type_FIXED_SIZE_BINARY: 'bytes',
+            lib.Type_STRING: 'unicode',
         })
     return _logical_type_map
 
@@ -78,11 +84,11 @@ def get_logical_type(arrow_type):
     try:
         return logical_type_map[arrow_type.id]
     except KeyError:
-        if isinstance(arrow_type, pa.lib.DictionaryType):
+        if isinstance(arrow_type, lib.DictionaryType):
             return 'categorical'
-        elif isinstance(arrow_type, pa.lib.ListType):
+        elif isinstance(arrow_type, lib.ListType):
             return f'list[{get_logical_type(arrow_type.value_type)}]'
-        elif isinstance(arrow_type, pa.lib.TimestampType):
+        elif isinstance(arrow_type, lib.TimestampType):
             return 'datetimetz' if arrow_type.tz is not None else 'datetime'
         elif pa.types.is_decimal(arrow_type):
             return 'decimal'
@@ -139,7 +145,7 @@ def get_extension_dtype_info(column):
         }
         physical_dtype = str(cats.codes.dtype)
     elif hasattr(dtype, 'tz'):
-        metadata = {'timezone': pa.lib.tzinfo_to_string(dtype.tz)}
+        metadata = {'timezone': lib.tzinfo_to_string(dtype.tz)}
         physical_dtype = 'datetime64[ns]'
     else:
         metadata = None
@@ -276,7 +282,7 @@ def construct_metadata(columns_to_convert, df, column_names, index_levels,
         index_descriptors = index_column_metadata = column_indexes = []
 
     return {
-        b'pandas': json.dumps({
+        b'pandas': json_dumps({
             'index_columns': index_descriptors,
             'column_indexes': column_indexes,
             'columns': column_metadata + index_column_metadata,
@@ -511,7 +517,7 @@ def _get_index_level(df, name):
 def _level_name(name):
     # preserve type when default serializable, otherwise str it
     try:
-        json.dumps(name)
+        json_dumps(name)
         return name
     except TypeError:
         return str(name)
@@ -569,7 +575,7 @@ def dataframe_to_types(df, preserve_index, columns=None):
             type_ = pa.array(empty, from_pandas=True).type
         else:
             values, type_ = get_datetimetz_type(values, c.dtype, None)
-            type_ = pa.lib._ndarray_to_arrow_type(values, type_)
+            type_ = lib._ndarray_to_arrow_type(values, type_)
             if type_ is None:
                 type_ = pa.array(c, from_pandas=True).type
         types.append(type_)
@@ -729,7 +735,7 @@ def _reconstruct_block(item, columns=None, extension_columns=None, return_block=
     pandas Block
 
     """
-    import pandas.core.internals as _int
+    import pandas.core.internals as _int  # type: ignore[unresolved_import]
 
     block_arr = item.get('block', None)
     placement = item['placement']
@@ -755,8 +761,8 @@ def _reconstruct_block(item, columns=None, extension_columns=None, return_block=
         # create ExtensionBlock
         arr = item['py_array']
         assert len(placement) == 1
-        name = columns[placement[0]]
-        pandas_dtype = extension_columns[name]
+        name = columns[placement[0]]  # type: ignore[non-subscriptable]
+        pandas_dtype = extension_columns[name]  # type: ignore[non-subscriptable]
         if not hasattr(pandas_dtype, '__from_arrow__'):
             raise ValueError("This column does not support to be converted "
                              "to a pandas ExtensionArray")
@@ -773,7 +779,7 @@ def _reconstruct_block(item, columns=None, extension_columns=None, return_block=
 def make_datetimetz(unit, tz):
     if _pandas_api.is_v1():
         unit = 'ns'  # ARROW-3789: Coerce date/timestamp types to datetime64[ns]
-    tz = pa.lib.string_to_tzinfo(tz)
+    tz = lib.string_to_tzinfo(tz)
     return _pandas_api.datetimetz_type(unit, tz=tz)
 
 
@@ -803,10 +809,11 @@ def table_to_dataframe(
     columns = _deserialize_column_index(table, all_columns, column_indexes)
 
     column_names = table.column_names
-    result = pa.lib.table_to_blocks(options, table, categories,
-                                    list(ext_columns_dtypes.keys()))
+    result = lib.table_to_blocks(options, table, categories,
+                                 list(ext_columns_dtypes.keys()))
     if _pandas_api.is_ge_v3():
-        from pandas.api.internals import create_dataframe_from_blocks
+        from pandas.api.internals import create_dataframe_from_blocks \
+            # type: ignore[unresolved_import]
 
         blocks = [
             _reconstruct_block(
@@ -816,8 +823,9 @@ def table_to_dataframe(
         df = create_dataframe_from_blocks(blocks, index=index, columns=columns)
         return df
     else:
-        from pandas.core.internals import BlockManager
-        from pandas import DataFrame
+        from pandas.core.internals import BlockManager \
+            # type: ignore[unresolved_import]
+        from pandas import DataFrame  # type: ignore[unresolved-import]
 
         blocks = [
             _reconstruct_block(item, column_names, ext_columns_dtypes)
@@ -826,7 +834,8 @@ def table_to_dataframe(
         axes = [columns, index]
         mgr = BlockManager(blocks, axes)
         if _pandas_api.is_ge_v21():
-            df = DataFrame._from_mgr(mgr, mgr.axes)
+            df = DataFrame._from_mgr(mgr, mgr.axes) \
+                # type: ignore[unresolved-attribute]
         else:
             df = DataFrame(mgr)
         return df
@@ -1161,7 +1170,7 @@ def _reconstruct_columns_from_metadata(columns, column_indexes):
             level = level.map(encoder)
         # ARROW-13756: if index is timezone aware DataTimeIndex
         elif pandas_dtype == "datetimetz":
-            tz = pa.lib.string_to_tzinfo(
+            tz = lib.string_to_tzinfo(
                 column_indexes[0]['metadata']['timezone'])
             level = pd.to_datetime(level, utc=True).tz_convert(tz)
             if _pandas_api.is_ge_v3():
@@ -1229,7 +1238,7 @@ def _add_any_metadata(table, pandas_metadata):
         if idx != -1:
             if col_meta['pandas_type'] == 'datetimetz':
                 col = table[idx]
-                if not isinstance(col.type, pa.lib.TimestampType):
+                if not isinstance(col.type, lib.TimestampType):
                     continue
                 metadata = col_meta['metadata']
                 if not metadata:
@@ -1268,7 +1277,7 @@ def make_tz_aware(series, tz):
     """
     Make a datetime64 Series timezone-aware for the given tz
     """
-    tz = pa.lib.string_to_tzinfo(tz)
+    tz = lib.string_to_tzinfo(tz)
     series = (series.dt.tz_localize('utc')
                     .dt.tz_convert(tz))
     return series

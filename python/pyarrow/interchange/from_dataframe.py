@@ -32,6 +32,7 @@ import pyarrow as pa
 import re
 
 import pyarrow.compute as pc
+from pyarrow.compute import equal, invert, is_nan  # type: ignore[unresolved-attribute]
 from pyarrow.interchange.column import Dtype
 
 
@@ -346,7 +347,7 @@ def buffers_to_array(
     buffers: ColumnBuffers,
     data_type: Tuple[DtypeKind, int, str, str],
     length: int,
-    describe_null: ColumnNullType,
+    describe_null: Tuple[ColumnNullType, Any],
     offset: int = 0,
     allow_copy: bool = True,
 ) -> pa.Array:
@@ -450,7 +451,7 @@ def buffers_to_array(
 def validity_buffer_from_mask(
     validity_buff: BufferObject,
     validity_dtype: Dtype,
-    describe_null: ColumnNullType,
+    describe_null: Tuple[ColumnNullType, Any],
     length: int,
     offset: int = 0,
     allow_copy: bool = True,
@@ -513,7 +514,7 @@ def validity_buffer_from_mask(
                                               offset=offset)
 
         if sentinel_val == 1:
-            mask_bool = pc.invert(mask_bool)
+            mask_bool = invert(mask_bool)
 
         return mask_bool.buffers()[1]
 
@@ -529,7 +530,7 @@ def validity_buffer_from_mask(
 def validity_buffer_nan_sentinel(
     data_pa_buffer: BufferObject,
     data_type: Dtype,
-    describe_null: ColumnNullType,
+    describe_null: Tuple[ColumnNullType, Any],
     length: int,
     offset: int = 0,
     allow_copy: bool = True,
@@ -583,8 +584,8 @@ def validity_buffer_nan_sentinel(
                 [None, data_pa_buffer],
                 offset=offset,
             )
-            mask = pc.is_nan(pyarrow_data)
-            mask = pc.invert(mask)
+            mask = is_nan(pyarrow_data)
+            mask = invert(mask)
             return mask.buffers()[1]
 
     # Check for sentinel values
@@ -603,8 +604,8 @@ def validity_buffer_nan_sentinel(
                                              length,
                                              [None, data_pa_buffer],
                                              offset=offset)
-        sentinel_arr = pc.equal(pyarrow_data, sentinel_val)
-        mask_bool = pc.invert(sentinel_arr)
+        sentinel_arr = equal(pyarrow_data, sentinel_val)
+        mask_bool = invert(sentinel_arr)
         return mask_bool.buffers()[1]
 
     elif null_kind == ColumnNullType.NON_NULLABLE:

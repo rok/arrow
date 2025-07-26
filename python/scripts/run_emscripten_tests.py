@@ -114,7 +114,7 @@ class TemplateOverrider(http.server.SimpleHTTPRequestHandler):
 
 
 def run_server_thread(dist_dir, q):
-    global _SERVER_ADDRESS
+    global _SERVER_ADDRESS  # type: ignore[unresolved-global]
     os.chdir(dist_dir)
     server = http.server.HTTPServer(("", 0), TemplateOverrider)
     q.put(server.server_address)
@@ -130,7 +130,7 @@ def launch_server(dist_dir):
     address = q.get(timeout=50)
     time.sleep(0.1)  # wait to make sure server is started
     yield address
-    p.terminate()
+    p.join()
 
 
 class NodeDriver:

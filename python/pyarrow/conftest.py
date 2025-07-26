@@ -15,13 +15,13 @@
 # specific language governing permissions and limitations
 # under the License.
 
-import pytest
+import pytest  # type: ignore[unresolved-import]
 
 import os
 import pyarrow as pa
 from pyarrow import Codec
 from pyarrow import fs
-from pyarrow.lib import is_threading_enabled
+from pyarrow.lib import is_threading_enabled  # type: ignore[unresolved_import]
 from pyarrow.tests.util import windows_has_tzdata
 import sys
 
@@ -114,19 +114,19 @@ elif sys.platform == "emscripten":
     defaults['timezone_data'] = os.path.exists("/usr/share/zoneinfo")
 
 try:
-    import cython  # noqa
+    import cython  # type: ignore[unresolved-import]  # noqa
     defaults['cython'] = True
 except ImportError:
     pass
 
 try:
-    import fastparquet  # noqa
+    import fastparquet  # type: ignore[unresolved_import]  # noqa
     defaults['fastparquet'] = True
 except ImportError:
     pass
 
 try:
-    import pyarrow.gandiva  # noqa
+    import pyarrow.gandiva  # type: ignore[unresolved_import]  # noqa
     defaults['gandiva'] = True
 except ImportError:
     pass
@@ -156,13 +156,13 @@ except ImportError:
     pass
 
 try:
-    import pandas  # noqa
+    import pandas  # type: ignore[unresolved-import]  # noqa
     defaults['pandas'] = True
 except ImportError:
     defaults['nopandas'] = True
 
 try:
-    import numpy  # noqa
+    import numpy  # type: ignore[unresolved-import]  # noqa
     defaults['numpy'] = True
 except ImportError:
     defaults['nonumpy'] = True
@@ -186,25 +186,25 @@ except ImportError:
     pass
 
 try:
-    from pyarrow.fs import AzureFileSystem  # noqa
+    from pyarrow.fs import AzureFileSystem  # type: ignore[possibly-unbound-import]  # noqa
     defaults['azure'] = True
 except ImportError:
     pass
 
 try:
-    from pyarrow.fs import GcsFileSystem  # noqa
+    from pyarrow.fs import GcsFileSystem  # type: ignore[possibly-unbound-import]  # noqa
     defaults['gcs'] = True
 except ImportError:
     pass
 
 try:
-    from pyarrow.fs import S3FileSystem  # noqa
+    from pyarrow.fs import S3FileSystem  # type: ignore[possibly-unbound-import]  # noqa
     defaults['s3'] = True
 except ImportError:
     pass
 
 try:
-    from pyarrow.fs import HadoopFileSystem  # noqa
+    from pyarrow.fs import HadoopFileSystem  # type: ignore[possibly-unbound-import]  # noqa
     defaults['hdfs'] = True
 except ImportError:
     pass
@@ -250,7 +250,7 @@ def pytest_ignore_collect(collection_path, config):
 
         if 'pyarrow/fs' in str(collection_path):
             try:
-                from pyarrow.fs import S3FileSystem  # noqa
+                from pyarrow.fs import S3FileSystem  # type: ignore[possibly-unbound-import]  # noqa
                 return False
             except ImportError:
                 return True
@@ -336,7 +336,7 @@ def unary_agg_func_fixture():
     Register a unary aggregate function (mean)
     """
     from pyarrow import compute as pc
-    import numpy as np
+    import numpy as np  # type: ignore[unresolved-import]
 
     def func(ctx, x):
         return pa.scalar(np.nanmean(x))
@@ -362,7 +362,7 @@ def varargs_agg_func_fixture():
     Register a unary aggregate function
     """
     from pyarrow import compute as pc
-    import numpy as np
+    import numpy as np  # type: ignore[unresolved-import]
 
     def func(ctx, *args):
         sum = 0.0

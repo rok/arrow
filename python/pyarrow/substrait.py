@@ -16,7 +16,7 @@
 # under the License.
 
 try:
-    from pyarrow._substrait import (  # noqa
+    from pyarrow._substrait import (  # type: ignore[unresolved_import]  # noqa
         BoundExpressions,
         get_supported_functions,
         run_query,
