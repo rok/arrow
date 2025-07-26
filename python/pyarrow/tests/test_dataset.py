@@ -32,7 +32,7 @@ from urllib.parse import quote
 try:
     import numpy as np
 except ImportError:
-    pass
+    np = None
 import pytest
 
 import pyarrow as pa
@@ -41,10 +41,7 @@ import pyarrow.csv
 import pyarrow.feather
 import pyarrow.fs as fs
 import pyarrow.json
-from pyarrow import lib  # type: ignore[unresolved-attribute]
-from pyarrow.compute import (is_in, hour, days_between, sort_indices, unique) \
-    # type: ignore[unresolved-attribute]
-from pyarrow.lib import is_threading_enabled  # type: ignore[unresolved_import]
+from pyarrow.lib import is_threading_enabled
 from pyarrow.tests.util import (FSProtocolClass, ProxyHandler,
                                 _configure_s3_limited_user, _filesystem_uri,
                                 change_cwd)
@@ -52,27 +49,17 @@ from pyarrow.tests.util import (FSProtocolClass, ProxyHandler,
 try:
     import pandas as pd
 except ImportError:
-    pass
+    pd = None
 
 try:
     import pyarrow.dataset as ds
-    from pyarrow.dataset import ParquetFragmentScanOptions, ParquetReadOptions, \
-        ParquetFileFragment, ParquetFileFormat  # type: ignore[possibly-unbound-attribute]
 except ImportError:
-    pass
+    ds = None
 
 try:
-    from pyarrow.dataset import (
-        OrcFileFormat  # type: ignore[possibly-unbound-import]
-    )
+    import pyarrow.parquet as pq
 except ImportError:
-    pass
-
-try:
-    import pyarrow.parquet as pq \
-        # type: ignore[unresolved-import]
-except ImportError:
-    pass
+    pq = None
 
 # Marks all of the tests in this module
 # Ignore these with pytest ... -m 'not dataset'
@@ -283,7 +270,7 @@ def multisourcefs(request):
 
 @pytest.fixture
 def dataset(mockfs):
-    format = ParquetFileFormat()
+    format = ds.ParquetFileFormat()
     selector = fs.FileSelector('subdir', recursive=True)
     options = ds.FileSystemFactoryOptions('subdir')
     options.partitioning = ds.DirectoryPartitioning(
@@ -351,7 +338,7 @@ def test_filesystem_dataset(mockfs):
     schema = pa.schema([
         pa.field('const', pa.int64())
     ])
-    file_format = ParquetFileFormat()
+    file_format = ds.ParquetFileFormat()
     paths = ['subdir/1/xxx/file0.parquet', 'subdir/2/yyy/file1.parquet']
     partitions = [ds.field('part') == x for x in range(1, 3)]
     fragments = [file_format.make_fragment(path, mockfs, part)
@@ -369,7 +356,7 @@ def test_filesystem_dataset(mockfs):
 
     for dataset in [dataset_from_fragments, dataset_from_paths]:
         assert isinstance(dataset, ds.FileSystemDataset)
-        assert isinstance(dataset.format, ParquetFileFormat)
+        assert isinstance(dataset.format, ds.ParquetFileFormat)
         assert dataset.partition_expression.equals(root_partition)
         assert set(dataset.files) == set(paths)
 
@@ -377,14 +364,14 @@ def test_filesystem_dataset(mockfs):
         for fragment, partition, path in zip(fragments, partitions, paths):
             assert fragment.partition_expression.equals(partition)
             assert fragment.path == path
-            assert isinstance(fragment.format, ParquetFileFormat)
-            assert isinstance(fragment, ParquetFileFragment)
+            assert isinstance(fragment.format, ds.ParquetFileFormat)
+            assert isinstance(fragment, ds.ParquetFileFragment)
             assert fragment.row_groups == [0]
             assert fragment.num_row_groups == 1
 
             row_group_fragments = list(fragment.split_by_row_group())
             assert fragment.num_row_groups == len(row_group_fragments) == 1
-            assert isinstance(row_group_fragments[0], ParquetFileFragment)
+            assert isinstance(row_group_fragments[0], ds.ParquetFileFragment)
             assert row_group_fragments[0].path == path
             assert row_group_fragments[0].row_groups == [0]
             assert row_group_fragments[0].num_row_groups == 1
@@ -503,7 +490,7 @@ def test_dataset(dataset, dataset_reader):
 def test_dataset_factory_inspect_schema_promotion(promotable_mockfs):
     mockfs, path1, path2 = promotable_mockfs
     factory = ds.FileSystemDatasetFactory(
-        mockfs, [path1, path2], ParquetFileFormat()
+        mockfs, [path1, path2], ds.ParquetFileFormat()
     )
 
     with pytest.raises(
@@ -547,7 +534,7 @@ def test_dataset_factory_inspect_schema_promotion(promotable_mockfs):
 def test_dataset_factory_inspect_bad_params(promotable_mockfs):
     mockfs, path1, path2 = promotable_mockfs
     factory = ds.FileSystemDatasetFactory(
-        mockfs, [path1, path2], ParquetFileFormat()
+        mockfs, [path1, path2], ds.ParquetFileFormat()
     )
 
     with pytest.raises(ValueError, match='Invalid promote_options: bad_option'):
@@ -955,11 +942,11 @@ def test_partition_keys():
 
 @pytest.mark.parquet
 def test_parquet_read_options():
-    opts1 = ParquetReadOptions()
-    opts2 = ParquetReadOptions(dictionary_columns=['a', 'b'])
-    opts3 = ParquetReadOptions(coerce_int96_timestamp_unit="ms")
-    opts4 = ParquetReadOptions(binary_type=pa.binary_view())
-    opts5 = ParquetReadOptions(list_type=pa.LargeListType)
+    opts1 = ds.ParquetReadOptions()
+    opts2 = ds.ParquetReadOptions(dictionary_columns=['a', 'b'])
+    opts3 = ds.ParquetReadOptions(coerce_int96_timestamp_unit="ms")
+    opts4 = ds.ParquetReadOptions(binary_type=pa.binary_view())
+    opts5 = ds.ParquetReadOptions(list_type=pa.LargeListType)
 
     assert opts1.dictionary_columns == set()
 
@@ -997,37 +984,37 @@ def test_parquet_read_options():
 
 @pytest.mark.parquet
 def test_parquet_file_format_read_options():
-    pff1 = ParquetFileFormat()
-    pff2 = ParquetFileFormat(dictionary_columns={'a'})
-    pff3 = ParquetFileFormat(coerce_int96_timestamp_unit="s")
-    pff4 = ParquetFileFormat(binary_type=pa.binary_view())
-    pff5 = ParquetFileFormat(list_type=pa.LargeListType)
+    pff1 = ds.ParquetFileFormat()
+    pff2 = ds.ParquetFileFormat(dictionary_columns={'a'})
+    pff3 = ds.ParquetFileFormat(coerce_int96_timestamp_unit="s")
+    pff4 = ds.ParquetFileFormat(binary_type=pa.binary_view())
+    pff5 = ds.ParquetFileFormat(list_type=pa.LargeListType)
 
-    assert pff1.read_options == ParquetReadOptions()
-    assert pff2.read_options == ParquetReadOptions(dictionary_columns=['a'])
-    assert pff3.read_options == ParquetReadOptions(
+    assert pff1.read_options == ds.ParquetReadOptions()
+    assert pff2.read_options == ds.ParquetReadOptions(dictionary_columns=['a'])
+    assert pff3.read_options == ds.ParquetReadOptions(
         coerce_int96_timestamp_unit="s")
-    assert pff4.read_options == ParquetReadOptions(
+    assert pff4.read_options == ds.ParquetReadOptions(
         binary_type=pa.binary_view())
-    assert pff5.read_options == ParquetReadOptions(
+    assert pff5.read_options == ds.ParquetReadOptions(
         list_type=pa.LargeListType)
 
 
 @pytest.mark.parquet
 def test_parquet_scan_options():
-    opts1 = ParquetFragmentScanOptions()
-    opts2 = ParquetFragmentScanOptions(buffer_size=4096)
-    opts3 = ParquetFragmentScanOptions(
+    opts1 = ds.ParquetFragmentScanOptions()
+    opts2 = ds.ParquetFragmentScanOptions(buffer_size=4096)
+    opts3 = ds.ParquetFragmentScanOptions(
         buffer_size=2**13, use_buffered_stream=True)
-    opts4 = ParquetFragmentScanOptions(buffer_size=2**13, pre_buffer=False)
-    opts5 = ParquetFragmentScanOptions(
+    opts4 = ds.ParquetFragmentScanOptions(buffer_size=2**13, pre_buffer=False)
+    opts5 = ds.ParquetFragmentScanOptions(
         thrift_string_size_limit=123456,
         thrift_container_size_limit=987654,)
-    opts6 = ParquetFragmentScanOptions(
+    opts6 = ds.ParquetFragmentScanOptions(
         page_checksum_verification=True)
     cache_opts = pa.CacheOptions(
         hole_size_limit=2**10, range_size_limit=8*2**10, lazy=True)
-    opts7 = ParquetFragmentScanOptions(pre_buffer=True, cache_options=cache_opts)
+    opts7 = ds.ParquetFragmentScanOptions(pre_buffer=True, cache_options=cache_opts)
 
     assert opts1.use_buffered_stream is False
     assert opts1.buffer_size == 2**13
@@ -1089,16 +1076,16 @@ def test_file_format_pickling(pickle_module):
             use_threads=False, block_size=14)),
     ]
     try:
-        formats.append(OrcFileFormat())
+        formats.append(ds.OrcFileFormat())
     except ImportError:
         pass
 
     if pq is not None:
         formats.extend([
-            ParquetFileFormat(),
-            ParquetFileFormat(dictionary_columns={'a'}),
-            ParquetFileFormat(use_buffered_stream=True),
-            ParquetFileFormat(
+            ds.ParquetFileFormat(),
+            ds.ParquetFileFormat(dictionary_columns={'a'}),
+            ds.ParquetFileFormat(use_buffered_stream=True),
+            ds.ParquetFileFormat(
                 use_buffered_stream=True,
                 buffer_size=4096,
                 thrift_string_size_limit=123,
@@ -1127,8 +1114,8 @@ def test_fragment_scan_options_pickling(pickle_module):
 
     if pq is not None:
         options.extend([
-            ParquetFragmentScanOptions(buffer_size=4096),
-            ParquetFragmentScanOptions(pre_buffer=True),
+            ds.ParquetFragmentScanOptions(buffer_size=4096),
+            ds.ParquetFragmentScanOptions(pre_buffer=True),
         ])
 
     for option in options:
@@ -1145,8 +1132,8 @@ def test_fragment_scan_options_pickling(pickle_module):
 @pytest.mark.parametrize('pre_buffer', [False, True])
 @pytest.mark.parquet
 def test_filesystem_factory(mockfs, paths_or_selector, pre_buffer):
-    format = ParquetFileFormat(
-        read_options=ParquetReadOptions(dictionary_columns={"str"}),
+    format = ds.ParquetFileFormat(
+        read_options=ds.ParquetReadOptions(dictionary_columns={"str"}),
         pre_buffer=pre_buffer
     )
 
@@ -1218,7 +1205,7 @@ def test_filesystem_factory(mockfs, paths_or_selector, pre_buffer):
 
 @pytest.mark.parquet
 def test_make_fragment(multisourcefs):
-    parquet_format = ParquetFileFormat()
+    parquet_format = ds.ParquetFileFormat()
     dataset = ds.dataset('/plain', filesystem=multisourcefs,
                          format=parquet_format)
 
@@ -1229,7 +1216,7 @@ def test_make_fragment(multisourcefs):
         row_group_fragment = parquet_format.make_fragment(path, multisourcefs,
                                                           row_groups=[0])
         for f in [fragment, row_group_fragment]:
-            assert isinstance(f, ParquetFileFragment)
+            assert isinstance(f, ds.ParquetFileFragment)
             assert f.path == path
             assert isinstance(f.filesystem, type(multisourcefs))
         assert row_group_fragment.row_groups == [0]
@@ -1245,7 +1232,7 @@ def test_make_fragment_with_size(s3_example_simple):
     """
     table, path, fs, uri, host, port, access_key, secret_key = s3_example_simple
 
-    file_format = ParquetFileFormat()
+    file_format = ds.ParquetFileFormat()
     paths = [path]
 
     fragments = [file_format.make_fragment(path, fs)
@@ -1276,7 +1263,7 @@ def test_make_fragment_with_size(s3_example_simple):
         fragments_with_size, format=file_format, schema=table.schema, filesystem=fs
     )
 
-    with pytest.raises(lib.ArrowInvalid, match='Parquet file size is 1 bytes'):
+    with pytest.raises(pyarrow.lib.ArrowInvalid, match='Parquet file size is 1 bytes'):
         table = dataset_with_size.to_table()
 
     # too large sizes -> error
@@ -1352,8 +1339,8 @@ def test_make_parquet_fragment_from_buffer(dataset_reader, pickle_module):
         arrays[1],
         arrays[2].dictionary_encode()
     ]
-    dictionary_format = ParquetFileFormat(
-        read_options=ParquetReadOptions(
+    dictionary_format = ds.ParquetFileFormat(
+        read_options=ds.ParquetReadOptions(
             dictionary_columns=['alpha', 'animal']
         ),
         use_buffered_stream=True,
@@ -1361,7 +1348,7 @@ def test_make_parquet_fragment_from_buffer(dataset_reader, pickle_module):
     )
 
     cases = [
-        (arrays, ParquetFileFormat()),
+        (arrays, ds.ParquetFileFormat()),
         (dictionary_arrays, dictionary_format)
     ]
     for arrays, format_ in cases:
@@ -1965,7 +1952,7 @@ def test_fragments_repr(tempdir, dataset):
     "pickled", [lambda x, m: x, lambda x, m: m.loads(m.dumps(x))])
 def test_partitioning_factory(mockfs, pickled, pickle_module):
     paths_or_selector = fs.FileSelector('subdir', recursive=True)
-    format = ParquetFileFormat()
+    format = ds.ParquetFileFormat()
 
     options = ds.FileSystemFactoryOptions('subdir')
     partitioning_factory = ds.DirectoryPartitioning.discover(['group', 'key'])
@@ -2000,7 +1987,7 @@ def test_partitioning_factory(mockfs, pickled, pickle_module):
 def test_partitioning_factory_dictionary(mockfs, infer_dictionary, pickled,
                                          pickle_module):
     paths_or_selector = fs.FileSelector('subdir', recursive=True)
-    format = ParquetFileFormat()
+    format = ds.ParquetFileFormat()
     options = ds.FileSystemFactoryOptions('subdir')
 
     partitioning_factory = ds.DirectoryPartitioning.discover(
@@ -2229,8 +2216,7 @@ def test_dictionary_partitioning_outer_nulls_raises(tempdir):
 def test_positional_keywords_raises(tempdir):
     table = pa.table({'a': ['x', 'y', None], 'b': ['x', 'y', 'z']})
     with pytest.raises(TypeError):
-        ds.write_dataset(table, tempdir, "basename-{i}.arrow") \
-            # type: ignore[too-many-positional-arguments]
+        ds.write_dataset(table, tempdir, "basename-{i}.arrow")
 
 
 @pytest.mark.parquet
@@ -2608,12 +2594,12 @@ def test_construct_from_invalid_sources_raise(multisourcefs):
     child1 = ds.FileSystemDatasetFactory(
         multisourcefs,
         fs.FileSelector('/plain'),
-        format=ParquetFileFormat()
+        format=ds.ParquetFileFormat()
     )
     child2 = ds.FileSystemDatasetFactory(
         multisourcefs,
         fs.FileSelector('/schema'),
-        format=ParquetFileFormat()
+        format=ds.ParquetFileFormat()
     )
     batch1 = pa.RecordBatch.from_arrays([pa.array(range(10))], names=["a"])
     batch2 = pa.RecordBatch.from_arrays([pa.array(range(10))], names=["b"])
@@ -3085,7 +3071,7 @@ def test_file_format_inspect_fsspec(tempdir):
     assert fsspec_fs.ls(tempdir)[0].endswith("data.parquet")
 
     # inspect using dataset file format
-    format = ParquetFileFormat()
+    format = ds.ParquetFileFormat()
     # manually creating a PyFileSystem instead of using fs._ensure_filesystem
     # which would convert an fsspec local filesystem to a native one
     filesystem = fs.PyFileSystem(fs.FSSpecHandler(fsspec_fs))
@@ -3158,13 +3144,13 @@ def test_filter_compute_expression(tempdir, dataset_reader):
     _, path = _create_single_file(tempdir, table)
     dataset = ds.dataset(str(path))
 
-    filter_ = is_in(ds.field('A'), pa.array(["a", "b"]))
+    filter_ = pc.is_in(ds.field('A'), pa.array(["a", "b"]))
     assert dataset_reader.to_table(dataset, filter=filter_).num_rows == 3
 
-    filter_ = hour(ds.field('B')) >= 3
+    filter_ = pc.hour(ds.field('B')) >= 3
     assert dataset_reader.to_table(dataset, filter=filter_).num_rows == 2
 
-    days = days_between(ds.field('B'), ds.field("C"))
+    days = pc.days_between(ds.field('B'), ds.field("C"))
     result = dataset_reader.to_table(dataset, columns={"days": days})
     assert result["days"].to_pylist() == [0, 1, 2, 3, 4]
 
@@ -3172,7 +3158,7 @@ def test_filter_compute_expression(tempdir, dataset_reader):
 def test_dataset_union(multisourcefs):
     child = ds.FileSystemDatasetFactory(
         multisourcefs, fs.FileSelector('/plain'),
-        format=ParquetFileFormat()
+        format=ds.ParquetFileFormat()
     )
     factory = ds.UnionDatasetFactory([child])
 
@@ -3395,7 +3381,7 @@ def test_orc_format(tempdir, dataset_reader):
     path = str(tempdir / 'test.orc')
     orc.write_table(table, path)
 
-    dataset = ds.dataset(path, format=OrcFileFormat())
+    dataset = ds.dataset(path, format=ds.OrcFileFormat())
     fragments = list(dataset.get_fragments())
     assert isinstance(fragments[0], ds.FileFragment)
     result = dataset_reader.to_table(dataset)
@@ -3450,7 +3436,7 @@ def test_orc_scan_options(tempdir, dataset_reader):
 
 def test_orc_format_not_supported():
     try:
-        from pyarrow.dataset import OrcFileFormat  # type: ignore[possibly-unbound-import]  # noqa
+        from pyarrow.dataset import OrcFileFormat  # noqa
     except ImportError:
         # ORC is not available, test error message
         with pytest.raises(
@@ -3469,7 +3455,7 @@ def test_orc_writer_not_implemented_for_dataset():
             pa.table({"a": range(10)}), format='orc', base_dir='/tmp'
         )
 
-    of = OrcFileFormat()
+    of = ds.OrcFileFormat()
     with pytest.raises(
         NotImplementedError,
         match="Writing datasets not yet implemented for this file format"
@@ -3687,7 +3673,7 @@ def test_column_names_encoding(tempdir, dataset_reader):
 
     # Reading as string without specifying encoding should produce an error
     dataset = ds.dataset(path, format='csv', schema=expected_schema)
-    with pytest.raises(lib.ArrowInvalid, match="invalid UTF8"):
+    with pytest.raises(pyarrow.lib.ArrowInvalid, match="invalid UTF8"):
         dataset_reader.to_table(dataset)
 
     # Setting the encoding in the read_options should transcode the data
@@ -4189,7 +4175,7 @@ def test_write_to_dataset_given_null_just_works(tempdir):
 
 def _sort_table(tab, sort_col):
     import pyarrow.compute as pc
-    sorted_indices = sort_indices(
+    sorted_indices = pc.sort_indices(
         tab, options=pc.SortOptions([(sort_col, 'ascending')]))
     return pc.take(tab, sorted_indices)
 
@@ -4637,7 +4623,7 @@ def test_write_dataset_max_open_files(tempdir):
     def _get_compare_pair(data_source, record_batch, file_format, col_id):
         num_of_files_generated = _get_num_of_files_generated(
             base_directory=data_source, file_format=file_format)
-        number_of_partitions = len(unique(record_batch[col_id]))
+        number_of_partitions = len(pa.compute.unique(record_batch[col_id]))
         return num_of_files_generated, number_of_partitions
 
     # CASE 1: when max_open_files=default & max_open_files >= num_of_partitions
@@ -4935,7 +4921,7 @@ def test_write_dataset_parquet(tempdir):
 
     # using custom options
     for version in ["1.0", "2.4", "2.6"]:
-        format = ParquetFileFormat()
+        format = ds.ParquetFileFormat()
         opts = format.make_write_options(version=version)
         assert "<pyarrow.dataset.ParquetFileWriteOptions" in repr(opts)
         base_dir = tempdir / f'parquet_dataset_version{version}'
@@ -5151,7 +5137,7 @@ def test_write_dataset_s3_put_only(s3_server):
     # required while writing a dataset in s3 where we have very
     # limited permissions and thus we can directly write the dataset
     # without creating a directory.
-    from pyarrow.fs import S3FileSystem  # type: ignore[possibly-unbound-import]
+    from pyarrow.fs import S3FileSystem
 
     # write dataset with s3 filesystem
     host, port, _, _ = s3_server['connection']
@@ -5233,7 +5219,7 @@ def test_dataset_null_to_dictionary_cast(tempdir, dataset_reader):
     fsds = ds.FileSystemDataset.from_paths(
         paths=[tempdir / "test.parquet"],
         schema=schema,
-        format=ParquetFileFormat(),
+        format=ds.ParquetFileFormat(),
         filesystem=fs.LocalFileSystem(),
     )
     table = dataset_reader.to_table(fsds)
@@ -5741,7 +5727,7 @@ def test_write_dataset_write_page_index(tempdir):
             arrays = [[1, 2, 3], [None, 5, None]]
             table = pa.Table.from_arrays(arrays, schema=schema)
 
-            file_format = ParquetFileFormat()
+            file_format = ds.ParquetFileFormat()
             base_dir = tempdir / f"write_page_index_{write_page_index}"
             ds.write_dataset(
                 table,
@@ -5821,7 +5807,7 @@ def test_checksum_write_dataset_read_dataset_to_table(tempdir):
     table_orig = pa.table({'a': [1, 2, 3, 4]})
 
     # Write a sample dataset with page checksum enabled
-    pq_write_format = ParquetFileFormat()
+    pq_write_format = pa.dataset.ParquetFileFormat()
     write_options = pq_write_format.make_write_options(
         write_page_checksum=True)
 
@@ -5834,9 +5820,9 @@ def test_checksum_write_dataset_read_dataset_to_table(tempdir):
     )
 
     # Open dataset and verify that the data is correct
-    pq_scan_opts_crc = ParquetFragmentScanOptions(
+    pq_scan_opts_crc = ds.ParquetFragmentScanOptions(
         page_checksum_verification=True)
-    pq_read_format_crc = ParquetFileFormat(
+    pq_read_format_crc = pa.dataset.ParquetFileFormat(
         default_fragment_scan_options=pq_scan_opts_crc)
     table_check = ds.dataset(
         original_dir_path,
@@ -5866,9 +5852,9 @@ def test_checksum_write_dataset_read_dataset_to_table(tempdir):
 
     # Case 1: Reading the corrupted file with dataset().to_table() and without
     # page checksum verification succeeds but yields corrupted data
-    pq_scan_opts_no_crc = ParquetFragmentScanOptions(
+    pq_scan_opts_no_crc = ds.ParquetFragmentScanOptions(
         page_checksum_verification=False)
-    pq_read_format_no_crc = ParquetFileFormat(
+    pq_read_format_no_crc = pa.dataset.ParquetFileFormat(
         default_fragment_scan_options=pq_scan_opts_no_crc)
     table_corrupt = ds.dataset(
         corrupted_dir_path, format=pq_read_format_no_crc).to_table()
@@ -5897,10 +5883,10 @@ def test_make_write_options_error():
              "'pyarrow._dataset_parquet.ParquetFileFormat' objects "
              "doesn't apply to a 'int'")
     with pytest.raises(TypeError) as excinfo:
-        ParquetFileFormat.make_write_options(43)
+        pa.dataset.ParquetFileFormat.make_write_options(43)
     assert msg_1 in str(excinfo.value) or msg_2 in str(excinfo.value)
 
-    pformat = ParquetFileFormat()
+    pformat = pa.dataset.ParquetFileFormat()
     msg = "make_write_options\\(\\) takes exactly 0 positional arguments"
     with pytest.raises(TypeError, match=msg):
         pformat.make_write_options(43)

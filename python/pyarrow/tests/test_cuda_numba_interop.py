@@ -26,11 +26,10 @@ dtypes = ['uint8', 'int16', 'float32']
 cuda = pytest.importorskip("pyarrow.cuda")
 nb_cuda = pytest.importorskip("numba.cuda")
 
-from numba.cuda.cudadrv.devicearray import DeviceNDArray \
-    # type: ignore[unresolved_import]  # noqa: E402
+from numba.cuda.cudadrv.devicearray import DeviceNDArray  # noqa: E402
 
 
-context_choices = {}
+context_choices = None
 context_choice_ids = ['pyarrow.cuda', 'numba.cuda']
 
 
@@ -50,7 +49,7 @@ def teardown_module(module):
 @pytest.mark.parametrize("c", range(len(context_choice_ids)),
                          ids=context_choice_ids)
 def test_context(c):
-    ctx, nb_ctx = context_choices.get(c, (None, None))
+    ctx, nb_ctx = context_choices[c]
     assert ctx.handle == nb_ctx.handle.value
     assert ctx.handle == ctx.to_numba().handle.value
     ctx2 = cuda.Context.from_numba(nb_ctx)
@@ -73,8 +72,7 @@ def make_random_buffer(size, target='host', dtype='uint8', ctx=None):
         return arr, buf
     elif target == 'device':
         arr, buf = make_random_buffer(size, target='host', dtype=dtype)
-        dbuf = ctx.new_buffer(size * dtype.itemsize) \
-            # type: ignore[possibly-unbound-attribute]
+        dbuf = ctx.new_buffer(size * dtype.itemsize)
         dbuf.copy_from_host(buf, position=0, nbytes=buf.size)
         return arr, dbuf
     raise ValueError('invalid target value')
@@ -85,7 +83,7 @@ def make_random_buffer(size, target='host', dtype='uint8', ctx=None):
 @pytest.mark.parametrize("dtype", dtypes, ids=dtypes)
 @pytest.mark.parametrize("size", [0, 1, 8, 1000])
 def test_from_object(c, dtype, size):
-    ctx, nb_ctx = context_choices.get(c, (None, None))
+    ctx, nb_ctx = context_choices[c]
     arr, cbuf = make_random_buffer(size, target='device', dtype=dtype, ctx=ctx)
 
     # Creating device buffer from numba DeviceNDArray:
@@ -163,7 +161,7 @@ def test_from_object(c, dtype, size):
                          ids=context_choice_ids)
 @pytest.mark.parametrize("dtype", dtypes, ids=dtypes)
 def test_numba_memalloc(c, dtype):
-    ctx, nb_ctx = context_choices.get(c, (None, None))
+    ctx, nb_ctx = context_choices[c]
     dtype = np.dtype(dtype)
     # Allocate memory using numba context
     # Warning: this will not be reflected in pyarrow context manager
@@ -186,7 +184,7 @@ def test_numba_memalloc(c, dtype):
                          ids=context_choice_ids)
 @pytest.mark.parametrize("dtype", dtypes, ids=dtypes)
 def test_pyarrow_memalloc(c, dtype):
-    ctx, nb_ctx = context_choices.get(c, (None, None))
+    ctx, nb_ctx = context_choices[c]
     size = 10
     arr, cbuf = make_random_buffer(size, target='device', dtype=dtype, ctx=ctx)
 
@@ -200,7 +198,7 @@ def test_pyarrow_memalloc(c, dtype):
                          ids=context_choice_ids)
 @pytest.mark.parametrize("dtype", dtypes, ids=dtypes)
 def test_numba_context(c, dtype):
-    ctx, nb_ctx = context_choices.get(c, (None, None))
+    ctx, nb_ctx = context_choices[c]
     size = 10
     with nb_cuda.gpus[0]:
         arr, cbuf = make_random_buffer(size, target='device',
@@ -219,7 +217,7 @@ def test_numba_context(c, dtype):
                          ids=context_choice_ids)
 @pytest.mark.parametrize("dtype", dtypes, ids=dtypes)
 def test_pyarrow_jit(c, dtype):
-    ctx, nb_ctx = context_choices.get(c, (None, None))
+    ctx, nb_ctx = context_choices[c]
 
     @nb_cuda.jit
     def increment_by_one(an_array):

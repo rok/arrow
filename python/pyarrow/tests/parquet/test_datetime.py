@@ -22,7 +22,7 @@ import warnings
 try:
     import numpy as np
 except ImportError:
-    pass
+    np = None
 import pytest
 
 import pyarrow as pa
@@ -32,7 +32,7 @@ try:
     import pyarrow.parquet as pq
     from pyarrow.tests.parquet.common import _read_table, _write_table
 except ImportError:
-    pass
+    pq = None
 
 
 try:
@@ -41,7 +41,7 @@ try:
 
     from pyarrow.tests.parquet.common import _roundtrip_pandas_dataframe
 except ImportError:
-    pass
+    pd = tm = None
 
 
 # Marks all of the tests in this module

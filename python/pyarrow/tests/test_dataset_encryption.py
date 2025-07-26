@@ -23,26 +23,18 @@ import pyarrow as pa
 
 import pytest
 
-from pyarrow.dataset import (
-    ParquetFragmentScanOptions,  # type: ignore[possibly-unbound-attribute]
-    ParquetFileFormat,  # type: ignore[possibly-unbound-attribute]
-)
-
 encryption_unavailable = False
 
 try:
     import pyarrow.parquet as pq
     import pyarrow.dataset as ds
 except ImportError:
-    pass
+    pq = None
+    ds = None
 
 try:
     from pyarrow.tests.parquet.encryption import InMemoryKmsClient
     import pyarrow.parquet.encryption as pe
-    from pyarrow.dataset import (
-        ParquetEncryptionConfig,  # type: ignore[possibly-unbound-attribute]
-        ParquetDecryptionConfig,  # type: ignore[possibly-unbound-attribute]
-    )
 except ImportError:
     encryption_unavailable = True
 
@@ -114,15 +106,15 @@ def test_dataset_encryption_decryption():
     kms_connection_config = create_kms_connection_config()
 
     crypto_factory = pe.CryptoFactory(kms_factory)
-    parquet_encryption_cfg = ParquetEncryptionConfig(
+    parquet_encryption_cfg = ds.ParquetEncryptionConfig(
         crypto_factory, kms_connection_config, encryption_config
     )
-    parquet_decryption_cfg = ParquetDecryptionConfig(
+    parquet_decryption_cfg = ds.ParquetDecryptionConfig(
         crypto_factory, kms_connection_config, decryption_config
     )
 
     # create write_options with dataset encryption config
-    pformat = ParquetFileFormat()
+    pformat = pa.dataset.ParquetFileFormat()
     write_options = pformat.make_write_options(encryption_config=parquet_encryption_cfg)
 
     mockfs = fs._MockFileSystem()
@@ -137,15 +129,15 @@ def test_dataset_encryption_decryption():
     )
 
     # read without decryption config -> should error is dataset was properly encrypted
-    pformat = ParquetFileFormat()
+    pformat = pa.dataset.ParquetFileFormat()
     with pytest.raises(IOError, match=r"no decryption"):
         ds.dataset("sample_dataset", format=pformat, filesystem=mockfs)
 
     # set decryption config for parquet fragment scan options
-    pq_scan_opts = ParquetFragmentScanOptions(
+    pq_scan_opts = ds.ParquetFragmentScanOptions(
         decryption_config=parquet_decryption_cfg
     )
-    pformat = ParquetFileFormat(default_fragment_scan_options=pq_scan_opts)
+    pformat = pa.dataset.ParquetFileFormat(default_fragment_scan_options=pq_scan_opts)
     dataset = ds.dataset("sample_dataset", format=pformat, filesystem=mockfs)
 
     assert table.equals(dataset.to_table())
@@ -153,11 +145,11 @@ def test_dataset_encryption_decryption():
     # set decryption properties for parquet fragment scan options
     decryption_properties = crypto_factory.file_decryption_properties(
         kms_connection_config, decryption_config)
-    pq_scan_opts = ParquetFragmentScanOptions(
+    pq_scan_opts = ds.ParquetFragmentScanOptions(
         decryption_properties=decryption_properties
     )
 
-    pformat = ParquetFileFormat(default_fragment_scan_options=pq_scan_opts)
+    pformat = pa.dataset.ParquetFileFormat(default_fragment_scan_options=pq_scan_opts)
     dataset = ds.dataset("sample_dataset", format=pformat, filesystem=mockfs)
 
     assert table.equals(dataset.to_table())
@@ -172,7 +164,7 @@ def test_write_dataset_parquet_without_encryption():
 
     # Set the encryption configuration using ParquetFileFormat
     # and make_write_options
-    pformat = ParquetFileFormat()
+    pformat = pa.dataset.ParquetFileFormat()
 
     with pytest.raises(NotImplementedError):
         _ = pformat.make_write_options(encryption_config="some value")
@@ -210,14 +202,14 @@ def test_large_row_encryption_decryption():
         plaintext_footer=False,
         data_key_length_bits=128,
     )
-    pqe_config = ParquetEncryptionConfig(
+    pqe_config = ds.ParquetEncryptionConfig(
         crypto_factory, kms_config, encryption_config
     )
-    pqd_config = ParquetDecryptionConfig(
+    pqd_config = ds.ParquetDecryptionConfig(
         crypto_factory, kms_config, pe.DecryptionConfiguration()
     )
-    scan_options = ParquetFragmentScanOptions(decryption_config=pqd_config)
-    file_format = ParquetFileFormat(default_fragment_scan_options=scan_options)
+    scan_options = ds.ParquetFragmentScanOptions(decryption_config=pqd_config)
+    file_format = ds.ParquetFileFormat(default_fragment_scan_options=scan_options)
     write_options = file_format.make_write_options(encryption_config=pqe_config)
     file_decryption_properties = crypto_factory.file_decryption_properties(kms_config)
 

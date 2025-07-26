@@ -22,7 +22,8 @@ try:
     import pyarrow.parquet as pq
     import pyarrow.parquet.encryption as pe
 except ImportError:
-    pass
+    pq = None
+    pe = None
 else:
     from pyarrow.tests.parquet.encryption import (
         InMemoryKmsClient, verify_file_encrypted)

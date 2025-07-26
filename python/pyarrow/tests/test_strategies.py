@@ -19,29 +19,29 @@ import hypothesis as h
 
 import pytest
 
-from pyarrow import lib  # type: ignore[unresolved-attribute]
+import pyarrow as pa
 import pyarrow.tests.strategies as past
 
 
 @h.given(past.all_types)
 def test_types(ty):
-    assert isinstance(ty, lib.DataType)
+    assert isinstance(ty, pa.lib.DataType)
 
 
 @h.given(past.all_fields)
 def test_fields(field):
-    assert isinstance(field, lib.Field)
+    assert isinstance(field, pa.lib.Field)
 
 
 @h.given(past.all_schemas)
 def test_schemas(schema):
-    assert isinstance(schema, lib.Schema)
+    assert isinstance(schema, pa.lib.Schema)
 
 
 @pytest.mark.numpy
 @h.given(past.all_arrays)
 def test_arrays(array):
-    assert isinstance(array, lib.Array)
+    assert isinstance(array, pa.lib.Array)
 
 
 @pytest.mark.numpy
@@ -52,15 +52,15 @@ def test_array_nullability(array):
 
 @h.given(past.chunked_arrays(past.primitive_types))
 def test_chunked_arrays(chunked_array):
-    assert isinstance(chunked_array, lib.ChunkedArray)
+    assert isinstance(chunked_array, pa.lib.ChunkedArray)
 
 
 @h.given(past.all_record_batches)
 def test_record_batches(record_bath):
-    assert isinstance(record_bath, lib.RecordBatch)
+    assert isinstance(record_bath, pa.lib.RecordBatch)
 
 
 @pytest.mark.numpy
 @h.given(past.all_tables)
 def test_tables(table):
-    assert isinstance(table, lib.Table)
+    assert isinstance(table, pa.lib.Table)

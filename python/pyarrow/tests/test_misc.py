@@ -22,7 +22,7 @@ import sys
 import pytest
 
 import pyarrow as pa
-from pyarrow.lib import ArrowInvalid  # type: ignore[unresolved_import]
+from pyarrow.lib import ArrowInvalid
 
 
 def test_get_include():

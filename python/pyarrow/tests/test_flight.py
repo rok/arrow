@@ -26,18 +26,17 @@ import tempfile
 import threading
 import time
 import traceback
-from json import dumps as json_dumps
-from json import dumps as json_loads
+import json
 from datetime import datetime
 
 try:
     import numpy as np
 except ImportError:
-    pass
+    np = None
 import pytest
 import pyarrow as pa
 
-from pyarrow.lib import IpcReadOptions, tobytes  # type: ignore[unresolved_import]
+from pyarrow.lib import IpcReadOptions, tobytes
 from pyarrow.util import find_free_port
 from pyarrow.tests import util
 
@@ -50,35 +49,8 @@ try:
         ClientMiddleware, ClientMiddlewareFactory,
     )
 except ImportError:
-    class MockContextManager:
-        def __init__(self, *args, **kwargs):
-            pass
-
-        def __enter__(self):
-            return self
-
-        def __exit__(self, exc_type, exc_val, exc_tb):
-            pass
-
-    class FlightServerBase(MockContextManager):
-        def serve(self):
-            pass
-
-    class FlightClient(MockContextManager):
-        def get_flight_info(self, *args, **kwargs):
-            pass
-
-        def do_action(self, *args, **kwargs):
-            pass
-
-        def do_get(self, *args, **kwargs):
-            pass
-
-        def do_put(self, *args, **kwargs):
-            pass
-
-        def close(self):
-            pass
+    flight = None
+    FlightClient, FlightServerBase = object, object
     ServerAuthHandler, ClientAuthHandler = object, object
     ServerMiddleware, ServerMiddlewareFactory = object, object
     ClientMiddleware, ClientMiddlewareFactory = object, object
@@ -344,7 +316,7 @@ class InvalidStreamFlightServer(FlightServerBase):
     def do_get(self, context, ticket):
         data1 = [pa.array([-10, -5, 0, 5, 10], type=pa.int32())]
         data2 = [pa.array([-10.0, -5.0, 0.0, 5.0, 10.0], type=pa.float64())]
-        assert data1[0].type != data2[0].type
+        assert data1.type != data2.type
         table1 = pa.Table.from_arrays(data1, names=['a'])
         table2 = pa.Table.from_arrays(data2, names=['a'])
         assert table1.schema == self.schema
@@ -1121,7 +1093,7 @@ def test_client_wait_for_available():
     server = None
 
     def serve():
-        nonlocal server
+        global server
         time.sleep(0.5)
         server = FlightServerBase(location)
         server.serve()
@@ -1771,7 +1743,7 @@ def test_flight_do_put_limit():
             with pytest.raises(flight.FlightWriteSizeExceededError,
                                match="exceeded soft limit") as excinfo:
                 writer.write_batch(large_batch)
-            assert excinfo.value.limit == 4096  # type: ignore[unresolved-attribute]
+            assert excinfo.value.limit == 4096
             smaller_batches = [
                 large_batch.slice(0, 384),
                 large_batch.slice(384),
@@ -2385,7 +2357,7 @@ class ActionNoneFlightServer(EchoFlightServer):
 
     def do_action(self, context, action):
         if action.type == "get_value":
-            return [json_dumps(self.VALUES).encode('utf-8')]
+            return [json.dumps(self.VALUES).encode('utf-8')]
         elif action.type == "append":
             self.VALUES.append(True)
             return None
@@ -2402,7 +2374,7 @@ def test_none_action_side_effect():
             FlightClient(('localhost', server.port)) as client:
         client.do_action(flight.Action("append", b""))
         r = client.do_action(flight.Action("get_value", b""))
-        assert json_loads(next(r).body.to_pybytes()) == [True]
+        assert json.loads(next(r).body.to_pybytes()) == [True]
 
 
 @pytest.mark.slow  # Takes a while for gRPC to "realize" writes fail

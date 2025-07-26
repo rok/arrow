@@ -23,7 +23,7 @@ import io
 try:
     import numpy as np
 except ImportError:
-    pass
+    np = None
 import pytest
 
 import pyarrow as pa
@@ -35,14 +35,16 @@ try:
     import pyarrow.parquet as pq
     from pyarrow.tests.parquet.common import _write_table
 except ImportError:
-    pass
+    pq = None
 
 
 try:
     import pandas as pd
+    import pandas.testing as tm
+
     from pyarrow.tests.parquet.common import alltypes_sample
 except ImportError:
-    pass
+    pd = tm = None
 
 
 # Marks all of the tests in this module
@@ -494,12 +496,12 @@ def test_multi_dataset_metadata(tempdir):
 
     # Write merged metadata-only file
     with open(metapath, "wb") as f:
-        _meta.write_metadata_file(f)  # type: ignore[possibly-unbound-attribute]
+        _meta.write_metadata_file(f)
 
     # Read back the metadata
     meta = pq.read_metadata(metapath)
     md = meta.to_dict()
-    _md = _meta.to_dict()  # type: ignore[possibly-unbound-attribute]
+    _md = _meta.to_dict()
     for key in _md:
         if key != 'serialized_size':
             assert _md[key] == md[key]

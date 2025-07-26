@@ -23,7 +23,7 @@ import pyarrow as pa
 
 @pytest.mark.gandiva
 def test_tree_exp_builder():
-    import pyarrow.gandiva as gandiva  # type: ignore[unresolved_import]
+    import pyarrow.gandiva as gandiva
 
     builder = gandiva.TreeExprBuilder()
 
@@ -65,7 +65,7 @@ def test_tree_exp_builder():
 
 @pytest.mark.gandiva
 def test_table():
-    import pyarrow.gandiva as gandiva  # type: ignore[unresolved_import]
+    import pyarrow.gandiva as gandiva
 
     table = pa.Table.from_arrays([pa.array([1.0, 2.0]), pa.array([3.0, 4.0])],
                                  ['a', 'b'])
@@ -92,7 +92,7 @@ def test_table():
 
 @pytest.mark.gandiva
 def test_filter():
-    import pyarrow.gandiva as gandiva  # type: ignore[unresolved_import]
+    import pyarrow.gandiva as gandiva
 
     table = pa.Table.from_arrays([pa.array([1.0 * i for i in range(10000)])],
                                  ['a'])
@@ -116,7 +116,7 @@ def test_filter():
 
 @pytest.mark.gandiva
 def test_in_expr():
-    import pyarrow.gandiva as gandiva  # type: ignore[unresolved_import]
+    import pyarrow.gandiva as gandiva
 
     arr = pa.array(["ga", "an", "nd", "di", "iv", "va"])
     table = pa.Table.from_arrays([arr], ["a"])
@@ -154,7 +154,7 @@ def test_in_expr():
 @pytest.mark.skip(reason="Gandiva C++ did not have *real* binary, "
                          "time and date support.")
 def test_in_expr_todo():
-    import pyarrow.gandiva as gandiva  # type: ignore[unresolved_import]
+    import pyarrow.gandiva as gandiva
     # TODO: Implement reasonable support for timestamp, time & date.
     # Current exceptions:
     # pyarrow.lib.ArrowException: ExpressionValidationError:
@@ -227,7 +227,7 @@ def test_in_expr_todo():
 
 @pytest.mark.gandiva
 def test_boolean():
-    import pyarrow.gandiva as gandiva  # type: ignore[unresolved_import]
+    import pyarrow.gandiva as gandiva
 
     table = pa.Table.from_arrays([
         pa.array([1., 31., 46., 3., 57., 44., 22.]),
@@ -254,7 +254,7 @@ def test_boolean():
 
 @pytest.mark.gandiva
 def test_literals():
-    import pyarrow.gandiva as gandiva  # type: ignore[unresolved_import]
+    import pyarrow.gandiva as gandiva
 
     builder = gandiva.TreeExprBuilder()
 
@@ -294,7 +294,7 @@ def test_literals():
 
 @pytest.mark.gandiva
 def test_regex():
-    import pyarrow.gandiva as gandiva  # type: ignore[unresolved_import]
+    import pyarrow.gandiva as gandiva
 
     elements = ["park", "sparkle", "bright spark and fire", "spark"]
     data = pa.array(elements, type=pa.string())
@@ -318,7 +318,7 @@ def test_regex():
 
 @pytest.mark.gandiva
 def test_get_registered_function_signatures():
-    import pyarrow.gandiva as gandiva  # type: ignore[unresolved_import]
+    import pyarrow.gandiva as gandiva
     signatures = gandiva.get_registered_function_signatures()
 
     assert type(signatures[0].return_type()) is pa.DataType
@@ -328,7 +328,7 @@ def test_get_registered_function_signatures():
 
 @pytest.mark.gandiva
 def test_filter_project():
-    import pyarrow.gandiva as gandiva  # type: ignore[unresolved_import]
+    import pyarrow.gandiva as gandiva
     mpool = pa.default_memory_pool()
     # Create a table with some sample data
     array0 = pa.array([10, 12, -20, 5, 21, 29], pa.int32())
@@ -375,7 +375,7 @@ def test_filter_project():
 
 @pytest.mark.gandiva
 def test_to_string():
-    import pyarrow.gandiva as gandiva  # type: ignore[unresolved_import]
+    import pyarrow.gandiva as gandiva
     builder = gandiva.TreeExprBuilder()
 
     assert str(builder.make_literal(2.0, pa.float64())
@@ -395,7 +395,7 @@ def test_to_string():
 
 @pytest.mark.gandiva
 def test_rejects_none():
-    import pyarrow.gandiva as gandiva  # type: ignore[unresolved_import]
+    import pyarrow.gandiva as gandiva
 
     builder = gandiva.TreeExprBuilder()
 

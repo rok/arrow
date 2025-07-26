@@ -118,3 +118,6 @@ fallback_version = '22.0.0a0'
 #unsupported-operator = "ignore"
 #missing-argument = "ignore"
 #call-non-callable = "ignore"
+
+[tool.ty.src]
+exclude = ["pyarrow/tests"]

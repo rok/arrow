@@ -220,14 +220,13 @@ def test_table_join_keys_order():
 
 
 def test_filter_table_errors():
-    from pyarrow.compute import divide  # type: ignore[unresolved-attribute]
     t = pa.table({
         "a": [1, 2, 3, 4, 5],
         "b": [10, 20, 30, 40, 50]
     })
 
     with pytest.raises(pa.ArrowTypeError):
-        _filter_table(t, divide(pc.field("a"), pc.scalar(2)))
+        _filter_table(t, pc.divide(pc.field("a"), pc.scalar(2)))
 
     with pytest.raises(pa.ArrowInvalid):
         _filter_table(t, (pc.field("Z") <= pc.scalar(2)))
@@ -268,16 +267,14 @@ def test_filter_table_ordering():
 
 
 def test_complex_filter_table():
-    from pyarrow.compute import bit_wise_and, multiply \
-        # type: ignore[unresolved-attribute]
     t = pa.table({
         "a": [1, 2, 3, 4, 5, 6, 6],
         "b": [10, 20, 30, 40, 50, 60, 61]
     })
 
     result = _filter_table(
-        t, ((bit_wise_and(pc.field("a"), pc.scalar(1)) == pc.scalar(0)) &
-            (multiply(pc.field("a"), pc.scalar(10)) == pc.field("b")))
+        t, ((pc.bit_wise_and(pc.field("a"), pc.scalar(1)) == pc.scalar(0)) &
+            (pc.multiply(pc.field("a"), pc.scalar(10)) == pc.field("b")))
     )
 
     assert result == pa.table({

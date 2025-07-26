@@ -26,7 +26,7 @@ import hypothesis.strategies as st
 try:
     import numpy as np
 except ImportError:
-    pass
+    np = None
 
 import pyarrow as pa
 import pyarrow.tests.strategies as past
@@ -63,7 +63,7 @@ def compression(request):
     yield request.param
 
 
-TEST_FILES = []
+TEST_FILES = None
 
 
 def setup_module(module):
@@ -72,12 +72,11 @@ def setup_module(module):
 
 
 def teardown_module(module):
-    if TEST_FILES is not None:
-        for path in TEST_FILES:
-            try:
-                os.remove(path)
-            except os.error:
-                pass
+    for path in TEST_FILES:
+        try:
+            os.remove(path)
+        except os.error:
+            pass
 
 
 @pytest.mark.pandas
@@ -591,7 +590,7 @@ def test_sparse_dataframe(version):
     # GH #221
     data = {'A': [0, 1, 2],
             'B': [1, 0, 1]}
-    df = pd.DataFrame(data).to_sparse(fill_value=1)  # type: ignore[call-non-callable]
+    df = pd.DataFrame(data).to_sparse(fill_value=1)
     expected = df.to_dense()
     _check_pandas_roundtrip(df, expected, version=version)
 
