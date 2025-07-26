@@ -59,7 +59,7 @@ try:
     )
     parquet_encryption_enabled = True
 except ImportError:
-    pass
+    parquet_encryption_enabled = False
 
 
 cdef Expression _true = Expression._scalar(True)

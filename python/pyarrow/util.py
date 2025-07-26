@@ -238,7 +238,7 @@ def _download_urllib(url, out_path):
 
 
 def _download_requests(url, out_path):
-    import requests
+    import requests  # type: ignore[unresolved-import]
     with requests.get(url) as response:
         with open(out_path, 'wb') as f:
             f.write(response.content)

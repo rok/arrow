@@ -29,7 +29,7 @@ from pyarrow.includes.libarrow_substrait cimport *
 try:
     import substrait as py_substrait
 except ImportError:
-    pass
+    py_substrait = None
 else:
     import substrait.proto  # no-cython-lint
 

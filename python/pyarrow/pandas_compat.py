@@ -31,7 +31,7 @@ import re
 import warnings
 
 try:
-    import numpy as np
+    import numpy as np  # type: ignore[unresolved-import]
 except ImportError:
     pass
 
@@ -825,7 +825,7 @@ def table_to_dataframe(
     else:
         from pandas.core.internals import BlockManager \
             # type: ignore[unresolved_import]
-        from pandas import DataFrame
+        from pandas import DataFrame  # type: ignore[unresolved-import]
 
         blocks = [
             _reconstruct_block(item, column_names, ext_columns_dtypes)

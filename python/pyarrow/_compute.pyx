@@ -36,7 +36,7 @@ import inspect
 try:
     import numpy as np
 except ImportError:
-    pass
+    np = None
 import warnings
 
 
