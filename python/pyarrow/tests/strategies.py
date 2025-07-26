@@ -24,24 +24,24 @@ import hypothesis.strategies as st
 try:
     import hypothesis.extra.numpy as npst
 except ImportError:
-    pass
+    npst = None
 try:
     import hypothesis.extra.pytz as tzst
 except ImportError:
-    pass
+    tzst = None
 try:
     import zoneinfo
 except ImportError:
-    pass
+    zoneinfo = None
 if sys.platform == 'win32':
     try:
         import tzdata  # noqa:F401
     except ImportError:
-        pass
+        zoneinfo = None
 try:
     import numpy as np
 except ImportError:
-    pass
+    np = None
 
 import pyarrow as pa
 

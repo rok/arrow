@@ -20,7 +20,7 @@ import pytest
 try:
     import numpy as np
 except ImportError:
-    pass
+    np = None
 import pyarrow as pa
 
 import pyarrow.tests.util as test_util

@@ -23,7 +23,7 @@ import pytest
 try:
     import numpy as np
 except ImportError:
-    pass
+    np = None
 
 import pyarrow.interchange as pi
 from pyarrow.interchange.column import (

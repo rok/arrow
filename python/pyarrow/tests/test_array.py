@@ -30,11 +30,7 @@ import weakref
 try:
     import numpy as np
 except ImportError:
-    pass
-try:
-    from pyarrow import lib  # type: ignore[unresolved-import]
-except ImportError:
-    pass
+    np = None
 
 import pyarrow as pa
 import pyarrow.tests.strategies as past
@@ -327,7 +323,7 @@ def test_asarray():
     np_arr = np.asarray([_ for _ in arr])
     assert np_arr.tolist() == [0, 1, 2, 3]
     assert np_arr.dtype == np.dtype('O')
-    assert isinstance(np_arr[0], lib.Int64Value)
+    assert isinstance(np_arr[0], pa.lib.Int64Value)
 
     # Calling with the arrow array gives back an array with 'int64' dtype
     np_arr = np.asarray(arr)
@@ -554,9 +550,7 @@ def test_arange():
     for case in cases:
         result = pa.arange(*case)
         result.validate(full=True)
-
-        assert result.equals(pa.array(list(range(*case)), type=pa.int64())) \
-            # type: ignore[no-matching-overload]
+        assert result.equals(pa.array(list(range(*case)), type=pa.int64()))
 
     # Validate memory_pool keyword argument
     result = pa.arange(-1, 101, memory_pool=pa.default_memory_pool())
@@ -1912,9 +1906,9 @@ def test_cast_from_null():
     out_types = [
 
         pa.union([pa.field('a', pa.binary(10)),
-                  pa.field('b', pa.string())], mode=lib.UnionMode_DENSE),
+                  pa.field('b', pa.string())], mode=pa.lib.UnionMode_DENSE),
         pa.union([pa.field('a', pa.binary(10)),
-                  pa.field('b', pa.string())], mode=lib.UnionMode_SPARSE),
+                  pa.field('b', pa.string())], mode=pa.lib.UnionMode_SPARSE),
     ]
     in_arr = pa.array(in_data, type=pa.null())
     for out_type in out_types:
@@ -3227,8 +3221,8 @@ def test_struct_array_field():
     x2 = a.field('x')
     y2 = a.field('y')
 
-    assert isinstance(x0, lib.Int16Array)
-    assert isinstance(y1, lib.FloatArray)
+    assert isinstance(x0, pa.lib.Int16Array)
+    assert isinstance(y1, pa.lib.FloatArray)
     assert x0.equals(pa.array([1, 3, 5], type=pa.int16()))
     assert y0.equals(pa.array([2.5, 4.5, 6.5], type=pa.float32()))
     assert x0.equals(x1)
@@ -3262,8 +3256,8 @@ def test_struct_array_flattened_field():
     x2 = a._flattened_field('x')
     y2 = a._flattened_field('y')
 
-    assert isinstance(x0, lib.Int16Array)
-    assert isinstance(y1, lib.FloatArray)
+    assert isinstance(x0, pa.lib.Int16Array)
+    assert isinstance(y1, pa.lib.FloatArray)
     assert x0.equals(pa.array([1, None, 5], type=pa.int16()))
     assert y0.equals(pa.array([2.5, None, 6.5], type=pa.float32()))
     assert x0.equals(x1)
@@ -3311,7 +3305,7 @@ def test_empty_cast():
             # ARROW-4766: Ensure that supported types conversion don't segfault
             # on empty arrays of common types
             pa.array([], type=t1).cast(t2)
-        except (lib.ArrowNotImplementedError, pa.ArrowInvalid):
+        except (pa.lib.ArrowNotImplementedError, pa.ArrowInvalid):
             continue
 
 
@@ -4107,7 +4101,7 @@ def test_list_view_from_arrays_fails(list_array_type, list_type_factory):
     mask = pa.array([False, False, True])
 
     # Ambiguous to specify both validity map and offsets or sizes with nulls
-    with pytest.raises(lib.ArrowInvalid):
+    with pytest.raises(pa.lib.ArrowInvalid):
         list_array_type.from_arrays(offsets, sizes, values, mask=mask)
 
     offsets = [0, 1, 1]
@@ -4115,7 +4109,7 @@ def test_list_view_from_arrays_fails(list_array_type, list_type_factory):
     array_slice = array[1:]
 
     # List offsets and sizes must not be slices if a validity map is specified
-    with pytest.raises(lib.ArrowInvalid):
+    with pytest.raises(pa.lib.ArrowInvalid):
         list_array_type.from_arrays(
             array_slice.offsets, array_slice.sizes,
             array_slice.values, mask=array_slice.is_null())

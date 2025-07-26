@@ -24,7 +24,7 @@ import pyarrow as pa
 try:
     from pyarrow.cffi import ffi
 except ImportError:
-    pass
+    ffi = None
 
 import pytest
 
@@ -32,7 +32,7 @@ try:
     import pandas as pd
     import pandas.testing as tm
 except ImportError:
-    pass
+    pd = tm = None
 
 
 needs_cffi = pytest.mark.skipif(ffi is None,
@@ -676,8 +676,7 @@ def test_roundtrip_reader_capsule(constructor):
     obj = constructor(schema, batches)
 
     bad_schema = pa.schema({'ints': pa.int32()})
-    with pytest.raises(pa.lib.ArrowTypeError, match="Field 0 cannot be cast"): \
-            # type: ignore[unresolved-attribute]
+    with pytest.raises(pa.lib.ArrowTypeError, match="Field 0 cannot be cast"):
         obj.__arrow_c_stream__(bad_schema.__arrow_c_schema__())
 
     # Can work with matching schema

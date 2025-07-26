@@ -22,7 +22,7 @@ import random
 try:
     import numpy as np
 except ImportError:
-    pass
+    np = None
 import pytest
 
 import pyarrow as pa
@@ -33,7 +33,7 @@ try:
     import pyarrow.parquet as pq
     from pyarrow.tests.parquet.common import _read_table, _write_table
 except ImportError:
-    pass
+    pq = None
 
 
 try:
@@ -44,7 +44,7 @@ try:
                                                dataframe_with_lists)
     from pyarrow.tests.parquet.common import alltypes_sample
 except ImportError:
-    pass
+    pd = tm = None
 
 
 # Marks all of the tests in this module
@@ -390,8 +390,7 @@ def test_parquet_nested_convenience(tempdir):
 
     read = pq.read_table(
         path, columns=['a'])
-    tm.assert_frame_equal(read.to_pandas(), df[['a']]) \
-        # type: ignore[invalid-argument-type]
+    tm.assert_frame_equal(read.to_pandas(), df[['a']])
 
     read = pq.read_table(
         path, columns=['a', 'b'])

@@ -17,7 +17,7 @@
 
 import gc
 import decimal
-from json import dumps as json_dumps
+import json
 import multiprocessing as mp
 import sys
 import warnings
@@ -32,14 +32,13 @@ try:
     import numpy as np
     import numpy.testing as npt
     try:
-        _np_VisibleDeprecationWarning = np.VisibleDeprecationWarning \
-            # type: ignore[unresolved-attribute]
+        _np_VisibleDeprecationWarning = np.VisibleDeprecationWarning
     except AttributeError:
         from numpy.exceptions import (
             VisibleDeprecationWarning as _np_VisibleDeprecationWarning
         )
 except ImportError:
-    pass
+    np = None
 
 from pyarrow.pandas_compat import get_logical_type, _pandas_api
 from pyarrow.tests.util import invoke_script, random_ascii, rands
@@ -48,7 +47,6 @@ import pyarrow.tests.util as test_util
 from pyarrow.vendored.version import Version
 
 import pyarrow as pa
-from pyarrow import lib  # type: ignore[unresolved-attribute]
 try:
     from pyarrow import parquet as pq
 except ImportError:
@@ -629,13 +627,11 @@ class TestConvertMetadata:
             expected = df[['a']]
             if isinstance(df.index, pd.DatetimeIndex):
                 df.index.freq = None
-            tm.assert_frame_equal(result, expected) \
-                # type: ignore[invalid-argument-type]
+            tm.assert_frame_equal(result, expected)
 
             table_subset2 = table_subset.remove_column(1)
             result = table_subset2.to_pandas()
-            tm.assert_frame_equal(result, df[['a']].reset_index(drop=True)) \
-                # type: ignore[invalid-argument-type]
+            tm.assert_frame_equal(result, df[['a']].reset_index(drop=True))
 
     def test_to_pandas_column_subset_multiindex(self):
         # ARROW-10122
@@ -1941,7 +1937,7 @@ class TestConvertStringLikeTypes:
     # cannot be converted to utf-8
     def test_array_of_bytes_to_strings_bad_data(self):
         with pytest.raises(
-                lib.ArrowInvalid,
+                pa.lib.ArrowInvalid,
                 match="was not a utf8 string"):
             pa.array(np.array([b'\x80\x81'], dtype=object), pa.string())
 
@@ -1957,13 +1953,13 @@ class TestConvertStringLikeTypes:
         expected = pa.array([b'foo', None, b'baz'], type=pa.binary(3))
         assert converted.equals(expected)
 
-        with pytest.raises(lib.ArrowInvalid,
+        with pytest.raises(pa.lib.ArrowInvalid,
                            match=r'Got bytestring of length 3 \(expected 4\)'):
             arr = np.array([b'foo', b'bar', b'baz'], dtype='|S3')
             pa.array(arr, type=pa.binary(4))
 
         with pytest.raises(
-                lib.ArrowInvalid,
+                pa.lib.ArrowInvalid,
                 match=r'Got bytestring of length 12 \(expected 3\)'):
             arr = np.array([b'foo', b'bar', b'baz'], dtype='|U3')
             pa.array(arr, type=pa.binary(3))
@@ -3268,8 +3264,7 @@ class TestConvertMisc:
             df = pd.DataFrame({'a': pd.arrays.SparseArray([1, np.nan, 3])})
         except AttributeError:
             # pandas.arrays module introduced in pandas 0.24
-            from pandas import SparseArray  # type: ignore[unresolved-import]
-            df = pd.DataFrame({'a': SparseArray([1, np.nan, 3])})
+            df = pd.DataFrame({'a': pd.SparseArray([1, np.nan, 3])})
         with pytest.raises(TypeError, match="Sparse pandas data"):
             pa.Table.from_pandas(df)
 
@@ -3724,9 +3719,7 @@ def test_table_from_pandas_schema_field_order_metadata():
         coerce_cols_to_types["datetime"] = "datetime64[s, UTC]"
     expected = df[["float", "datetime"]].astype(coerce_cols_to_types)
 
-    # TODO: result and expected should have the same type,
-    #  see other ignore[invalid-argument-type] involving assert_frame_equal
-    tm.assert_frame_equal(result, expected)  # type: ignore[invalid-argument-type]
+    tm.assert_frame_equal(result, expected)
 
 
 # ----------------------------------------------------------------------
@@ -4429,13 +4422,11 @@ def test_convert_to_extension_array(monkeypatch):
 
     # monkeypatch pandas Int64Dtype to *not* have the protocol method
     if Version(pd.__version__) < Version("1.3.0.dev"):
-        from pandas.core import integer   # type: ignore[unresolved-import]
         monkeypatch.delattr(
-            integer._IntegerDtype, "__from_arrow__")
+            pd.core.arrays.integer._IntegerDtype, "__from_arrow__")
     else:
         monkeypatch.delattr(
-            pd.core.arrays.integer.NumericDtype, "__from_arrow__") \
-            # type: ignore[unresolved-attribute]
+            pd.core.arrays.integer.NumericDtype, "__from_arrow__")
     # Int64Dtype has no __from_arrow__ -> use normal conversion
     result = table.to_pandas()
     assert len(_get_mgr(result).blocks) == 1
@@ -4476,13 +4467,11 @@ def test_conversion_extensiontype_to_extensionarray(monkeypatch):
     # monkeypatch pandas Int64Dtype to *not* have the protocol method
     # (remove the version added above and the actual version for recent pandas)
     if Version(pd.__version__) < Version("1.3.0.dev"):
-        from pandas.core import integer  # type: ignore[unresolved-import]
         monkeypatch.delattr(
-            integer._IntegerDtype, "__from_arrow__")
+            pd.core.arrays.integer._IntegerDtype, "__from_arrow__")
     else:
         monkeypatch.delattr(
-            pd.core.arrays.integer.NumericDtype, "__from_arrow__") \
-            # type: ignore[unresolved-attribute]
+            pd.core.arrays.integer.NumericDtype, "__from_arrow__")
 
     result = arr.to_pandas()
     assert _get_mgr(result).blocks[0].values.dtype == np.dtype("int64")
@@ -4661,7 +4650,7 @@ def test_metadata_compat_range_index_pre_0_12():
     t1 = pa.Table.from_arrays([a_arrow, rng_index_arrow],
                               names=['a', 'qux'])
     t1 = t1.replace_schema_metadata({
-        b'pandas': json_dumps(
+        b'pandas': json.dumps(
             {'index_columns': ['qux'],
              'column_indexes': [{'name': None,
                                  'field_name': None,
@@ -4690,7 +4679,7 @@ def test_metadata_compat_range_index_pre_0_12():
     t2 = pa.Table.from_arrays([a_arrow, rng_index_arrow],
                               names=['qux', gen_name_0])
     t2 = t2.replace_schema_metadata({
-        b'pandas': json_dumps(
+        b'pandas': json.dumps(
             {'index_columns': [gen_name_0],
              'column_indexes': [{'name': None,
                                  'field_name': None,
@@ -4719,7 +4708,7 @@ def test_metadata_compat_range_index_pre_0_12():
     t3 = pa.Table.from_arrays([a_arrow, rng_index_arrow],
                               names=['a', gen_name_0])
     t3 = t3.replace_schema_metadata({
-        b'pandas': json_dumps(
+        b'pandas': json.dumps(
             {'index_columns': [gen_name_0],
              'column_indexes': [{'name': None,
                                  'field_name': None,
@@ -4748,7 +4737,7 @@ def test_metadata_compat_range_index_pre_0_12():
     t4 = pa.Table.from_arrays([a_arrow, rng_index_arrow, b_arrow],
                               names=['a', 'qux', gen_name_1])
     t4 = t4.replace_schema_metadata({
-        b'pandas': json_dumps(
+        b'pandas': json.dumps(
             {'index_columns': ['qux', gen_name_1],
              'column_indexes': [{'name': None,
                                  'field_name': None,
@@ -4782,7 +4771,7 @@ def test_metadata_compat_range_index_pre_0_12():
     t5 = pa.Table.from_arrays([a_arrow, rng_index_arrow, b_arrow],
                               names=['a', gen_name_0, gen_name_1])
     t5 = t5.replace_schema_metadata({
-        b'pandas': json_dumps(
+        b'pandas': json.dumps(
             {'index_columns': [gen_name_0, gen_name_1],
              'column_indexes': [{'name': None,
                                  'field_name': None,
@@ -4829,7 +4818,7 @@ def test_metadata_compat_missing_field_name():
 
     # metadata generated by fastparquet 0.3.2 with missing field_names
     table = table.replace_schema_metadata({
-        b'pandas': json_dumps({
+        b'pandas': json.dumps({
             'column_indexes': [
                 {'field_name': None,
                  'metadata': None,
@@ -4971,7 +4960,7 @@ def test_does_not_mutate_timedelta_dtype():
 
     assert np.dtype(np.timedelta64) == expected
 
-    df = pd.DataFrame({"a": [np.timedelta64("s")]})
+    df = pd.DataFrame({"a": [np.timedelta64()]})
     t = pa.Table.from_pandas(df)
     t.to_pandas()
 
@@ -5126,7 +5115,7 @@ def test_roundtrip_map_array_with_pydicts_duplicate_keys():
 
     # ------------------------
     # With maps as pydicts
-    with pytest.raises(lib.ArrowException):
+    with pytest.raises(pa.lib.ArrowException):
         # raises because of duplicate keys
         maps.to_pandas(maps_as_pydicts="strict")
     series_pydicts = maps.to_pandas(maps_as_pydicts="lossy")

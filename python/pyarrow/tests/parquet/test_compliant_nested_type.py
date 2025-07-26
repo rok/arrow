@@ -24,13 +24,15 @@ try:
     from pyarrow.tests.parquet.common import (_read_table,
                                               _check_roundtrip)
 except ImportError:
-    pass
+    pq = None
 
 try:
     import pandas as pd
+    import pandas.testing as tm
+
     from pyarrow.tests.parquet.common import _roundtrip_pandas_dataframe
 except ImportError:
-    pass
+    pd = tm = None
 
 
 # Marks all of the tests in this module

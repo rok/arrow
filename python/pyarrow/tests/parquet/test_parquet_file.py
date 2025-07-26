@@ -30,13 +30,15 @@ try:
     import pyarrow.parquet as pq
     from pyarrow.tests.parquet.common import _write_table
 except ImportError:
-    pass
+    pq = None
 
 try:
+    import pandas as pd
     import pandas.testing as tm
+
     from pyarrow.tests.parquet.common import alltypes_sample
 except ImportError:
-    pass
+    pd = tm = None
 
 
 # Marks all of the tests in this module
@@ -325,7 +327,7 @@ def test_parquet_file_with_filesystem(s3_example_fs, use_uri):
     table = pa.table({"a": range(10)})
     pq.write_table(table, s3_path, filesystem=s3_fs)
 
-    parquet_file = pq.ParquetFile(*args, **kwargs)  # type: ignore[missing-argument]
+    parquet_file = pq.ParquetFile(*args, **kwargs)
     assert parquet_file.read() == table
     assert not parquet_file.closed
     parquet_file.close()
@@ -406,7 +408,7 @@ def test_parquet_file_hugginface_support():
         pytest.skip("fsspec is not installed, skipping Hugging Face test")
 
     fake_hf_module = types.ModuleType("huggingface_hub")
-    fake_hf_module.HfFileSystem = MemoryFileSystem  # type: ignore[unresolved-attribute]
+    fake_hf_module.HfFileSystem = MemoryFileSystem
     with mock.patch.dict("sys.modules", {"huggingface_hub": fake_hf_module}):
         uri = "hf://datasets/apache/arrow/test.parquet"
         table = pa.table({"a": range(10)})

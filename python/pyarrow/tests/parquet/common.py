@@ -20,7 +20,7 @@ import io
 try:
     import numpy as np
 except ImportError:
-    pass
+    np = None
 
 import pyarrow as pa
 from pyarrow.tests import util
@@ -41,7 +41,7 @@ def _write_table(table, path, **kwargs):
 def _read_table(*args, **kwargs):
     import pyarrow.parquet as pq
 
-    table = pq.read_table(*args, **kwargs)  # type: ignore[missing-argument]
+    table = pq.read_table(*args, **kwargs)
     table.validate(full=True)
     return table
 

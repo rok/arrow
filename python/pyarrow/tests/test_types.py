@@ -27,18 +27,16 @@ import hypothesis.strategies as st
 try:
     import hypothesis.extra.pytz as tzst
 except ImportError:
-    pass
+    tzst = None
 import weakref
 
 try:
     import numpy as np
 except ImportError:
-    pass
+    np = None
 import pyarrow as pa
 import pyarrow.types as types
 import pyarrow.tests.strategies as past
-
-from pyarrow import lib  # type: ignore[unresolved-import]
 
 
 def get_many_types():
@@ -85,14 +83,14 @@ def get_many_types():
                    pa.field('b', pa.int8(), nullable=False),
                    pa.field('c', pa.string())]),
         pa.union([pa.field('a', pa.binary(10)),
-                  pa.field('b', pa.string())], mode=lib.UnionMode_DENSE),
+                  pa.field('b', pa.string())], mode=pa.lib.UnionMode_DENSE),
         pa.union([pa.field('a', pa.binary(10)),
-                  pa.field('b', pa.string())], mode=lib.UnionMode_DENSE,
+                  pa.field('b', pa.string())], mode=pa.lib.UnionMode_DENSE,
                  type_codes=[4, 8]),
         pa.union([pa.field('a', pa.binary(10)),
-                  pa.field('b', pa.string())], mode=lib.UnionMode_SPARSE),
+                  pa.field('b', pa.string())], mode=pa.lib.UnionMode_SPARSE),
         pa.union([pa.field('a', pa.binary(10), nullable=False),
-                  pa.field('b', pa.string())], mode=lib.UnionMode_SPARSE),
+                  pa.field('b', pa.string())], mode=pa.lib.UnionMode_SPARSE),
         pa.dictionary(pa.int32(), pa.string()),
         pa.run_end_encoded(pa.int16(), pa.int32()),
         pa.run_end_encoded(pa.int32(), pa.string()),
@@ -249,7 +247,7 @@ def test_is_nested_or_struct():
 
 
 def test_is_union():
-    for mode in [lib.UnionMode_SPARSE, lib.UnionMode_DENSE]:
+    for mode in [pa.lib.UnionMode_SPARSE, pa.lib.UnionMode_DENSE]:
         assert types.is_union(pa.union([pa.field('a', pa.int32()),
                                         pa.field('b', pa.int8()),
                                         pa.field('c', pa.string())],
@@ -355,7 +353,7 @@ def test_is_primitive():
     (datetime.timezone(datetime.timedelta(hours=1, minutes=30)), '+01:30')
 ])
 def test_tzinfo_to_string(tz, expected):
-    assert lib.tzinfo_to_string(tz) == expected
+    assert pa.lib.tzinfo_to_string(tz) == expected
 
 
 def test_pytz_tzinfo_to_string():
@@ -363,13 +361,13 @@ def test_pytz_tzinfo_to_string():
 
     tz = [pytz.utc, pytz.timezone('Europe/Paris')]
     expected = ['UTC', 'Europe/Paris']
-    assert [lib.tzinfo_to_string(i) for i in tz] == expected
+    assert [pa.lib.tzinfo_to_string(i) for i in tz] == expected
 
     # StaticTzInfo.tzname returns with '-09' so we need to infer the timezone's
     # name from the tzinfo.zone attribute
     tz = [pytz.timezone('Etc/GMT-9'), pytz.FixedOffset(180)]
     expected = ['Etc/GMT-9', '+03:00']
-    assert [lib.tzinfo_to_string(i) for i in tz] == expected
+    assert [pa.lib.tzinfo_to_string(i) for i in tz] == expected
 
 
 @pytest.mark.timezone_data
@@ -383,9 +381,9 @@ def test_dateutil_tzinfo_to_string():
     import dateutil.tz
 
     tz = dateutil.tz.UTC
-    assert lib.tzinfo_to_string(tz) == 'UTC'
+    assert pa.lib.tzinfo_to_string(tz) == 'UTC'
     tz = dateutil.tz.gettz('Europe/Paris')
-    assert lib.tzinfo_to_string(tz) == 'Europe/Paris'
+    assert pa.lib.tzinfo_to_string(tz) == 'Europe/Paris'
 
 
 @pytest.mark.timezone_data
@@ -397,20 +395,20 @@ def test_zoneinfo_tzinfo_to_string():
         pytest.importorskip('tzdata')
 
     tz = zoneinfo.ZoneInfo('UTC')
-    assert lib.tzinfo_to_string(tz) == 'UTC'
+    assert pa.lib.tzinfo_to_string(tz) == 'UTC'
     tz = zoneinfo.ZoneInfo('Europe/Paris')
-    assert lib.tzinfo_to_string(tz) == 'Europe/Paris'
+    assert pa.lib.tzinfo_to_string(tz) == 'Europe/Paris'
 
 
 def test_tzinfo_to_string_errors():
     msg = "Not an instance of datetime.tzinfo"
     with pytest.raises(TypeError):
-        lib.tzinfo_to_string("Europe/Budapest")
+        pa.lib.tzinfo_to_string("Europe/Budapest")
 
     tz = datetime.timezone(datetime.timedelta(hours=1, seconds=30))
     msg = "Offset must represent whole number of minutes"
     with pytest.raises(ValueError, match=msg):
-        lib.tzinfo_to_string(tz)
+        pa.lib.tzinfo_to_string(tz)
 
 
 if tzst:
@@ -423,8 +421,8 @@ else:
 def test_pytz_timezone_roundtrip(tz):
     if tz is None:
         pytest.skip('requires timezone not None')
-    timezone_string = lib.tzinfo_to_string(tz)
-    timezone_tzinfo = lib.string_to_tzinfo(timezone_string)
+    timezone_string = pa.lib.tzinfo_to_string(tz)
+    timezone_tzinfo = pa.lib.string_to_tzinfo(timezone_string)
     assert timezone_tzinfo == tz
 
 
@@ -484,14 +482,14 @@ def test_convert_custom_tzinfo_objects_to_string():
         def utcoffset(self, dt):
             return None
 
-    assert lib.tzinfo_to_string(CorrectTimezone1()) == "-02:30"
-    assert lib.tzinfo_to_string(CorrectTimezone2()) == "+03:00"
+    assert pa.lib.tzinfo_to_string(CorrectTimezone1()) == "-02:30"
+    assert pa.lib.tzinfo_to_string(CorrectTimezone2()) == "+03:00"
 
     msg = (r"Object returned by tzinfo.utcoffset\(None\) is not an instance "
            r"of datetime.timedelta")
     for wrong in [BuggyTimezone1(), BuggyTimezone2(), BuggyTimezone3()]:
         with pytest.raises(ValueError, match=msg):
-            lib.tzinfo_to_string(wrong)
+            pa.lib.tzinfo_to_string(wrong)
 
 
 def test_string_to_tzinfo():
@@ -501,7 +499,7 @@ def test_string_to_tzinfo():
         expected = [pytz.utc, pytz.timezone('Europe/Paris'),
                     pytz.FixedOffset(180), pytz.FixedOffset(90),
                     pytz.FixedOffset(-120)]
-        result = [lib.string_to_tzinfo(i) for i in string]
+        result = [pa.lib.string_to_tzinfo(i) for i in string]
         assert result == expected
 
     except ImportError:
@@ -513,7 +511,7 @@ def test_string_to_tzinfo():
                         datetime.timezone(
                             datetime.timedelta(hours=1, minutes=30)),
                         datetime.timezone(-datetime.timedelta(hours=2))]
-            result = [lib.string_to_tzinfo(i) for i in string]
+            result = [pa.lib.string_to_tzinfo(i) for i in string]
             assert result == expected
 
         except ImportError:
@@ -527,8 +525,8 @@ def test_timezone_string_roundtrip_pytz():
           pytz.utc, pytz.timezone('America/New_York')]
     name = ['+01:30', '-01:30', 'UTC', 'America/New_York']
 
-    assert [lib.tzinfo_to_string(i) for i in tz] == name
-    assert [lib.string_to_tzinfo(i)for i in name] == tz
+    assert [pa.lib.tzinfo_to_string(i) for i in tz] == name
+    assert [pa.lib.string_to_tzinfo(i)for i in name] == tz
 
 
 def test_timestamp():
@@ -799,13 +797,13 @@ def test_union_type():
 
     sparse_factories = [
         partial(pa.union, mode='sparse'),
-        partial(pa.union, mode=lib.UnionMode_SPARSE),
+        partial(pa.union, mode=pa.lib.UnionMode_SPARSE),
         pa.sparse_union,
     ]
 
     dense_factories = [
         partial(pa.union, mode='dense'),
-        partial(pa.union, mode=lib.UnionMode_DENSE),
+        partial(pa.union, mode=pa.lib.UnionMode_DENSE),
         pa.dense_union,
     ]
 
@@ -1324,7 +1322,6 @@ def test_field_modified_copies():
     assert f0.equals(f0_)
 
 
-@pytest.mark.numpy
 def test_is_integer_value():
     assert pa.types.is_integer_value(1)
     if np is not None:

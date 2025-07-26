@@ -19,8 +19,7 @@ import math
 import weakref
 
 import pyarrow as pa
-from pyarrow.lib import StringBuilder, StringViewBuilder \
-    # type: ignore[unresolved_import]
+from pyarrow.lib import StringBuilder, StringViewBuilder
 
 
 def test_weakref():
