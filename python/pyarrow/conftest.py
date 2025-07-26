@@ -15,7 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
-import pytest
+import pytest  # type: ignore[unresolved-import]
 
 import os
 import pyarrow as pa
@@ -114,7 +114,7 @@ elif sys.platform == "emscripten":
     defaults['timezone_data'] = os.path.exists("/usr/share/zoneinfo")
 
 try:
-    import cython  # noqa
+    import cython  # type: ignore[unresolved-import]  # noqa
     defaults['cython'] = True
 except ImportError:
     pass
@@ -156,13 +156,13 @@ except ImportError:
     pass
 
 try:
-    import pandas  # noqa
+    import pandas  # type: ignore[unresolved-import]  # noqa
     defaults['pandas'] = True
 except ImportError:
     defaults['nopandas'] = True
 
 try:
-    import numpy  # noqa
+    import numpy  # type: ignore[unresolved-import]  # noqa
     defaults['numpy'] = True
 except ImportError:
     defaults['nonumpy'] = True
@@ -336,7 +336,7 @@ def unary_agg_func_fixture():
     Register a unary aggregate function (mean)
     """
     from pyarrow import compute as pc
-    import numpy as np
+    import numpy as np  # type: ignore[unresolved-import]
 
     def func(ctx, x):
         return pa.scalar(np.nanmean(x))
@@ -362,7 +362,7 @@ def varargs_agg_func_fixture():
     Register a unary aggregate function
     """
     from pyarrow import compute as pc
-    import numpy as np
+    import numpy as np  # type: ignore[unresolved-import]
 
     def func(ctx, *args):
         sum = 0.0

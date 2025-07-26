@@ -17,7 +17,7 @@
 
 from __future__ import absolute_import
 
-from cffi import FFI
+from cffi import FFI  # type: ignore[unresolved-import]
 
 c_source = """
     struct ArrowSchema {

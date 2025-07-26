@@ -42,7 +42,7 @@ from pyarrow._json cimport ReadOptions as JsonReadOptions
 try:
     import pyarrow.substrait as pa_substrait
 except ImportError:
-    pass
+    pa_substrait = None
 
 
 _DEFAULT_BATCH_SIZE = 2**17
@@ -89,7 +89,7 @@ def _get_parquet_classes():
         try:
             import pyarrow._dataset_parquet as _dataset_pq
         except ImportError:
-            pass
+            _dataset_pq = None
 
 
 def _get_parquet_symbol(name):
