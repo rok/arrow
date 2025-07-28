@@ -24,7 +24,7 @@ import sys
 try:
     import numpy as np
 except ImportError:
-    np = None
+    pass
 import pytest
 import unittest.mock as mock
 
@@ -40,7 +40,7 @@ try:
     from pyarrow.tests.parquet.common import (
         _read_table, _test_dataframe, _write_table)
 except ImportError:
-    pq = None
+    pass
 
 
 try:
@@ -48,7 +48,7 @@ try:
     import pandas.testing as tm
 
 except ImportError:
-    pd = tm = None
+    pass
 
 
 # Marks all of the tests in this module

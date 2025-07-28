@@ -27,25 +27,56 @@ import pytest
 import random
 import sys
 import textwrap
+from pyarrow import lib   # type: ignore[unresolved-import]
+from pyarrow.compute import \
+    sum as pc_sum, mode, variance, skew, kurtosis, count_substring, \
+    count_substring_regex, find_substring, find_substring_regex, match_like, \
+    match_substring, match_substring_regex, utf8_trim_whitespace, \
+    ascii_trim_whitespace, utf8_trim, utf8_slice_codeunits, binary_slice, \
+    split_pattern, utf8_split_whitespace, ascii_split_whitespace, \
+    split_pattern_regex, any as pc_any, all as pc_all, filter, min_max, \
+    choose, utf8_is_printable, ascii_center, ascii_lpad, ascii_rpad, utf8_center, \
+    utf8_lpad, utf8_rpad, binary_replace_slice, utf8_replace_slice, \
+    replace_substring, replace_substring_regex, extract_regex, extract_regex_span, \
+    binary_join, binary_join_element_wise, not_equal, less, less_equal, greater, \
+    greater_equal, equal, round_to_multiple, round_binary, is_null, or_kleene, \
+    is_valid, and_, and_kleene, or_, xor, invert, dictionary_decode, \
+    dictionary_encode, strptime, strftime, year as pc_year, \
+    is_leap_year as pc_is_leap_year, month as pc_month, day as pc_day, \
+    day_of_year as pc_day_of_year, iso_year as pc_iso_year, iso_week as pc_iso_week, \
+    iso_calendar as pc_iso_calendar, quarter as pc_quarter, hour as pc_hour, \
+    minute as pc_minute, second as pc_second, millisecond as pc_millisecond, \
+    microsecond as pc_microsecond, nanosecond as pc_nanosecond, \
+    subsecond as pc_subsecond, local_timestamp as pc_local_timestamp, \
+    is_dst as pc_is_dst, day_of_week as pc_day_of_week, \
+    week as pc_week, \
+    assume_timezone as pc_assume_timezone, count, ceil_temporal, floor_temporal, \
+    round_temporal, partition_nth_indices, select_k_unstable, array_sort_indices, \
+    sort_indices, is_in, index_in, quantile, tdigest, cumulative_sum, \
+    cumulative_prod, max_element_wise, min_element_wise, cumulative_min, \
+    cumulative_max, map_lookup, struct_field, case_when, make_struct, list_element, \
+    count_distinct, utf8_normalize, rank, rank_quantile, rank_normal, negate, \
+    subtract, divide, multiply, power, sqrt, exp, cos, sin, tan, acos, atan, \
+    asin, atan2, sinh, cosh, tanh, asinh, acosh, atanh, abs as pc_abs, sign, \
+    bit_wise_not, bit_wise_and, \
+    bit_wise_or, bit_wise_xor, is_nan, is_finite, coalesce, hour, round as pc_round, \
+    add as pc_add, cast, list_slice, run_end_decode, run_end_encode, pairwise_diff, \
+    pairwise_diff_checked, pivot_wider, winsorize   # type: ignore[unresolved-import]
 
 try:
     import numpy as np
 except ImportError:
-    np = None
+    pass
 
 try:
     import pandas as pd
 except ImportError:
-    pd = None
+    pass
 
 import pyarrow as pa
 import pyarrow.compute as pc
-from pyarrow.lib import ArrowNotImplementedError
+from pyarrow.lib import ArrowNotImplementedError  # type: ignore[unresolved_import]
 
-try:
-    import pyarrow.substrait as pas
-except ImportError:
-    pas = None
 
 exported_functions = [
     func for (name, func) in sorted(pc.__dict__.items())
@@ -328,36 +359,36 @@ def test_function_attributes():
 
 def test_input_type_conversion():
     # Automatic array conversion from Python
-    arr = pc.add([1, 2], [4, None])
+    arr = pc_add([1, 2], [4, None])
     assert arr.to_pylist() == [5, None]
     # Automatic scalar conversion from Python
-    arr = pc.add([1, 2], 4)
+    arr = pc_add([1, 2], 4)
     assert arr.to_pylist() == [5, 6]
     # Other scalar type
-    assert pc.equal(["foo", "bar", None],
-                    "foo").to_pylist() == [True, False, None]
+    assert equal(["foo", "bar", None],
+                 "foo").to_pylist() == [True, False, None]
 
 
 @pytest.mark.parametrize('arrow_type', numerical_arrow_types)
 def test_sum_array(arrow_type):
     arr = pa.array([1, 2, 3, 4], type=arrow_type)
     assert arr.sum().as_py() == 10
-    assert pc.sum(arr).as_py() == 10
+    assert pc_sum(arr).as_py() == 10
 
     arr = pa.array([1, 2, 3, 4, None], type=arrow_type)
     assert arr.sum().as_py() == 10
-    assert pc.sum(arr).as_py() == 10
+    assert pc_sum(arr).as_py() == 10
 
     arr = pa.array([None], type=arrow_type)
     assert arr.sum().as_py() is None  # noqa: E711
-    assert pc.sum(arr).as_py() is None  # noqa: E711
+    assert pc_sum(arr).as_py() is None  # noqa: E711
     assert arr.sum(min_count=0).as_py() == 0
-    assert pc.sum(arr, min_count=0).as_py() == 0
+    assert pc_sum(arr, min_count=0).as_py() == 0
 
     arr = pa.array([], type=arrow_type)
     assert arr.sum().as_py() is None  # noqa: E711
     assert arr.sum(min_count=0).as_py() == 0
-    assert pc.sum(arr, min_count=0).as_py() == 0
+    assert pc_sum(arr, min_count=0).as_py() == 0
 
 
 @pytest.mark.parametrize("arrow_type", [pa.decimal128(3, 2), pa.decimal256(3, 2)])
@@ -406,24 +437,24 @@ def test_sum_decimal_array(arrow_type):
 @pytest.mark.parametrize('arrow_type', numerical_arrow_types)
 def test_sum_chunked_array(arrow_type):
     arr = pa.chunked_array([pa.array([1, 2, 3, 4], type=arrow_type)])
-    assert pc.sum(arr).as_py() == 10
+    assert pc_sum(arr).as_py() == 10
 
     arr = pa.chunked_array([
         pa.array([1, 2], type=arrow_type), pa.array([3, 4], type=arrow_type)
     ])
-    assert pc.sum(arr).as_py() == 10
+    assert pc_sum(arr).as_py() == 10
 
     arr = pa.chunked_array([
         pa.array([1, 2], type=arrow_type),
         pa.array([], type=arrow_type),
         pa.array([3, 4], type=arrow_type)
     ])
-    assert pc.sum(arr).as_py() == 10
+    assert pc_sum(arr).as_py() == 10
 
     arr = pa.chunked_array((), type=arrow_type)
     assert arr.num_chunks == 0
-    assert pc.sum(arr).as_py() is None  # noqa: E711
-    assert pc.sum(arr, min_count=0).as_py() == 0
+    assert pc_sum(arr).as_py() is None  # noqa: E711
+    assert pc_sum(arr, min_count=0).as_py() == 0
 
 
 @pytest.mark.parametrize('arrow_type', [pa.decimal128(3, 2), pa.decimal256(3, 2)])
@@ -442,77 +473,77 @@ def test_sum_chunked_array_decimal_type(arrow_type):
             pa.array([Decimal("1.23"), Decimal("4.56")], type=arrow_type)
         ]
     )
-    assert pc.sum(arr).as_py() == expected_sum
-    assert pc.sum(arr).type == max_precision_type
+    assert pc_sum(arr).as_py() == expected_sum
+    assert pc_sum(arr).type == max_precision_type
 
     arr = pa.chunked_array([
         pa.array([Decimal("1.23")], type=arrow_type),
         pa.array([Decimal("4.56")], type=arrow_type)
     ])
-    assert pc.sum(arr).as_py() == expected_sum
-    assert pc.sum(arr).type == max_precision_type
+    assert pc_sum(arr).as_py() == expected_sum
+    assert pc_sum(arr).type == max_precision_type
 
     arr = pa.chunked_array([
         pa.array([Decimal("1.23")], type=arrow_type),
         pa.array([], type=arrow_type),
         pa.array([Decimal("4.56")], type=arrow_type)
     ])
-    assert pc.sum(arr).as_py() == expected_sum
-    assert pc.sum(arr).type == max_precision_type
+    assert pc_sum(arr).as_py() == expected_sum
+    assert pc_sum(arr).type == max_precision_type
 
     arr = pa.chunked_array((), type=arrow_type)
     assert arr.num_chunks == 0
-    assert pc.sum(arr).as_py() is None  # noqa: E711
-    assert pc.sum(arr).type == max_precision_type
-    assert pc.sum(arr, min_count=0).as_py() == zero
-    assert pc.sum(arr, min_count=0).type == max_precision_type
+    assert pc_sum(arr).as_py() is None  # noqa: E711
+    assert pc_sum(arr).type == max_precision_type
+    assert pc_sum(arr, min_count=0).as_py() == zero
+    assert pc_sum(arr, min_count=0).type == max_precision_type
 
 
 def test_mode_array():
     # ARROW-9917
-    arr = pa.array([1, 1, 3, 4, 3, 5], type='int64')
-    mode = pc.mode(arr)
-    assert len(mode) == 1
-    assert mode[0].as_py() == {"mode": 1, "count": 2}
+    data = pa.array([1, 1, 3, 4, 3, 5], type='int64')
+    arr = mode(data)
+    assert len(arr) == 1
+    assert arr[0].as_py() == {"mode": 1, "count": 2}
 
-    mode = pc.mode(arr, n=2)
-    assert len(mode) == 2
-    assert mode[0].as_py() == {"mode": 1, "count": 2}
-    assert mode[1].as_py() == {"mode": 3, "count": 2}
+    arr = mode(data, n=2)
+    assert len(arr) == 2
+    assert arr[0].as_py() == {"mode": 1, "count": 2}
+    assert arr[1].as_py() == {"mode": 3, "count": 2}
 
-    arr = pa.array([], type='int64')
-    assert len(pc.mode(arr)) == 0
+    data = pa.array([], type='int64')
+    assert len(mode(data)) == 0
 
-    arr = pa.array([1, 1, 3, 4, 3, None], type='int64')
-    mode = pc.mode(arr, skip_nulls=False)
-    assert len(mode) == 0
-    mode = pc.mode(arr, min_count=6)
-    assert len(mode) == 0
-    mode = pc.mode(arr, skip_nulls=False, min_count=5)
-    assert len(mode) == 0
+    data = pa.array([1, 1, 3, 4, 3, None], type='int64')
+    arr = mode(data, skip_nulls=False)
+    assert len(arr) == 0
+    arr = mode(data, min_count=6)
+    assert len(arr) == 0
+    arr = mode(data, skip_nulls=False, min_count=5)
+    assert len(arr) == 0
 
-    arr = pa.array([True, False])
-    mode = pc.mode(arr, n=2)
-    assert len(mode) == 2
-    assert mode[0].as_py() == {"mode": False, "count": 1}
-    assert mode[1].as_py() == {"mode": True, "count": 1}
+    data = pa.array([True, False])
+    arr = mode(data, n=2)
+    assert len(arr) == 2
+    assert arr[0].as_py() == {"mode": False, "count": 1}
+    assert arr[1].as_py() == {"mode": True, "count": 1}
 
 
 def test_mode_chunked_array():
     # ARROW-9917
-    arr = pa.chunked_array([pa.array([1, 1, 3, 4, 3, 5], type='int64')])
-    mode = pc.mode(arr)
-    assert len(mode) == 1
-    assert mode[0].as_py() == {"mode": 1, "count": 2}
+    data = pa.chunked_array([pa.array([1, 1, 3, 4, 3, 5], type='int64')])
+    arr = mode(data)
+    assert len(arr) == 1
+    assert arr[0].as_py() == {"mode": 1, "count": 2}
 
-    mode = pc.mode(arr, n=2)
-    assert len(mode) == 2
-    assert mode[0].as_py() == {"mode": 1, "count": 2}
-    assert mode[1].as_py() == {"mode": 3, "count": 2}
+    arr = mode(data, n=2)
+    assert len(arr) == 2
+    assert arr[0].as_py() == {"mode": 1, "count": 2}
+    assert arr[1].as_py() == {"mode": 3, "count": 2}
 
     arr = pa.chunked_array((), type='int64')
     assert arr.num_chunks == 0
-    assert len(pc.mode(arr)) == 0
+    assert len(mode(arr)) == 0
 
 
 def test_empty_chunked_array():
@@ -525,23 +556,23 @@ def test_empty_chunked_array():
 
 def test_variance():
     data = [1, 2, 3, 4, 5, 6, 7, 8]
-    assert pc.variance(data).as_py() == 5.25
-    assert pc.variance(data, ddof=0).as_py() == 5.25
-    assert pc.variance(data, ddof=1).as_py() == 6.0
+    assert variance(data).as_py() == 5.25
+    assert variance(data, ddof=0).as_py() == 5.25
+    assert variance(data, ddof=1).as_py() == 6.0
 
 
 def test_skew():
     data = [1, 1, None, 2]
-    assert pc.skew(data).as_py() == pytest.approx(0.707106781186548, rel=1e-10)
-    assert pc.skew(data, skip_nulls=False).as_py() is None
-    assert pc.skew(data, min_count=4).as_py() is None
+    assert skew(data).as_py() == pytest.approx(0.707106781186548, rel=1e-10)
+    assert skew(data, skip_nulls=False).as_py() is None
+    assert skew(data, min_count=4).as_py() is None
 
 
 def test_kurtosis():
     data = [1, 1, None, 2]
-    assert pc.kurtosis(data).as_py() == pytest.approx(-1.5, rel=1e-10)
-    assert pc.kurtosis(data, skip_nulls=False).as_py() is None
-    assert pc.kurtosis(data, min_count=4).as_py() is None
+    assert kurtosis(data).as_py() == pytest.approx(-1.5, rel=1e-10)
+    assert kurtosis(data, skip_nulls=False).as_py() is None
+    assert kurtosis(data, min_count=4).as_py() is None
 
 
 @pytest.mark.parametrize("input, expected", (
@@ -554,8 +585,8 @@ def test_kurtosis():
     ([1, 40], {'skew': None, 'kurtosis': None}),
 ))
 def test_unbiased_skew_and_kurtosis(input, expected):
-    arrow_skew = pc.skew(input, skip_nulls=True, biased=False)
-    arrow_kurtosis = pc.kurtosis(input, skip_nulls=True, biased=False)
+    arrow_skew = skew(input, skip_nulls=True, biased=False)
+    arrow_kurtosis = kurtosis(input, skip_nulls=True, biased=False)
     assert arrow_skew.as_py() == expected['skew']
     assert arrow_kurtosis.as_py() == expected['kurtosis']
 
@@ -565,11 +596,11 @@ def test_count_substring():
                          (pa.large_string(), pa.int64())]:
         arr = pa.array(["ab", "cab", "abcab", "ba", "AB", None], type=ty)
 
-        result = pc.count_substring(arr, "ab")
+        result = count_substring(arr, "ab")
         expected = pa.array([1, 1, 2, 0, 0, None], type=offset)
         assert expected == result
 
-        result = pc.count_substring(arr, "ab", ignore_case=True)
+        result = count_substring(arr, "ab", ignore_case=True)
         expected = pa.array([1, 1, 2, 0, 1, None], type=offset)
         assert expected == result
 
@@ -579,11 +610,11 @@ def test_count_substring_regex():
                          (pa.large_string(), pa.int64())]:
         arr = pa.array(["ab", "cab", "baAacaa", "ba", "AB", None], type=ty)
 
-        result = pc.count_substring_regex(arr, "a+")
+        result = count_substring_regex(arr, "a+")
         expected = pa.array([1, 1, 3, 1, 0, None], type=offset)
         assert expected.equals(result)
 
-        result = pc.count_substring_regex(arr, "a+", ignore_case=True)
+        result = count_substring_regex(arr, "a+", ignore_case=True)
         expected = pa.array([1, 1, 2, 1, 1, None], type=offset)
         assert expected.equals(result)
 
@@ -591,61 +622,61 @@ def test_count_substring_regex():
 def test_find_substring():
     for ty in [pa.string(), pa.binary(), pa.large_string(), pa.large_binary()]:
         arr = pa.array(["ab", "cab", "ba", None], type=ty)
-        result = pc.find_substring(arr, "ab")
+        result = find_substring(arr, "ab")
         assert result.to_pylist() == [0, 1, -1, None]
 
-        result = pc.find_substring_regex(arr, "a?b")
+        result = find_substring_regex(arr, "a?b")
         assert result.to_pylist() == [0, 1, 0, None]
 
         arr = pa.array(["ab*", "cAB*", "ba", "aB?"], type=ty)
-        result = pc.find_substring(arr, "aB*", ignore_case=True)
+        result = find_substring(arr, "aB*", ignore_case=True)
         assert result.to_pylist() == [0, 1, -1, -1]
 
-        result = pc.find_substring_regex(arr, "a?b", ignore_case=True)
+        result = find_substring_regex(arr, "a?b", ignore_case=True)
         assert result.to_pylist() == [0, 1, 0, 0]
 
 
 def test_match_like():
     arr = pa.array(["ab", "ba%", "ba", "ca%d", None])
-    result = pc.match_like(arr, r"_a\%%")
+    result = match_like(arr, r"_a\%%")
     expected = pa.array([False, True, False, True, None])
     assert expected.equals(result)
 
     arr = pa.array(["aB", "bA%", "ba", "ca%d", None])
-    result = pc.match_like(arr, r"_a\%%", ignore_case=True)
+    result = match_like(arr, r"_a\%%", ignore_case=True)
     expected = pa.array([False, True, False, True, None])
     assert expected.equals(result)
-    result = pc.match_like(arr, r"_a\%%", ignore_case=False)
+    result = match_like(arr, r"_a\%%", ignore_case=False)
     expected = pa.array([False, False, False, True, None])
     assert expected.equals(result)
 
 
 def test_match_substring():
     arr = pa.array(["ab", "abc", "ba", None])
-    result = pc.match_substring(arr, "ab")
+    result = match_substring(arr, "ab")
     expected = pa.array([True, True, False, None])
     assert expected.equals(result)
 
     arr = pa.array(["áB", "Ábc", "ba", None])
-    result = pc.match_substring(arr, "áb", ignore_case=True)
+    result = match_substring(arr, "áb", ignore_case=True)
     expected = pa.array([True, True, False, None])
     assert expected.equals(result)
-    result = pc.match_substring(arr, "áb", ignore_case=False)
+    result = match_substring(arr, "áb", ignore_case=False)
     expected = pa.array([False, False, False, None])
     assert expected.equals(result)
 
 
 def test_match_substring_regex():
     arr = pa.array(["ab", "abc", "ba", "c", None])
-    result = pc.match_substring_regex(arr, "^a?b")
+    result = match_substring_regex(arr, "^a?b")
     expected = pa.array([True, True, True, False, None])
     assert expected.equals(result)
 
     arr = pa.array(["aB", "Abc", "BA", "c", None])
-    result = pc.match_substring_regex(arr, "^a?b", ignore_case=True)
+    result = match_substring_regex(arr, "^a?b", ignore_case=True)
     expected = pa.array([True, True, True, False, None])
     assert expected.equals(result)
-    result = pc.match_substring_regex(arr, "^a?b", ignore_case=False)
+    result = match_substring_regex(arr, "^a?b", ignore_case=False)
     expected = pa.array([False, False, False, False, None])
     assert expected.equals(result)
 
@@ -653,21 +684,21 @@ def test_match_substring_regex():
 def test_trim():
     # \u3000 is unicode whitespace
     arr = pa.array([" foo", None, " \u3000foo bar \t"])
-    result = pc.utf8_trim_whitespace(arr)
+    result = utf8_trim_whitespace(arr)
     expected = pa.array(["foo", None, "foo bar"])
     assert expected.equals(result)
 
     arr = pa.array([" foo", None, " \u3000foo bar \t"])
-    result = pc.ascii_trim_whitespace(arr)
+    result = ascii_trim_whitespace(arr)
     expected = pa.array(["foo", None, "\u3000foo bar"])
     assert expected.equals(result)
 
     arr = pa.array([" foo", None, " \u3000foo bar \t"])
-    result = pc.utf8_trim(arr, characters=' f\u3000')
+    result = utf8_trim(arr, characters=' f\u3000')
     expected = pa.array(["oo", None, "oo bar \t"])
     assert expected.equals(result)
     # Positional option
-    result = pc.utf8_trim(arr, ' f\u3000')
+    result = utf8_trim(arr, ' f\u3000')
     expected = pa.array(["oo", None, "oo bar \t"])
     assert expected.equals(result)
 
@@ -679,12 +710,12 @@ def test_slice_compatibility():
             for step in [-3, -2, -1, 1, 2, 3]:
                 expected = pa.array([k.as_py()[start:stop:step]
                                      for k in arr])
-                result = pc.utf8_slice_codeunits(
+                result = utf8_slice_codeunits(
                     arr, start=start, stop=stop, step=step)
                 assert expected.equals(result)
                 # Positional options
-                assert pc.utf8_slice_codeunits(arr,
-                                               start, stop, step) == result
+                assert utf8_slice_codeunits(arr,
+                                            start, stop, step) == result
 
 
 def test_binary_slice_compatibility():
@@ -697,113 +728,113 @@ def test_binary_slice_compatibility():
             continue
         expected = pa.array([k.as_py()[start:stop:step]
                              for k in arr])
-        result = pc.binary_slice(
+        result = binary_slice(
             arr, start=start, stop=stop, step=step)
         assert expected.equals(result)
         # Positional options
-        assert pc.binary_slice(arr, start, stop, step) == result
+        assert binary_slice(arr, start, stop, step) == result
         # Fixed size binary input / output
         for item in data:
             fsb_scalar = pa.scalar(item, type=pa.binary(len(item)))
             expected = item[start:stop:step]
-            actual = pc.binary_slice(fsb_scalar, start, stop, step)
+            actual = binary_slice(fsb_scalar, start, stop, step)
             assert actual.type == pa.binary(len(expected))
             assert actual.as_py() == expected
 
 
 def test_split_pattern():
     arr = pa.array(["-foo---bar--", "---foo---b"])
-    result = pc.split_pattern(arr, pattern="---")
+    result = split_pattern(arr, pattern="---")
     expected = pa.array([["-foo", "bar--"], ["", "foo", "b"]])
     assert expected.equals(result)
 
-    result = pc.split_pattern(arr, "---", max_splits=1)
+    result = split_pattern(arr, "---", max_splits=1)
     expected = pa.array([["-foo", "bar--"], ["", "foo---b"]])
     assert expected.equals(result)
 
-    result = pc.split_pattern(arr, "---", max_splits=1, reverse=True)
+    result = split_pattern(arr, "---", max_splits=1, reverse=True)
     expected = pa.array([["-foo", "bar--"], ["---foo", "b"]])
     assert expected.equals(result)
 
 
 def test_split_whitespace_utf8():
     arr = pa.array(["foo bar", " foo  \u3000\tb"])
-    result = pc.utf8_split_whitespace(arr)
+    result = utf8_split_whitespace(arr)
     expected = pa.array([["foo", "bar"], ["", "foo", "b"]])
     assert expected.equals(result)
 
-    result = pc.utf8_split_whitespace(arr, max_splits=1)
+    result = utf8_split_whitespace(arr, max_splits=1)
     expected = pa.array([["foo", "bar"], ["", "foo  \u3000\tb"]])
     assert expected.equals(result)
 
-    result = pc.utf8_split_whitespace(arr, max_splits=1, reverse=True)
+    result = utf8_split_whitespace(arr, max_splits=1, reverse=True)
     expected = pa.array([["foo", "bar"], [" foo", "b"]])
     assert expected.equals(result)
 
 
 def test_split_whitespace_ascii():
     arr = pa.array(["foo bar", " foo  \u3000\tb"])
-    result = pc.ascii_split_whitespace(arr)
+    result = ascii_split_whitespace(arr)
     expected = pa.array([["foo", "bar"], ["", "foo", "\u3000", "b"]])
     assert expected.equals(result)
 
-    result = pc.ascii_split_whitespace(arr, max_splits=1)
+    result = ascii_split_whitespace(arr, max_splits=1)
     expected = pa.array([["foo", "bar"], ["", "foo  \u3000\tb"]])
     assert expected.equals(result)
 
-    result = pc.ascii_split_whitespace(arr, max_splits=1, reverse=True)
+    result = ascii_split_whitespace(arr, max_splits=1, reverse=True)
     expected = pa.array([["foo", "bar"], [" foo  \u3000", "b"]])
     assert expected.equals(result)
 
 
 def test_split_pattern_regex():
     arr = pa.array(["-foo---bar--", "---foo---b"])
-    result = pc.split_pattern_regex(arr, pattern="-+")
+    result = split_pattern_regex(arr, pattern="-+")
     expected = pa.array([["", "foo", "bar", ""], ["", "foo", "b"]])
     assert expected.equals(result)
 
-    result = pc.split_pattern_regex(arr, "-+", max_splits=1)
+    result = split_pattern_regex(arr, "-+", max_splits=1)
     expected = pa.array([["", "foo---bar--"], ["", "foo---b"]])
     assert expected.equals(result)
 
     with pytest.raises(NotImplementedError,
                        match="Cannot split in reverse with regex"):
-        result = pc.split_pattern_regex(
+        result = split_pattern_regex(
             arr, pattern="---", max_splits=1, reverse=True)
 
 
 def test_min_max():
     # An example generated function wrapper with possible options
     data = [4, 5, 6, None, 1]
-    s = pc.min_max(data)
+    s = min_max(data)
     assert s.as_py() == {'min': 1, 'max': 6}
-    s = pc.min_max(data, options=pc.ScalarAggregateOptions())
+    s = min_max(data, options=pc.ScalarAggregateOptions())
     assert s.as_py() == {'min': 1, 'max': 6}
-    s = pc.min_max(data, options=pc.ScalarAggregateOptions(skip_nulls=True))
+    s = min_max(data, options=pc.ScalarAggregateOptions(skip_nulls=True))
     assert s.as_py() == {'min': 1, 'max': 6}
-    s = pc.min_max(data, options=pc.ScalarAggregateOptions(skip_nulls=False))
+    s = min_max(data, options=pc.ScalarAggregateOptions(skip_nulls=False))
     assert s.as_py() == {'min': None, 'max': None}
 
     # Options as dict of kwargs
-    s = pc.min_max(data, options={'skip_nulls': False})
+    s = min_max(data, options={'skip_nulls': False})
     assert s.as_py() == {'min': None, 'max': None}
     # Options as named functions arguments
-    s = pc.min_max(data, skip_nulls=False)
+    s = min_max(data, skip_nulls=False)
     assert s.as_py() == {'min': None, 'max': None}
 
     # Both options and named arguments
     with pytest.raises(TypeError):
-        s = pc.min_max(
+        s = min_max(
             data, options=pc.ScalarAggregateOptions(), skip_nulls=False)
 
     # Wrong options type
     options = pc.TakeOptions()
     with pytest.raises(TypeError):
-        s = pc.min_max(data, options=options)
+        s = min_max(data, options=options)
 
     # Missing argument
     with pytest.raises(TypeError, match="min_max takes 1 positional"):
-        s = pc.min_max()
+        s = min_max()
 
 
 def test_any():
@@ -812,17 +843,17 @@ def test_any():
     options = pc.ScalarAggregateOptions(skip_nulls=False, min_count=0)
 
     a = pa.array([], type='bool')
-    assert pc.any(a).as_py() is None
-    assert pc.any(a, min_count=0).as_py() is False
-    assert pc.any(a, options=options).as_py() is False
+    assert pc_any(a).as_py() is None
+    assert pc_any(a, min_count=0).as_py() is False
+    assert pc_any(a, options=options).as_py() is False
 
     a = pa.array([False, None, True])
-    assert pc.any(a).as_py() is True
-    assert pc.any(a, options=options).as_py() is True
+    assert pc_any(a).as_py() is True
+    assert pc_any(a, options=options).as_py() is True
 
     a = pa.array([False, None, False])
-    assert pc.any(a).as_py() is False
-    assert pc.any(a, options=options).as_py() is None
+    assert pc_any(a).as_py() is False
+    assert pc_any(a, options=options).as_py() is None
 
 
 def test_all():
@@ -831,39 +862,39 @@ def test_all():
     options = pc.ScalarAggregateOptions(skip_nulls=False, min_count=0)
 
     a = pa.array([], type='bool')
-    assert pc.all(a).as_py() is None
-    assert pc.all(a, min_count=0).as_py() is True
-    assert pc.all(a, options=options).as_py() is True
+    assert pc_all(a).as_py() is None
+    assert pc_all(a, min_count=0).as_py() is True
+    assert pc_all(a, options=options).as_py() is True
 
     a = pa.array([False, True])
-    assert pc.all(a).as_py() is False
-    assert pc.all(a, options=options).as_py() is False
+    assert pc_all(a).as_py() is False
+    assert pc_all(a, options=options).as_py() is False
 
     a = pa.array([True, None])
-    assert pc.all(a).as_py() is True
-    assert pc.all(a, options=options).as_py() is None
+    assert pc_all(a).as_py() is True
+    assert pc_all(a, options=options).as_py() is None
 
     a = pa.chunked_array([[True], [True, None]])
-    assert pc.all(a).as_py() is True
-    assert pc.all(a, options=options).as_py() is None
+    assert pc_all(a).as_py() is True
+    assert pc_all(a, options=options).as_py() is None
 
     a = pa.chunked_array([[True], [False]])
-    assert pc.all(a).as_py() is False
-    assert pc.all(a, options=options).as_py() is False
+    assert pc_all(a).as_py() is False
+    assert pc_all(a, options=options).as_py() is False
 
 
 def test_is_valid():
     # An example generated function wrapper without options
     data = [4, 5, None]
-    assert pc.is_valid(data).to_pylist() == [True, True, False]
+    assert is_valid(data).to_pylist() == [True, True, False]
 
     with pytest.raises(TypeError):
-        pc.is_valid(data, options=None)
+        is_valid(data, options=None)
 
 
 def test_generated_docstrings():
     # With options
-    assert pc.min_max.__doc__ == textwrap.dedent("""\
+    assert min_max.__doc__ == textwrap.dedent("""\
         Compute the minimum and maximum values of a numeric array.
 
         Null values are ignored by default.
@@ -885,7 +916,7 @@ def test_generated_docstrings():
             If not passed, will allocate memory from the default memory pool.
         """)
     # Without options
-    assert pc.add.__doc__ == textwrap.dedent("""\
+    assert pc_add.__doc__ == textwrap.dedent("""\
         Add the arguments element-wise.
 
         Results will wrap around on integer overflow.
@@ -902,7 +933,7 @@ def test_generated_docstrings():
             If not passed, will allocate memory from the default memory pool.
         """)
     # Varargs with options
-    assert pc.min_element_wise.__doc__ == textwrap.dedent("""\
+    assert min_element_wise.__doc__ == textwrap.dedent("""\
         Find the element-wise minimum value.
 
         Nulls are ignored (by default) or propagated.
@@ -920,7 +951,7 @@ def test_generated_docstrings():
         memory_pool : pyarrow.MemoryPool, optional
             If not passed, will allocate memory from the default memory pool.
         """)
-    assert pc.filter.__doc__ == textwrap.dedent("""\
+    assert filter.__doc__ == textwrap.dedent("""\
         Filter with a boolean selection filter.
 
         The output is populated with values from the input at positions
@@ -967,24 +998,24 @@ def test_generated_signatures():
     # options and their default values.
 
     # Without options
-    sig = inspect.signature(pc.add)
+    sig = inspect.signature(pc_add)
     assert str(sig) == "(x, y, /, *, memory_pool=None)"
     # With options
-    sig = inspect.signature(pc.min_max)
+    sig = inspect.signature(min_max)
     assert str(sig) == ("(array, /, *, skip_nulls=True, min_count=1, "
                         "options=None, memory_pool=None)")
     # With positional options
-    sig = inspect.signature(pc.quantile)
+    sig = inspect.signature(quantile)
     assert str(sig) == ("(array, /, q=0.5, *, interpolation='linear', "
                         "skip_nulls=True, min_count=0, "
                         "options=None, memory_pool=None)")
     # Varargs with options
-    sig = inspect.signature(pc.binary_join_element_wise)
+    sig = inspect.signature(binary_join_element_wise)
     assert str(sig) == ("(*strings, null_handling='emit_null', "
                         "null_replacement='', options=None, "
                         "memory_pool=None)")
     # Varargs without options
-    sig = inspect.signature(pc.choose)
+    sig = inspect.signature(choose)
     assert str(sig) == "(indices, /, *values, memory_pool=None)"
     # Nullary with options
     sig = inspect.signature(pc.random)
@@ -1001,7 +1032,7 @@ def find_new_unicode_codepoints():
     new = set()
     characters = [chr(c) for c in range(0x80, 0x11000)
                   if not (0xD800 <= c < 0xE000)]
-    is_printable = pc.utf8_is_printable(pa.array(characters)).to_pylist()
+    is_printable = utf8_is_printable(pa.array(characters)).to_pylist()
     for i, c in enumerate(characters):
         if is_printable[i] != c.isprintable():
             new.add(ord(c))
@@ -1121,20 +1152,20 @@ def test_string_py_compat_boolean(function_name, variant):
 
 def test_pad():
     arr = pa.array([None, 'a', 'abcd'])
-    assert pc.ascii_center(arr, width=3).tolist() == [None, ' a ', 'abcd']
-    assert pc.ascii_lpad(arr, width=3).tolist() == [None, '  a', 'abcd']
-    assert pc.ascii_rpad(arr, width=3).tolist() == [None, 'a  ', 'abcd']
-    assert pc.ascii_center(arr, 3).tolist() == [None, ' a ', 'abcd']
-    assert pc.ascii_lpad(arr, 3).tolist() == [None, '  a', 'abcd']
-    assert pc.ascii_rpad(arr, 3).tolist() == [None, 'a  ', 'abcd']
+    assert ascii_center(arr, width=3).tolist() == [None, ' a ', 'abcd']
+    assert ascii_lpad(arr, width=3).tolist() == [None, '  a', 'abcd']
+    assert ascii_rpad(arr, width=3).tolist() == [None, 'a  ', 'abcd']
+    assert ascii_center(arr, 3).tolist() == [None, ' a ', 'abcd']
+    assert ascii_lpad(arr, 3).tolist() == [None, '  a', 'abcd']
+    assert ascii_rpad(arr, 3).tolist() == [None, 'a  ', 'abcd']
 
     arr = pa.array([None, 'á', 'abcd'])
-    assert pc.utf8_center(arr, width=3).tolist() == [None, ' á ', 'abcd']
-    assert pc.utf8_lpad(arr, width=3).tolist() == [None, '  á', 'abcd']
-    assert pc.utf8_rpad(arr, width=3).tolist() == [None, 'á  ', 'abcd']
-    assert pc.utf8_center(arr, 3).tolist() == [None, ' á ', 'abcd']
-    assert pc.utf8_lpad(arr, 3).tolist() == [None, '  á', 'abcd']
-    assert pc.utf8_rpad(arr, 3).tolist() == [None, 'á  ', 'abcd']
+    assert utf8_center(arr, width=3).tolist() == [None, ' á ', 'abcd']
+    assert utf8_lpad(arr, width=3).tolist() == [None, '  á', 'abcd']
+    assert utf8_rpad(arr, width=3).tolist() == [None, 'á  ', 'abcd']
+    assert utf8_center(arr, 3).tolist() == [None, ' á ', 'abcd']
+    assert utf8_lpad(arr, 3).tolist() == [None, '  á', 'abcd']
+    assert utf8_rpad(arr, 3).tolist() == [None, 'á  ', 'abcd']
 
 
 def test_utf8_zfill():
@@ -1177,53 +1208,53 @@ def test_replace_slice():
     for start in offsets:
         for stop in offsets:
             expected = series.str.slice_replace(start, stop, 'XX')
-            actual = pc.binary_replace_slice(
+            actual = binary_replace_slice(
                 arr, start=start, stop=stop, replacement='XX')
             assert actual.tolist() == expected.tolist()
             # Positional options
-            assert pc.binary_replace_slice(arr, start, stop, 'XX') == actual
+            assert binary_replace_slice(arr, start, stop, 'XX') == actual
 
     arr = pa.array([None, '', 'π', 'πb', 'πbθ', 'πbθd', 'πbθde'])
     series = arr.to_pandas().astype(object).replace({np.nan: None})
     for start in offsets:
         for stop in offsets:
             expected = series.str.slice_replace(start, stop, 'XX')
-            actual = pc.utf8_replace_slice(
+            actual = utf8_replace_slice(
                 arr, start=start, stop=stop, replacement='XX')
             assert actual.tolist() == expected.tolist()
 
 
 def test_replace_plain():
     data = pa.array(['foozfoo', 'food', None])
-    ar = pc.replace_substring(data, pattern='foo', replacement='bar')
+    ar = replace_substring(data, pattern='foo', replacement='bar')
     assert ar.tolist() == ['barzbar', 'bard', None]
-    ar = pc.replace_substring(data, 'foo', 'bar')
+    ar = replace_substring(data, 'foo', 'bar')
     assert ar.tolist() == ['barzbar', 'bard', None]
 
-    ar = pc.replace_substring(data, pattern='foo', replacement='bar',
-                              max_replacements=1)
+    ar = replace_substring(data, pattern='foo', replacement='bar',
+                           max_replacements=1)
     assert ar.tolist() == ['barzfoo', 'bard', None]
-    ar = pc.replace_substring(data, 'foo', 'bar', max_replacements=1)
+    ar = replace_substring(data, 'foo', 'bar', max_replacements=1)
     assert ar.tolist() == ['barzfoo', 'bard', None]
 
 
 def test_replace_regex():
     data = pa.array(['foo', 'mood', None])
     expected = ['f00', 'm00d', None]
-    ar = pc.replace_substring_regex(data, pattern='(.)oo', replacement=r'\100')
+    ar = replace_substring_regex(data, pattern='(.)oo', replacement=r'\100')
     assert ar.tolist() == expected
-    ar = pc.replace_substring_regex(data, '(.)oo', replacement=r'\100')
+    ar = replace_substring_regex(data, '(.)oo', replacement=r'\100')
     assert ar.tolist() == expected
-    ar = pc.replace_substring_regex(data, '(.)oo', r'\100')
+    ar = replace_substring_regex(data, '(.)oo', r'\100')
     assert ar.tolist() == expected
 
 
 def test_extract_regex():
     ar = pa.array(['a1', 'zb2z'])
     expected = [{'letter': 'a', 'digit': '1'}, {'letter': 'b', 'digit': '2'}]
-    struct = pc.extract_regex(ar, pattern=r'(?P<letter>[ab])(?P<digit>\d)')
+    struct = extract_regex(ar, pattern=r'(?P<letter>[ab])(?P<digit>\d)')
     assert struct.tolist() == expected
-    struct = pc.extract_regex(ar, r'(?P<letter>[ab])(?P<digit>\d)')
+    struct = extract_regex(ar, r'(?P<letter>[ab])(?P<digit>\d)')
     assert struct.tolist() == expected
 
 
@@ -1231,50 +1262,50 @@ def test_extract_regex_span():
     ar = pa.array(['a1', 'zb234z'])
     expected = [{'letter': [0, 1], 'digit': [1, 1]},
                 {'letter': [1, 1], 'digit': [2, 3]}]
-    struct = pc.extract_regex_span(ar, pattern=r'(?P<letter>[ab])(?P<digit>\d+)')
+    struct = extract_regex_span(ar, pattern=r'(?P<letter>[ab])(?P<digit>\d+)')
     assert struct.tolist() == expected
-    struct = pc.extract_regex_span(ar, r'(?P<letter>[ab])(?P<digit>\d+)')
+    struct = extract_regex_span(ar, r'(?P<letter>[ab])(?P<digit>\d+)')
     assert struct.tolist() == expected
 
 
 def test_binary_join():
     ar_list = pa.array([['foo', 'bar'], None, []])
     expected = pa.array(['foo-bar', None, ''])
-    assert pc.binary_join(ar_list, '-').equals(expected)
+    assert binary_join(ar_list, '-').equals(expected)
 
     separator_array = pa.array(['1', '2'], type=pa.binary())
     expected = pa.array(['a1b', 'c2d'], type=pa.binary())
     ar_list = pa.array([['a', 'b'], ['c', 'd']], type=pa.list_(pa.binary()))
-    assert pc.binary_join(ar_list, separator_array).equals(expected)
+    assert binary_join(ar_list, separator_array).equals(expected)
 
 
 def test_binary_join_element_wise():
     null = pa.scalar(None, type=pa.string())
     arrs = [[None, 'a', 'b'], ['c', None, 'd'], [None, '-', '--']]
-    assert pc.binary_join_element_wise(*arrs).to_pylist() == \
+    assert binary_join_element_wise(*arrs).to_pylist() == \
         [None, None, 'b--d']
-    assert pc.binary_join_element_wise('a', 'b', '-').as_py() == 'a-b'
-    assert pc.binary_join_element_wise('a', null, '-').as_py() is None
-    assert pc.binary_join_element_wise('a', 'b', null).as_py() is None
+    assert binary_join_element_wise('a', 'b', '-').as_py() == 'a-b'
+    assert binary_join_element_wise('a', null, '-').as_py() is None
+    assert binary_join_element_wise('a', 'b', null).as_py() is None
 
     skip = pc.JoinOptions(null_handling='skip')
-    assert pc.binary_join_element_wise(*arrs, options=skip).to_pylist() == \
+    assert binary_join_element_wise(*arrs, options=skip).to_pylist() == \
         [None, 'a', 'b--d']
-    assert pc.binary_join_element_wise(
+    assert binary_join_element_wise(
         'a', 'b', '-', options=skip).as_py() == 'a-b'
-    assert pc.binary_join_element_wise(
+    assert binary_join_element_wise(
         'a', null, '-', options=skip).as_py() == 'a'
-    assert pc.binary_join_element_wise(
+    assert binary_join_element_wise(
         'a', 'b', null, options=skip).as_py() is None
 
     replace = pc.JoinOptions(null_handling='replace', null_replacement='spam')
-    assert pc.binary_join_element_wise(*arrs, options=replace).to_pylist() == \
+    assert binary_join_element_wise(*arrs, options=replace).to_pylist() == \
         [None, 'a-spam', 'b--d']
-    assert pc.binary_join_element_wise(
+    assert binary_join_element_wise(
         'a', 'b', '-', options=replace).as_py() == 'a-b'
-    assert pc.binary_join_element_wise(
+    assert binary_join_element_wise(
         'a', null, '-', options=replace).as_py() == 'a-spam'
-    assert pc.binary_join_element_wise(
+    assert binary_join_element_wise(
         'a', 'b', null, options=replace).as_py() is None
 
 
@@ -1602,22 +1633,22 @@ def test_compare_array(typ):
     arr1 = con([1, 2, 3, 4, None])
     arr2 = con([1, 1, 4, None, 4])
 
-    result = pc.equal(arr1, arr2)
+    result = equal(arr1, arr2)
     assert result.equals(con([True, False, False, None, None]))
 
-    result = pc.not_equal(arr1, arr2)
+    result = not_equal(arr1, arr2)
     assert result.equals(con([False, True, True, None, None]))
 
-    result = pc.less(arr1, arr2)
+    result = less(arr1, arr2)
     assert result.equals(con([False, False, True, None, None]))
 
-    result = pc.less_equal(arr1, arr2)
+    result = less_equal(arr1, arr2)
     assert result.equals(con([True, False, True, None, None]))
 
-    result = pc.greater(arr1, arr2)
+    result = greater(arr1, arr2)
     assert result.equals(con([False, True, False, None, None]))
 
-    result = pc.greater_equal(arr1, arr2)
+    result = greater_equal(arr1, arr2)
     assert result.equals(con([True, True, False, None, None]))
 
 
@@ -1633,28 +1664,28 @@ def test_compare_string_scalar(typ):
     arr = con(['a', 'b', 'c', None])
     scalar = pa.scalar('b')
 
-    result = pc.equal(arr, scalar)
+    result = equal(arr, scalar)
     assert result.equals(con([False, True, False, None]))
 
     if typ == "array":
         nascalar = pa.scalar(None, type="string")
-        result = pc.equal(arr, nascalar)
-        isnull = pc.is_null(result)
+        result = equal(arr, nascalar)
+        isnull = is_null(result)
         assert isnull.equals(con([True, True, True, True]))
 
-    result = pc.not_equal(arr, scalar)
+    result = not_equal(arr, scalar)
     assert result.equals(con([True, False, True, None]))
 
-    result = pc.less(arr, scalar)
+    result = less(arr, scalar)
     assert result.equals(con([True, False, False, None]))
 
-    result = pc.less_equal(arr, scalar)
+    result = less_equal(arr, scalar)
     assert result.equals(con([True, True, False, None]))
 
-    result = pc.greater(arr, scalar)
+    result = greater(arr, scalar)
     assert result.equals(con([False, False, True, None]))
 
-    result = pc.greater_equal(arr, scalar)
+    result = greater_equal(arr, scalar)
     assert result.equals(con([False, True, True, None]))
 
 
@@ -1670,27 +1701,27 @@ def test_compare_scalar(typ):
     arr = con([1, 2, 3, None])
     scalar = pa.scalar(2)
 
-    result = pc.equal(arr, scalar)
+    result = equal(arr, scalar)
     assert result.equals(con([False, True, False, None]))
 
     if typ == "array":
         nascalar = pa.scalar(None, type="int64")
-        result = pc.equal(arr, nascalar)
+        result = equal(arr, nascalar)
         assert result.to_pylist() == [None, None, None, None]
 
-    result = pc.not_equal(arr, scalar)
+    result = not_equal(arr, scalar)
     assert result.equals(con([True, False, True, None]))
 
-    result = pc.less(arr, scalar)
+    result = less(arr, scalar)
     assert result.equals(con([True, False, False, None]))
 
-    result = pc.less_equal(arr, scalar)
+    result = less_equal(arr, scalar)
     assert result.equals(con([True, True, False, None]))
 
-    result = pc.greater(arr, scalar)
+    result = greater(arr, scalar)
     assert result.equals(con([False, False, True, None]))
 
-    result = pc.greater_equal(arr, scalar)
+    result = greater_equal(arr, scalar)
     assert result.equals(con([False, True, True, None]))
 
 
@@ -1706,14 +1737,14 @@ def test_compare_chunked_array_mixed():
         (arr_chunked, arr),
         (arr_chunked, arr_chunked2),
     ]:
-        result = pc.equal(left, right)
+        result = equal(left, right)
         assert result.equals(expected)
 
 
 def test_arithmetic_add():
     left = pa.array([1, 2, 3, 4, 5])
     right = pa.array([0, -1, 1, 2, 3])
-    result = pc.add(left, right)
+    result = pc_add(left, right)
     expected = pa.array([1, 1, 4, 6, 8])
     assert result.equals(expected)
 
@@ -1721,7 +1752,7 @@ def test_arithmetic_add():
 def test_arithmetic_subtract():
     left = pa.array([1, 2, 3, 4, 5])
     right = pa.array([0, -1, 1, 2, 3])
-    result = pc.subtract(left, right)
+    result = subtract(left, right)
     expected = pa.array([1, 3, 2, 2, 2])
     assert result.equals(expected)
 
@@ -1729,7 +1760,7 @@ def test_arithmetic_subtract():
 def test_arithmetic_multiply():
     left = pa.array([1, 2, 3, 4, 5])
     right = pa.array([0, -1, 1, 2, 3])
-    result = pc.multiply(left, right)
+    result = multiply(left, right)
     expected = pa.array([0, -2, 3, 8, 15])
     assert result.equals(expected)
 
@@ -1737,10 +1768,10 @@ def test_arithmetic_multiply():
 @pytest.mark.parametrize("ty", ["round", "round_to_multiple"])
 def test_round_to_integer(ty):
     if ty == "round":
-        round = pc.round
+        round_func = pc_round
         RoundOptions = partial(pc.RoundOptions, ndigits=0)
     elif ty == "round_to_multiple":
-        round = pc.round_to_multiple
+        round_func = round_to_multiple
         RoundOptions = partial(pc.RoundToMultipleOptions, multiple=1)
 
     values = [3.2, 3.5, 3.7, 4.5, -3.2, -3.5, -3.7, None]
@@ -1758,7 +1789,7 @@ def test_round_to_integer(ty):
     }
     for round_mode, expected in rmode_and_expected.items():
         options = RoundOptions(round_mode=round_mode)
-        result = round(values, options=options)
+        result = round_func(values, options=options)
         expected_array = pa.array(expected, type=pa.float64())
         assert expected_array.equals(result)
 
@@ -1775,11 +1806,11 @@ def test_round():
     }
     for ndigits, expected in ndigits_and_expected.items():
         options = pc.RoundOptions(ndigits, "half_towards_infinity")
-        result = pc.round(values, options=options)
+        result = pc_round(values, options=options)
         np.testing.assert_allclose(result, pa.array(expected), equal_nan=True)
-        assert pc.round(values, ndigits,
+        assert pc_round(values, ndigits,
                         round_mode="half_towards_infinity") == result
-        assert pc.round(values, ndigits, "half_towards_infinity") == result
+        assert pc_round(values, ndigits, "half_towards_infinity") == result
 
 
 @pytest.mark.numpy
@@ -1795,19 +1826,19 @@ def test_round_to_multiple():
     }
     for multiple, expected in multiple_and_expected.items():
         options = pc.RoundToMultipleOptions(multiple, "half_towards_infinity")
-        result = pc.round_to_multiple(values, options=options)
+        result = round_to_multiple(values, options=options)
         np.testing.assert_allclose(result, pa.array(expected), equal_nan=True)
-        assert pc.round_to_multiple(values, multiple,
-                                    "half_towards_infinity") == result
+        assert round_to_multiple(values, multiple,
+                                 "half_towards_infinity") == result
 
     for multiple in [0, -2, pa.scalar(-10.4)]:
         with pytest.raises(pa.ArrowInvalid,
                            match="Rounding multiple must be positive"):
-            pc.round_to_multiple(values, multiple=multiple)
+            round_to_multiple(values, multiple=multiple)
 
     for multiple in [object, 99999999999999999999999]:
         with pytest.raises(TypeError, match="is not a valid multiple type"):
-            pc.round_to_multiple(values, multiple=multiple)
+            round_to_multiple(values, multiple=multiple)
 
 
 def test_round_binary():
@@ -1815,15 +1846,15 @@ def test_round_binary():
     scales = pa.array([-3, -2, -1, 0, 1, 2, 3], pa.int32())
     expected = pa.array(
         [0, 200, 350, 457, 123.5, 234.57, 345.678], pa.float64())
-    assert pc.round_binary(values, scales) == expected
+    assert round_binary(values, scales) == expected
 
     expect_zero = pa.scalar(0, pa.float64())
     expect_inf = pa.scalar(10, pa.float64())
     scale = pa.scalar(-1, pa.int32())
 
-    assert pc.round_binary(
+    assert round_binary(
         5.0, scale, round_mode="half_towards_zero") == expect_zero
-    assert pc.round_binary(
+    assert round_binary(
         5.0, scale, round_mode="half_towards_infinity") == expect_inf
 
 
@@ -1832,11 +1863,11 @@ def test_is_null():
     result = arr.is_null()
     expected = pa.array([False, False, False, True])
     assert result.equals(expected)
-    assert result.equals(pc.is_null(arr))
+    assert result.equals(is_null(arr))
     result = arr.is_valid()
     expected = pa.array([True, True, True, False])
     assert result.equals(expected)
-    assert result.equals(pc.is_valid(arr))
+    assert result.equals(is_valid(arr))
 
     arr = pa.chunked_array([[1, 2], [3, None]])
     result = arr.is_null()
@@ -1956,27 +1987,27 @@ def test_logical():
     a = pa.array([True, False, False, None])
     b = pa.array([True, True, False, True])
 
-    assert pc.and_(a, b) == pa.array([True, False, False, None])
-    assert pc.and_kleene(a, b) == pa.array([True, False, False, None])
+    assert and_(a, b) == pa.array([True, False, False, None])
+    assert and_kleene(a, b) == pa.array([True, False, False, None])
 
-    assert pc.or_(a, b) == pa.array([True, True, False, None])
-    assert pc.or_kleene(a, b) == pa.array([True, True, False, True])
+    assert or_(a, b) == pa.array([True, True, False, None])
+    assert or_kleene(a, b) == pa.array([True, True, False, True])
 
-    assert pc.xor(a, b) == pa.array([False, True, False, None])
+    assert xor(a, b) == pa.array([False, True, False, None])
 
-    assert pc.invert(a) == pa.array([False, True, True, None])
+    assert invert(a) == pa.array([False, True, True, None])
 
 
 def test_dictionary_decode():
     array = pa.array(["a", "a", "b", "c", "b"])
     dictionary_array = array.dictionary_encode()
-    dictionary_array_decode = pc.dictionary_decode(dictionary_array)
+    dictionary_array_decode = dictionary_decode(dictionary_array)
 
     assert array != dictionary_array
 
     assert array == dictionary_array_decode
-    assert array == pc.dictionary_decode(array)
-    assert pc.dictionary_encode(dictionary_array) == dictionary_array
+    assert array == dictionary_decode(array)
+    assert dictionary_encode(dictionary_array) == dictionary_array
 
 
 def test_cast():
@@ -2053,7 +2084,7 @@ def test_fsl_to_fsl_cast(value_type):
     # Different sized FSL
     cast_type = pa.list_(pa.field("element", value_type), 3)
     err_msg = 'Size of FixedSizeList is not the same.'
-    with pytest.raises(pa.lib.ArrowTypeError, match=err_msg):
+    with pytest.raises(lib.ArrowTypeError, match=err_msg):
         fsl.cast(cast_type)
 
 
@@ -2251,28 +2282,28 @@ def test_cast_float_to_decimal_random(float_ty, decimal_traits):
 def test_strptime():
     arr = pa.array(["5/1/2020", None, "12/13/1900"])
 
-    got = pc.strptime(arr, format='%m/%d/%Y', unit='s')
+    got = strptime(arr, format='%m/%d/%Y', unit='s')
     expected = pa.array(
         [datetime.datetime(2020, 5, 1), None, datetime.datetime(1900, 12, 13)],
         type=pa.timestamp('s'))
     assert got == expected
     # Positional format
-    assert pc.strptime(arr, '%m/%d/%Y', unit='s') == got
+    assert strptime(arr, '%m/%d/%Y', unit='s') == got
 
     expected = pa.array([datetime.datetime(2020, 1, 5), None, None],
                         type=pa.timestamp('s'))
-    got = pc.strptime(arr, format='%d/%m/%Y', unit='s', error_is_null=True)
+    got = strptime(arr, format='%d/%m/%Y', unit='s', error_is_null=True)
     assert got == expected
 
     with pytest.raises(pa.ArrowInvalid,
                        match="Failed to parse string: '5/1/2020'"):
-        pc.strptime(arr, format='%Y-%m-%d', unit='s', error_is_null=False)
+        strptime(arr, format='%Y-%m-%d', unit='s', error_is_null=False)
 
     with pytest.raises(pa.ArrowInvalid,
                        match="Failed to parse string: '5/1/2020'"):
-        pc.strptime(arr, format='%Y-%m-%d', unit='s')
+        strptime(arr, format='%Y-%m-%d', unit='s')
 
-    got = pc.strptime(arr, format='%Y-%m-%d', unit='s', error_is_null=True)
+    got = strptime(arr, format='%Y-%m-%d', unit='s', error_is_null=True)
     assert got == pa.array([None, None, None], type=pa.timestamp('s'))
 
 
@@ -2294,7 +2325,7 @@ def test_strftime():
             tsa = pa.array(ts, type=pa.timestamp(unit, timezone))
             for fmt in formats:
                 options = pc.StrftimeOptions(fmt)
-                result = pc.strftime(tsa, options=options)
+                result = strftime(tsa, options=options)
                 # cast to the same type as result to ignore string vs large_string
                 expected = pa.array(ts.strftime(fmt)).cast(result.type)
                 assert result.equals(expected)
@@ -2303,34 +2334,34 @@ def test_strftime():
 
         # Default format
         tsa = pa.array(ts, type=pa.timestamp("s", timezone))
-        result = pc.strftime(tsa, options=pc.StrftimeOptions())
+        result = strftime(tsa, options=pc.StrftimeOptions())
         expected = pa.array(ts.strftime(fmt)).cast(result.type)
         assert result.equals(expected)
 
         # Default format plus timezone
         tsa = pa.array(ts, type=pa.timestamp("s", timezone))
-        result = pc.strftime(tsa, options=pc.StrftimeOptions(fmt + "%Z"))
+        result = strftime(tsa, options=pc.StrftimeOptions(fmt + "%Z"))
         expected = pa.array(ts.strftime(fmt + "%Z")).cast(result.type)
         assert result.equals(expected)
 
         # Pandas %S is equivalent to %S in arrow for unit="s"
         tsa = pa.array(ts, type=pa.timestamp("s", timezone))
         options = pc.StrftimeOptions("%S")
-        result = pc.strftime(tsa, options=options)
+        result = strftime(tsa, options=options)
         expected = pa.array(ts.strftime("%S")).cast(result.type)
         assert result.equals(expected)
 
         # Pandas %S.%f is equivalent to %S in arrow for unit="us"
         tsa = pa.array(ts, type=pa.timestamp("us", timezone))
         options = pc.StrftimeOptions("%S")
-        result = pc.strftime(tsa, options=options)
+        result = strftime(tsa, options=options)
         expected = pa.array(ts.strftime("%S.%f")).cast(result.type)
         assert result.equals(expected)
 
         # Test setting locale
         tsa = pa.array(ts, type=pa.timestamp("s", timezone))
         options = pc.StrftimeOptions(fmt, locale="C")
-        result = pc.strftime(tsa, options=options)
+        result = strftime(tsa, options=options)
         expected = pa.array(ts.strftime(fmt)).cast(result.type)
         assert result.equals(expected)
 
@@ -2338,19 +2369,19 @@ def test_strftime():
     fmt = "%Y-%m-%dT%H:%M:%S"
     ts = pd.to_datetime(times)
     tsa = pa.array(ts, type=pa.timestamp("s"))
-    result = pc.strftime(tsa, options=pc.StrftimeOptions(fmt))
+    result = strftime(tsa, options=pc.StrftimeOptions(fmt))
     expected = pa.array(ts.strftime(fmt)).cast(result.type)
 
     # Positional format
-    assert pc.strftime(tsa, fmt) == result
+    assert strftime(tsa, fmt) == result
 
     assert result.equals(expected)
     with pytest.raises(pa.ArrowInvalid,
                        match="Timezone not present, cannot convert to string"):
-        pc.strftime(tsa, options=pc.StrftimeOptions(fmt + "%Z"))
+        strftime(tsa, options=pc.StrftimeOptions(fmt + "%Z"))
     with pytest.raises(pa.ArrowInvalid,
                        match="Timezone not present, cannot convert to string"):
-        pc.strftime(tsa, options=pc.StrftimeOptions(fmt + "%z"))
+        strftime(tsa, options=pc.StrftimeOptions(fmt + "%z"))
 
 
 def _check_datetime_components(timestamps, timezone=None):
@@ -2398,42 +2429,42 @@ def _check_datetime_components(timestamps, timezone=None):
     microsecond = ts.dt.microsecond.astype("int64")
     nanosecond = ts.dt.nanosecond.astype("int64")
 
-    assert pc.year(tsa).equals(pa.array(year))
-    assert pc.is_leap_year(tsa).equals(pa.array(ts.dt.is_leap_year))
-    assert pc.month(tsa).equals(pa.array(month))
-    assert pc.day(tsa).equals(pa.array(day))
-    assert pc.day_of_week(tsa).equals(pa.array(dayofweek))
-    assert pc.day_of_year(tsa).equals(pa.array(dayofyear))
-    assert pc.iso_year(tsa).equals(pa.array(iso_year))
-    assert pc.iso_week(tsa).equals(pa.array(iso_week))
-    assert pc.iso_calendar(tsa).equals(iso_calendar)
-    assert pc.quarter(tsa).equals(pa.array(quarter))
-    assert pc.hour(tsa).equals(pa.array(hour))
-    assert pc.minute(tsa).equals(pa.array(minute))
-    assert pc.second(tsa).equals(pa.array(second))
-    assert pc.millisecond(tsa).equals(pa.array(microsecond // 10 ** 3))
-    assert pc.microsecond(tsa).equals(pa.array(microsecond % 10 ** 3))
-    assert pc.nanosecond(tsa).equals(pa.array(nanosecond))
-    assert pc.subsecond(tsa).equals(pa.array(subseconds))
-    assert pc.local_timestamp(tsa).equals(pa.array(ts.dt.tz_localize(None)))
+    assert pc_year(tsa).equals(pa.array(year))
+    assert pc_is_leap_year(tsa).equals(pa.array(ts.dt.is_leap_year))
+    assert pc_month(tsa).equals(pa.array(month))
+    assert pc_day(tsa).equals(pa.array(day))
+    assert pc_day_of_week(tsa).equals(pa.array(dayofweek))
+    assert pc_day_of_year(tsa).equals(pa.array(dayofyear))
+    assert pc_iso_year(tsa).equals(pa.array(iso_year))
+    assert pc_iso_week(tsa).equals(pa.array(iso_week))
+    assert pc_iso_calendar(tsa).equals(iso_calendar)
+    assert pc_quarter(tsa).equals(pa.array(quarter))
+    assert pc_hour(tsa).equals(pa.array(hour))
+    assert pc_minute(tsa).equals(pa.array(minute))
+    assert pc_second(tsa).equals(pa.array(second))
+    assert pc_millisecond(tsa).equals(pa.array(microsecond // 10 ** 3))
+    assert pc_microsecond(tsa).equals(pa.array(microsecond % 10 ** 3))
+    assert pc_nanosecond(tsa).equals(pa.array(nanosecond))
+    assert pc_subsecond(tsa).equals(pa.array(subseconds))
+    assert pc_local_timestamp(tsa).equals(pa.array(ts.dt.tz_localize(None)))
 
     if ts.dt.tz:
         if ts.dt.tz is datetime.timezone.utc:
             # datetime with utc returns None for dst()
-            is_dst = [False] * len(ts)
+            arr_is_dst = [False] * len(ts)
         else:
-            is_dst = ts.apply(lambda x: x.dst().seconds > 0)
-        assert pc.is_dst(tsa).equals(pa.array(is_dst))
+            arr_is_dst = ts.apply(lambda x: x.dst().seconds > 0)
+        assert pc_is_dst(tsa).equals(pa.array(arr_is_dst))
 
     day_of_week_options = pc.DayOfWeekOptions(
         count_from_zero=False, week_start=1)
-    assert pc.day_of_week(tsa, options=day_of_week_options).equals(
+    assert pc_day_of_week(tsa, options=day_of_week_options).equals(
         pa.array(dayofweek + 1))
 
     week_options = pc.WeekOptions(
         week_starts_monday=True, count_from_zero=False,
         first_week_is_fully_in_year=False)
-    assert pc.week(tsa, options=week_options).equals(pa.array(iso_week))
+    assert pc_week(tsa, options=week_options).equals(pa.array(iso_week))
 
 
 @pytest.mark.pandas
@@ -2472,7 +2503,7 @@ def test_iso_calendar_longer_array(unit):
     # https://github.com/apache/arrow/issues/38655
     # ensure correct result for array length > 32
     arr = pa.array([datetime.datetime(2022, 1, 2, 9)]*50, pa.timestamp(unit))
-    result = pc.iso_calendar(arr)
+    result = pc_iso_calendar(arr)
     expected = pa.StructArray.from_arrays(
         [[2021]*50, [52]*50, [7]*50],
         names=['iso_year', 'iso_week', 'iso_day_of_week']
@@ -2511,18 +2542,18 @@ def test_assume_timezone():
         options = pc.AssumeTimezoneOptions(timezone)
         ta = pa.array(timestamps, type=ts_type)
         expected = timestamps.tz_localize(timezone)
-        result = pc.assume_timezone(ta, options=options)
+        result = pc_assume_timezone(ta, options=options)
         assert result.equals(pa.array(expected))
-        result = pc.assume_timezone(ta, timezone)  # Positional option
+        result = pc_assume_timezone(ta, timezone)  # Positional option
         assert result.equals(pa.array(expected))
 
         ta_zoned = pa.array(timestamps, type=pa.timestamp("ns", timezone))
         with pytest.raises(pa.ArrowInvalid, match="already have a timezone:"):
-            pc.assume_timezone(ta_zoned, options=options)
+            pc_assume_timezone(ta_zoned, options=options)
 
     invalid_options = pc.AssumeTimezoneOptions("Europe/Brusselsss")
     with pytest.raises(ValueError, match="not found in timezone database"):
-        pc.assume_timezone(ta, options=invalid_options)
+        pc_assume_timezone(ta, options=invalid_options)
 
     timezone = "Europe/Brussels"
 
@@ -2535,18 +2566,18 @@ def test_assume_timezone():
     with pytest.raises(ValueError,
                        match="Timestamp doesn't exist in "
                        f"timezone '{timezone}'"):
-        pc.assume_timezone(nonexistent_array,
+        pc_assume_timezone(nonexistent_array,
                            options=options_nonexistent_raise)
 
     expected = pa.array(nonexistent.tz_localize(
         timezone, nonexistent="shift_forward"))
-    result = pc.assume_timezone(
+    result = pc_assume_timezone(
         nonexistent_array, options=options_nonexistent_latest)
     expected.equals(result)
 
     expected = pa.array(nonexistent.tz_localize(
         timezone, nonexistent="shift_backward"))
-    result = pc.assume_timezone(
+    result = pc_assume_timezone(
         nonexistent_array, options=options_nonexistent_earliest)
     expected.equals(result)
 
@@ -2559,15 +2590,16 @@ def test_assume_timezone():
     with pytest.raises(ValueError,
                        match="Timestamp is ambiguous in "
                              f"timezone '{timezone}'"):
-        pc.assume_timezone(ambiguous_array, options=options_ambiguous_raise)
+        pc_assume_timezone(ambiguous_array, options=options_ambiguous_raise)
 
-    expected = ambiguous.tz_localize(timezone, ambiguous=[True, True, True])
-    result = pc.assume_timezone(
+    expected = ambiguous.tz_localize(timezone, ambiguous=np.array([True, True, True]))
+    result = pc_assume_timezone(
         ambiguous_array, options=options_ambiguous_earliest)
     result.equals(pa.array(expected))
 
-    expected = ambiguous.tz_localize(timezone, ambiguous=[False, False, False])
-    result = pc.assume_timezone(
+    expected = ambiguous.tz_localize(
+        timezone, ambiguous=np.array([False, False, False]))
+    result = pc_assume_timezone(
         ambiguous_array, options=options_ambiguous_latest)
     result.equals(pa.array(expected))
 
@@ -2596,15 +2628,15 @@ def _check_temporal_rounding(ts, values, unit):
         frequency = str(value) + unit_shorthand[unit]
         options = pc.RoundTemporalOptions(value, unit)
 
-        result = pc.ceil_temporal(ta, options=options).to_pandas()
+        result = ceil_temporal(ta, options=options).to_pandas()
         expected = ts.dt.ceil(frequency)
         np.testing.assert_array_equal(result, expected)
 
-        result = pc.floor_temporal(ta, options=options).to_pandas()
+        result = floor_temporal(ta, options=options).to_pandas()
         expected = ts.dt.floor(frequency)
         np.testing.assert_array_equal(result, expected)
 
-        result = pc.round_temporal(ta, options=options).to_pandas()
+        result = round_temporal(ta, options=options).to_pandas()
         expected = ts.dt.round(frequency)
         np.testing.assert_array_equal(result, expected)
 
@@ -2617,29 +2649,29 @@ def _check_temporal_rounding(ts, values, unit):
             origin = ts.dt.floor(greater_unit[unit])
 
             if ta.type.tz is None:
-                result = pc.ceil_temporal(ta, options=options).to_pandas()
+                result = ceil_temporal(ta, options=options).to_pandas()
                 expected = (ts - origin).dt.ceil(frequency) + origin
                 np.testing.assert_array_equal(result, expected)
 
-            result = pc.floor_temporal(ta, options=options).to_pandas()
+            result = floor_temporal(ta, options=options).to_pandas()
             expected = (ts - origin).dt.floor(frequency) + origin
             np.testing.assert_array_equal(result, expected)
 
-            result = pc.round_temporal(ta, options=options).to_pandas()
+            result = round_temporal(ta, options=options).to_pandas()
             expected = (ts - origin).dt.round(frequency) + origin
             np.testing.assert_array_equal(result, expected)
 
         # Check RoundTemporalOptions partial defaults
         if unit == "day":
-            result = pc.ceil_temporal(ta, multiple=value).to_pandas()
+            result = ceil_temporal(ta, multiple=value).to_pandas()
             expected = ts.dt.ceil(frequency)
             np.testing.assert_array_equal(result, expected)
 
-            result = pc.floor_temporal(ta, multiple=value).to_pandas()
+            result = floor_temporal(ta, multiple=value).to_pandas()
             expected = ts.dt.floor(frequency)
             np.testing.assert_array_equal(result, expected)
 
-            result = pc.round_temporal(ta, multiple=value).to_pandas()
+            result = round_temporal(ta, multiple=value).to_pandas()
             expected = ts.dt.round(frequency)
             np.testing.assert_array_equal(result, expected)
 
@@ -2650,7 +2682,7 @@ def _check_temporal_rounding(ts, values, unit):
     if ta.type.tz is None:
         options = pc.RoundTemporalOptions(
             value, unit, ceil_is_strictly_greater=True)
-        result = pc.ceil_temporal(ta, options=options)
+        result = ceil_temporal(ta, options=options)
         expected = ts.dt.ceil(frequency)
 
         expected = np.where(
@@ -2663,15 +2695,15 @@ def _check_temporal_rounding(ts, values, unit):
     if unit == "day":
         frequency = "1D"
 
-        result = pc.ceil_temporal(ta).to_pandas()
+        result = ceil_temporal(ta).to_pandas()
         expected = ts.dt.ceil(frequency)
         np.testing.assert_array_equal(result, expected)
 
-        result = pc.floor_temporal(ta).to_pandas()
+        result = floor_temporal(ta).to_pandas()
         expected = ts.dt.floor(frequency)
         np.testing.assert_array_equal(result, expected)
 
-        result = pc.round_temporal(ta).to_pandas()
+        result = round_temporal(ta).to_pandas()
         expected = ts.dt.round(frequency)
         np.testing.assert_array_equal(result, expected)
 
@@ -2709,15 +2741,15 @@ def test_round_temporal(unit):
 
 def test_count():
     arr = pa.array([1, 2, 3, None, None])
-    assert pc.count(arr).as_py() == 3
-    assert pc.count(arr, mode='only_valid').as_py() == 3
-    assert pc.count(arr, mode='only_null').as_py() == 2
-    assert pc.count(arr, mode='all').as_py() == 5
-    assert pc.count(arr, 'all').as_py() == 5
+    assert count(arr).as_py() == 3
+    assert count(arr, mode='only_valid').as_py() == 3
+    assert count(arr, mode='only_null').as_py() == 2
+    assert count(arr, mode='all').as_py() == 5
+    assert count(arr, 'all').as_py() == 5
 
     with pytest.raises(ValueError,
                        match='"something else" is not a valid count mode'):
-        pc.count(arr, 'something else')
+        count(arr, 'something else')
 
 
 def test_index():
@@ -2759,15 +2791,15 @@ def test_partition_nth():
     data = list(range(100, 140))
     random.shuffle(data)
     pivot = 10
-    indices = pc.partition_nth_indices(data, pivot=pivot)
+    indices = partition_nth_indices(data, pivot=pivot)
     check_partition_nth(data, indices, pivot, "at_end")
     # Positional pivot argument
-    assert pc.partition_nth_indices(data, pivot) == indices
+    assert partition_nth_indices(data, pivot) == indices
 
     with pytest.raises(
             ValueError,
             match="'partition_nth_indices' cannot be called without options"):
-        pc.partition_nth_indices(data)
+        partition_nth_indices(data)
 
 
 def test_partition_nth_null_placement():
@@ -2776,14 +2808,14 @@ def test_partition_nth_null_placement():
 
     for pivot in (0, 7, 13, 19):
         for null_placement in ("at_start", "at_end"):
-            indices = pc.partition_nth_indices(data, pivot=pivot,
-                                               null_placement=null_placement)
+            indices = partition_nth_indices(data, pivot=pivot,
+                                            null_placement=null_placement)
             check_partition_nth(data, indices, pivot, null_placement)
 
 
 def test_select_k_array():
     def validate_select_k(select_k_indices, arr, order, stable_sort=False):
-        sorted_indices = pc.sort_indices(arr, sort_keys=[("dummy", order)])
+        sorted_indices = sort_indices(arr, sort_keys=[("dummy", order)])
         head_k_indices = sorted_indices.slice(0, len(select_k_indices))
         if stable_sort:
             assert select_k_indices == head_k_indices
@@ -2795,7 +2827,7 @@ def test_select_k_array():
     arr = pa.array([1, 2, None, 0])
     for k in [0, 2, 4]:
         for order in ["descending", "ascending"]:
-            result = pc.select_k_unstable(
+            result = select_k_unstable(
                 arr, k=k, sort_keys=[("dummy", order)])
             validate_select_k(result, arr, order)
 
@@ -2805,26 +2837,26 @@ def test_select_k_array():
         result = pc.bottom_k_unstable(arr, k=k)
         validate_select_k(result, arr, "ascending")
 
-    result = pc.select_k_unstable(
+    result = select_k_unstable(
         arr, options=pc.SelectKOptions(
             k=2, sort_keys=[("dummy", "descending")])
     )
     validate_select_k(result, arr, "descending")
 
-    result = pc.select_k_unstable(
+    result = select_k_unstable(
         arr, options=pc.SelectKOptions(k=2, sort_keys=[("dummy", "ascending")])
     )
     validate_select_k(result, arr, "ascending")
 
     # Position options
-    assert pc.select_k_unstable(arr, 2,
-                                sort_keys=[("dummy", "ascending")]) == result
-    assert pc.select_k_unstable(arr, 2, [("dummy", "ascending")]) == result
+    assert select_k_unstable(arr, 2,
+                             sort_keys=[("dummy", "ascending")]) == result
+    assert select_k_unstable(arr, 2, [("dummy", "ascending")]) == result
 
 
 def test_select_k_table():
     def validate_select_k(select_k_indices, tbl, sort_keys, stable_sort=False):
-        sorted_indices = pc.sort_indices(tbl, sort_keys=sort_keys)
+        sorted_indices = sort_indices(tbl, sort_keys=sort_keys)
         head_k_indices = sorted_indices.slice(0, len(select_k_indices))
         if stable_sort:
             assert select_k_indices == head_k_indices
@@ -2835,11 +2867,11 @@ def test_select_k_table():
 
     table = pa.table({"a": [1, 2, 0], "b": [1, 0, 1]})
     for k in [0, 2, 4]:
-        result = pc.select_k_unstable(
+        result = select_k_unstable(
             table, k=k, sort_keys=[("a", "ascending")])
         validate_select_k(result, table, sort_keys=[("a", "ascending")])
 
-        result = pc.select_k_unstable(
+        result = select_k_unstable(
             table, k=k, sort_keys=[(pc.field("a"), "ascending"), ("b", "ascending")])
         validate_select_k(
             result, table, sort_keys=[("a", "ascending"), ("b", "ascending")])
@@ -2854,65 +2886,65 @@ def test_select_k_table():
     with pytest.raises(
             ValueError,
             match="'select_k_unstable' cannot be called without options"):
-        pc.select_k_unstable(table)
+        select_k_unstable(table)
 
     with pytest.raises(ValueError,
                        match="select_k_unstable requires a nonnegative `k`"):
-        pc.select_k_unstable(table, k=-1, sort_keys=[("a", "ascending")])
+        select_k_unstable(table, k=-1, sort_keys=[("a", "ascending")])
 
     with pytest.raises(ValueError,
                        match="select_k_unstable requires a "
                              "non-empty `sort_keys`"):
-        pc.select_k_unstable(table, k=2, sort_keys=[])
+        select_k_unstable(table, k=2, sort_keys=[])
 
     with pytest.raises(ValueError, match="not a valid sort order"):
-        pc.select_k_unstable(table, k=k, sort_keys=[("a", "nonscending")])
+        select_k_unstable(table, k=k, sort_keys=[("a", "nonscending")])
 
     with pytest.raises(ValueError,
                        match="Invalid sort key column: No match for.*unknown"):
-        pc.select_k_unstable(table, k=k, sort_keys=[("unknown", "ascending")])
+        select_k_unstable(table, k=k, sort_keys=[("unknown", "ascending")])
 
 
 def test_array_sort_indices():
     arr = pa.array([1, 2, None, 0])
-    result = pc.array_sort_indices(arr)
+    result = array_sort_indices(arr)
     assert result.to_pylist() == [3, 0, 1, 2]
-    result = pc.array_sort_indices(arr, order="ascending")
+    result = array_sort_indices(arr, order="ascending")
     assert result.to_pylist() == [3, 0, 1, 2]
-    result = pc.array_sort_indices(arr, order="descending")
+    result = array_sort_indices(arr, order="descending")
     assert result.to_pylist() == [1, 0, 3, 2]
-    result = pc.array_sort_indices(arr, order="descending",
-                                   null_placement="at_start")
+    result = array_sort_indices(arr, order="descending",
+                                null_placement="at_start")
     assert result.to_pylist() == [2, 1, 0, 3]
-    result = pc.array_sort_indices(arr, "descending",
-                                   null_placement="at_start")
+    result = array_sort_indices(arr, "descending",
+                                null_placement="at_start")
     assert result.to_pylist() == [2, 1, 0, 3]
 
     with pytest.raises(ValueError, match="not a valid sort order"):
-        pc.array_sort_indices(arr, order="nonscending")
+        array_sort_indices(arr, order="nonscending")
 
 
 def test_sort_indices_array():
     arr = pa.array([1, 2, None, 0])
-    result = pc.sort_indices(arr)
+    result = sort_indices(arr)
     assert result.to_pylist() == [3, 0, 1, 2]
-    result = pc.sort_indices(arr, sort_keys=[("dummy", "ascending")])
+    result = sort_indices(arr, sort_keys=[("dummy", "ascending")])
     assert result.to_pylist() == [3, 0, 1, 2]
-    result = pc.sort_indices(arr, sort_keys=[("dummy", "descending")])
+    result = sort_indices(arr, sort_keys=[("dummy", "descending")])
     assert result.to_pylist() == [1, 0, 3, 2]
-    result = pc.sort_indices(arr, sort_keys=[("dummy", "descending")],
-                             null_placement="at_start")
+    result = sort_indices(arr, sort_keys=[("dummy", "descending")],
+                          null_placement="at_start")
     assert result.to_pylist() == [2, 1, 0, 3]
     # Positional `sort_keys`
-    result = pc.sort_indices(arr, [("dummy", "descending")],
-                             null_placement="at_start")
+    result = sort_indices(arr, [("dummy", "descending")],
+                          null_placement="at_start")
     assert result.to_pylist() == [2, 1, 0, 3]
     # Using SortOptions
-    result = pc.sort_indices(
+    result = sort_indices(
         arr, options=pc.SortOptions(sort_keys=[("dummy", "descending")])
     )
     assert result.to_pylist() == [1, 0, 3, 2]
-    result = pc.sort_indices(
+    result = sort_indices(
         arr, options=pc.SortOptions(sort_keys=[("dummy", "descending")],
                                     null_placement="at_start")
     )
@@ -2922,134 +2954,134 @@ def test_sort_indices_array():
 def test_sort_indices_table():
     table = pa.table({"a": [1, 1, None, 0], "b": [1, 0, 0, 1]})
 
-    result = pc.sort_indices(table, sort_keys=[("a", "ascending")])
+    result = sort_indices(table, sort_keys=[("a", "ascending")])
     assert result.to_pylist() == [3, 0, 1, 2]
-    result = pc.sort_indices(table, sort_keys=[(pc.field("a"), "ascending")],
-                             null_placement="at_start")
+    result = sort_indices(table, sort_keys=[(pc.field("a"), "ascending")],
+                          null_placement="at_start")
     assert result.to_pylist() == [2, 3, 0, 1]
 
-    result = pc.sort_indices(
+    result = sort_indices(
         table, sort_keys=[("a", "descending"), ("b", "ascending")]
     )
     assert result.to_pylist() == [1, 0, 3, 2]
-    result = pc.sort_indices(
+    result = sort_indices(
         table, sort_keys=[("a", "descending"), ("b", "ascending")],
         null_placement="at_start"
     )
     assert result.to_pylist() == [2, 1, 0, 3]
     # Positional `sort_keys`
-    result = pc.sort_indices(
+    result = sort_indices(
         table, [("a", "descending"), ("b", "ascending")],
         null_placement="at_start"
     )
     assert result.to_pylist() == [2, 1, 0, 3]
 
     with pytest.raises(ValueError, match="Must specify one or more sort keys"):
-        pc.sort_indices(table)
+        sort_indices(table)
 
     with pytest.raises(ValueError,
                        match="Invalid sort key column: No match for.*unknown"):
-        pc.sort_indices(table, sort_keys=[("unknown", "ascending")])
+        sort_indices(table, sort_keys=[("unknown", "ascending")])
 
     with pytest.raises(ValueError, match="not a valid sort order"):
-        pc.sort_indices(table, sort_keys=[("a", "nonscending")])
+        sort_indices(table, sort_keys=[("a", "nonscending")])
 
 
 def test_is_in():
     arr = pa.array([1, 2, None, 1, 2, 3])
 
-    result = pc.is_in(arr, value_set=pa.array([1, 3, None]))
+    result = is_in(arr, value_set=pa.array([1, 3, None]))
     assert result.to_pylist() == [True, False, True, True, False, True]
 
-    result = pc.is_in(arr, value_set=pa.array([1, 3, None]), skip_nulls=True)
+    result = is_in(arr, value_set=pa.array([1, 3, None]), skip_nulls=True)
     assert result.to_pylist() == [True, False, False, True, False, True]
 
-    result = pc.is_in(arr, value_set=pa.array([1, 3]))
+    result = is_in(arr, value_set=pa.array([1, 3]))
     assert result.to_pylist() == [True, False, False, True, False, True]
 
-    result = pc.is_in(arr, value_set=pa.array([1, 3]), skip_nulls=True)
+    result = is_in(arr, value_set=pa.array([1, 3]), skip_nulls=True)
     assert result.to_pylist() == [True, False, False, True, False, True]
 
 
 def test_index_in():
     arr = pa.array([1, 2, None, 1, 2, 3])
 
-    result = pc.index_in(arr, value_set=pa.array([1, 3, None]))
+    result = index_in(arr, value_set=pa.array([1, 3, None]))
     assert result.to_pylist() == [0, None, 2, 0, None, 1]
 
-    result = pc.index_in(arr, value_set=pa.array([1, 3, None]),
-                         skip_nulls=True)
+    result = index_in(arr, value_set=pa.array([1, 3, None]),
+                      skip_nulls=True)
     assert result.to_pylist() == [0, None, None, 0, None, 1]
 
-    result = pc.index_in(arr, value_set=pa.array([1, 3]))
+    result = index_in(arr, value_set=pa.array([1, 3]))
     assert result.to_pylist() == [0, None, None, 0, None, 1]
 
-    result = pc.index_in(arr, value_set=pa.array([1, 3]), skip_nulls=True)
+    result = index_in(arr, value_set=pa.array([1, 3]), skip_nulls=True)
     assert result.to_pylist() == [0, None, None, 0, None, 1]
 
     # Positional value_set
-    result = pc.index_in(arr, pa.array([1, 3]), skip_nulls=True)
+    result = index_in(arr, pa.array([1, 3]), skip_nulls=True)
     assert result.to_pylist() == [0, None, None, 0, None, 1]
 
 
 def test_quantile():
     arr = pa.array([1, 2, 3, 4])
 
-    result = pc.quantile(arr)
+    result = quantile(arr)
     assert result.to_pylist() == [2.5]
 
-    result = pc.quantile(arr, interpolation='lower')
+    result = quantile(arr, interpolation='lower')
     assert result.to_pylist() == [2]
-    result = pc.quantile(arr, interpolation='higher')
+    result = quantile(arr, interpolation='higher')
     assert result.to_pylist() == [3]
-    result = pc.quantile(arr, interpolation='nearest')
+    result = quantile(arr, interpolation='nearest')
     assert result.to_pylist() == [3]
-    result = pc.quantile(arr, interpolation='midpoint')
+    result = quantile(arr, interpolation='midpoint')
     assert result.to_pylist() == [2.5]
-    result = pc.quantile(arr, interpolation='linear')
+    result = quantile(arr, interpolation='linear')
     assert result.to_pylist() == [2.5]
 
     arr = pa.array([1, 2])
 
-    result = pc.quantile(arr, q=[0.25, 0.5, 0.75])
+    result = quantile(arr, q=[0.25, 0.5, 0.75])
     assert result.to_pylist() == [1.25, 1.5, 1.75]
 
-    result = pc.quantile(arr, q=[0.25, 0.5, 0.75], interpolation='lower')
+    result = quantile(arr, q=[0.25, 0.5, 0.75], interpolation='lower')
     assert result.to_pylist() == [1, 1, 1]
-    result = pc.quantile(arr, q=[0.25, 0.5, 0.75], interpolation='higher')
+    result = quantile(arr, q=[0.25, 0.5, 0.75], interpolation='higher')
     assert result.to_pylist() == [2, 2, 2]
-    result = pc.quantile(arr, q=[0.25, 0.5, 0.75], interpolation='midpoint')
+    result = quantile(arr, q=[0.25, 0.5, 0.75], interpolation='midpoint')
     assert result.to_pylist() == [1.5, 1.5, 1.5]
-    result = pc.quantile(arr, q=[0.25, 0.5, 0.75], interpolation='nearest')
+    result = quantile(arr, q=[0.25, 0.5, 0.75], interpolation='nearest')
     assert result.to_pylist() == [1, 1, 2]
-    result = pc.quantile(arr, q=[0.25, 0.5, 0.75], interpolation='linear')
+    result = quantile(arr, q=[0.25, 0.5, 0.75], interpolation='linear')
     assert result.to_pylist() == [1.25, 1.5, 1.75]
 
     # Positional `q`
-    result = pc.quantile(arr, [0.25, 0.5, 0.75], interpolation='linear')
+    result = quantile(arr, [0.25, 0.5, 0.75], interpolation='linear')
     assert result.to_pylist() == [1.25, 1.5, 1.75]
 
     with pytest.raises(ValueError, match="Quantile must be between 0 and 1"):
-        pc.quantile(arr, q=1.1)
+        quantile(arr, q=1.1)
     with pytest.raises(ValueError, match="not a valid quantile interpolation"):
-        pc.quantile(arr, interpolation='zzz')
+        quantile(arr, interpolation='zzz')
 
 
 def test_tdigest():
     arr = pa.array([1, 2, 3, 4])
-    result = pc.tdigest(arr)
+    result = tdigest(arr)
     assert result.to_pylist() == [2.5]
 
     arr = pa.chunked_array([pa.array([1, 2]), pa.array([3, 4])])
-    result = pc.tdigest(arr)
+    result = tdigest(arr)
     assert result.to_pylist() == [2.5]
 
     arr = pa.array([1, 2, 3, 4])
-    result = pc.tdigest(arr, q=[0, 0.5, 1])
+    result = tdigest(arr, q=[0, 0.5, 1])
     assert result.to_pylist() == [1, 2.5, 4]
 
     arr = pa.chunked_array([pa.array([1, 2]), pa.array([3, 4])])
-    result = pc.tdigest(arr, [0, 0.5, 1])  # positional `q`
+    result = tdigest(arr, [0, 0.5, 1])  # positional `q`
     assert result.to_pylist() == [1, 2.5, 4]
 
 
@@ -3065,32 +3097,32 @@ def test_min_max_element_wise():
     arr2 = pa.array([3, 1, 2])
     arr3 = pa.array([2, 3, None])
 
-    result = pc.max_element_wise(arr1, arr2)
+    result = max_element_wise(arr1, arr2)
     assert result == pa.array([3, 2, 3])
-    result = pc.min_element_wise(arr1, arr2)
+    result = min_element_wise(arr1, arr2)
     assert result == pa.array([1, 1, 2])
 
-    result = pc.max_element_wise(arr1, arr2, arr3)
+    result = max_element_wise(arr1, arr2, arr3)
     assert result == pa.array([3, 3, 3])
-    result = pc.min_element_wise(arr1, arr2, arr3)
+    result = min_element_wise(arr1, arr2, arr3)
     assert result == pa.array([1, 1, 2])
 
     # with specifying the option
-    result = pc.max_element_wise(arr1, arr3, skip_nulls=True)
+    result = max_element_wise(arr1, arr3, skip_nulls=True)
     assert result == pa.array([2, 3, 3])
-    result = pc.min_element_wise(arr1, arr3, skip_nulls=True)
+    result = min_element_wise(arr1, arr3, skip_nulls=True)
     assert result == pa.array([1, 2, 3])
-    result = pc.max_element_wise(
+    result = max_element_wise(
         arr1, arr3, options=pc.ElementWiseAggregateOptions())
     assert result == pa.array([2, 3, 3])
-    result = pc.min_element_wise(
+    result = min_element_wise(
         arr1, arr3, options=pc.ElementWiseAggregateOptions())
     assert result == pa.array([1, 2, 3])
 
     # not skipping nulls
-    result = pc.max_element_wise(arr1, arr3, skip_nulls=False)
+    result = max_element_wise(arr1, arr3, skip_nulls=False)
     assert result == pa.array([2, 3, None])
-    result = pc.min_element_wise(arr1, arr3, skip_nulls=False)
+    result = min_element_wise(arr1, arr3, skip_nulls=False)
     assert result == pa.array([1, 2, None])
 
 
@@ -3116,9 +3148,9 @@ def test_cumulative_sum(start, skip_nulls):
             if skip_nulls else pa.chunked_array([[0, None, None, None]])
         ]
         for i, arr in enumerate(arrays):
-            result = pc.cumulative_sum(arr, start=strt, skip_nulls=skip_nulls)
+            result = cumulative_sum(arr, start=strt, skip_nulls=skip_nulls)
             # Add `start` offset to expected array before comparing
-            expected = pc.add(expected_arrays[i], strt if strt is not None
+            expected = pc_add(expected_arrays[i], strt if strt is not None
                               else 0)
             assert result.equals(expected)
 
@@ -3137,16 +3169,16 @@ def test_cumulative_sum(start, skip_nulls):
             if skip_nulls else np.array([1, np.nan, None, None, None, None])
         ]
         for i, arr in enumerate(arrays):
-            result = pc.cumulative_sum(arr, start=strt, skip_nulls=skip_nulls)
+            result = cumulative_sum(arr, start=strt, skip_nulls=skip_nulls)
             # Add `start` offset to expected array before comparing
-            expected = pc.add(expected_arrays[i], strt if strt is not None
+            expected = pc_add(expected_arrays[i], strt if strt is not None
                               else 0)
             np.testing.assert_array_almost_equal(result.to_numpy(
                 zero_copy_only=False), expected.to_numpy(zero_copy_only=False))
 
     for strt in ['a', pa.scalar('arrow'), 1.1]:
         with pytest.raises(pa.ArrowInvalid):
-            pc.cumulative_sum([1, 2, 3], start=strt)
+            cumulative_sum([1, 2, 3], start=strt)
 
 
 @pytest.mark.numpy
@@ -3171,10 +3203,10 @@ def test_cumulative_prod(start, skip_nulls):
             if skip_nulls else pa.chunked_array([[1, None, None, None]])
         ]
         for i, arr in enumerate(arrays):
-            result = pc.cumulative_prod(arr, start=strt, skip_nulls=skip_nulls)
+            result = cumulative_prod(arr, start=strt, skip_nulls=skip_nulls)
             # Multiply `start` offset to expected array before comparing
-            expected = pc.multiply(expected_arrays[i], strt if strt is not None
-                                   else 1)
+            expected = multiply(expected_arrays[i], strt if strt is not None
+                                else 1)
             assert result.equals(expected)
 
     starts = [None, start, pa.scalar(start, type=pa.float32()),
@@ -3192,16 +3224,16 @@ def test_cumulative_prod(start, skip_nulls):
             if skip_nulls else np.array([1, np.nan, None, None, None, None])
         ]
         for i, arr in enumerate(arrays):
-            result = pc.cumulative_prod(arr, start=strt, skip_nulls=skip_nulls)
+            result = cumulative_prod(arr, start=strt, skip_nulls=skip_nulls)
             # Multiply `start` offset to expected array before comparing
-            expected = pc.multiply(expected_arrays[i], strt if strt is not None
-                                   else 1)
+            expected = multiply(expected_arrays[i], strt if strt is not None
+                                else 1)
             np.testing.assert_array_almost_equal(result.to_numpy(
                 zero_copy_only=False), expected.to_numpy(zero_copy_only=False))
 
     for strt in ['a', pa.scalar('arrow'), 1.1]:
         with pytest.raises(pa.ArrowInvalid):
-            pc.cumulative_prod([1, 2, 3], start=strt)
+            cumulative_prod([1, 2, 3], start=strt)
 
 
 @pytest.mark.numpy
@@ -3227,9 +3259,9 @@ def test_cumulative_max(start, skip_nulls):
             pa.chunked_array([[2, 2, None, None, None, None]])
         ]
         for i, arr in enumerate(arrays):
-            result = pc.cumulative_max(arr, start=strt, skip_nulls=skip_nulls)
+            result = cumulative_max(arr, start=strt, skip_nulls=skip_nulls)
             # Max `start` offset with expected array before comparing
-            expected = pc.max_element_wise(
+            expected = max_element_wise(
                 expected_arrays[i], strt if strt is not None else int(-1e9),
                 skip_nulls=False)
             assert result.equals(expected)
@@ -3249,9 +3281,9 @@ def test_cumulative_max(start, skip_nulls):
             if skip_nulls else np.array([2.5, 2.5, None, None, None, None])
         ]
         for i, arr in enumerate(arrays):
-            result = pc.cumulative_max(arr, start=strt, skip_nulls=skip_nulls)
+            result = cumulative_max(arr, start=strt, skip_nulls=skip_nulls)
             # Max `start` offset with expected array before comparing
-            expected = pc.max_element_wise(
+            expected = max_element_wise(
                 expected_arrays[i], strt if strt is not None else -1e9,
                 skip_nulls=False)
             np.testing.assert_array_almost_equal(result.to_numpy(
@@ -3259,7 +3291,7 @@ def test_cumulative_max(start, skip_nulls):
 
     for strt in ['a', pa.scalar('arrow'), 1.1]:
         with pytest.raises(pa.ArrowInvalid):
-            pc.cumulative_max([1, 2, 3], start=strt)
+            cumulative_max([1, 2, 3], start=strt)
 
 
 @pytest.mark.numpy
@@ -3285,9 +3317,9 @@ def test_cumulative_min(start, skip_nulls):
             pa.chunked_array([[5, 5, None, None, None, None]])
         ]
         for i, arr in enumerate(arrays):
-            result = pc.cumulative_min(arr, start=strt, skip_nulls=skip_nulls)
+            result = cumulative_min(arr, start=strt, skip_nulls=skip_nulls)
             # Min `start` offset with expected array before comparing
-            expected = pc.min_element_wise(
+            expected = min_element_wise(
                 expected_arrays[i], strt if strt is not None else int(1e9),
                 skip_nulls=False)
             assert result.equals(expected)
@@ -3307,9 +3339,9 @@ def test_cumulative_min(start, skip_nulls):
             if skip_nulls else np.array([5.5, 5.5, None, None, None, None])
         ]
         for i, arr in enumerate(arrays):
-            result = pc.cumulative_min(arr, start=strt, skip_nulls=skip_nulls)
+            result = cumulative_min(arr, start=strt, skip_nulls=skip_nulls)
             # Min `start` offset with expected array before comparing
-            expected = pc.min_element_wise(
+            expected = min_element_wise(
                 expected_arrays[i], strt if strt is not None else 1e9,
                 skip_nulls=False)
             np.testing.assert_array_almost_equal(result.to_numpy(
@@ -3317,26 +3349,26 @@ def test_cumulative_min(start, skip_nulls):
 
     for strt in ['a', pa.scalar('arrow'), 1.1]:
         with pytest.raises(pa.ArrowInvalid):
-            pc.cumulative_max([1, 2, 3], start=strt)
+            cumulative_max([1, 2, 3], start=strt)
 
 
 def test_make_struct():
-    assert pc.make_struct(1, 'a').as_py() == {'0': 1, '1': 'a'}
+    assert make_struct(1, 'a').as_py() == {'0': 1, '1': 'a'}
 
-    assert pc.make_struct(1, 'a', field_names=['i', 's']).as_py() == {
+    assert make_struct(1, 'a', field_names=['i', 's']).as_py() == {
         'i': 1, 's': 'a'}
 
-    assert pc.make_struct([1, 2, 3],
-                          "a b c".split()) == pa.StructArray.from_arrays([
-                              [1, 2, 3],
-                              "a b c".split()], names='0 1'.split())
+    assert make_struct([1, 2, 3],
+                       "a b c".split()) == pa.StructArray.from_arrays([
+                           [1, 2, 3],
+                           "a b c".split()], names='0 1'.split())
 
     with pytest.raises(ValueError,
                        match="Array arguments must all be the same length"):
-        pc.make_struct([1, 2, 3, 4], "a b c".split())
+        make_struct([1, 2, 3, 4], "a b c".split())
 
     with pytest.raises(ValueError, match="0 arguments but 2 field names"):
-        pc.make_struct(field_names=['one', 'two'])
+        make_struct(field_names=['one', 'two'])
 
 
 def test_map_lookup():
@@ -3348,12 +3380,12 @@ def test_map_lookup():
     result_all = pa.array([[1], None, None, [5, 7], None],
                           type=pa.list_(pa.int32()))
 
-    assert pc.map_lookup(arr, 'one', 'first') == result_first
-    assert pc.map_lookup(arr, pa.scalar(
+    assert map_lookup(arr, 'one', 'first') == result_first
+    assert map_lookup(arr, pa.scalar(
         'one', type=pa.utf8()), 'first') == result_first
-    assert pc.map_lookup(arr, pa.scalar(
+    assert map_lookup(arr, pa.scalar(
         'one', type=pa.utf8()), 'last') == result_last
-    assert pc.map_lookup(arr, pa.scalar(
+    assert map_lookup(arr, pa.scalar(
         'one', type=pa.utf8()), 'all') == result_all
 
 
@@ -3363,42 +3395,42 @@ def test_struct_fields_options():
     c = pa.StructArray.from_arrays([a, b], ["a", "b"])
     arr = pa.StructArray.from_arrays([a, c], ["a", "c"])
 
-    assert pc.struct_field(arr, '.c.b') == b
-    assert pc.struct_field(arr, b'.c.b') == b
-    assert pc.struct_field(arr, ['c', 'b']) == b
-    assert pc.struct_field(arr, [1, 'b']) == b
-    assert pc.struct_field(arr, (b'c', 'b')) == b
-    assert pc.struct_field(arr, pc.field(('c', 'b'))) == b
+    assert struct_field(arr, '.c.b') == b
+    assert struct_field(arr, b'.c.b') == b
+    assert struct_field(arr, ['c', 'b']) == b
+    assert struct_field(arr, [1, 'b']) == b
+    assert struct_field(arr, (b'c', 'b')) == b
+    assert struct_field(arr, pc.field(('c', 'b'))) == b
 
-    assert pc.struct_field(arr, '.a') == a
-    assert pc.struct_field(arr, ['a']) == a
-    assert pc.struct_field(arr, 'a') == a
-    assert pc.struct_field(arr, pc.field(('a',))) == a
+    assert struct_field(arr, '.a') == a
+    assert struct_field(arr, ['a']) == a
+    assert struct_field(arr, 'a') == a
+    assert struct_field(arr, pc.field(('a',))) == a
 
-    assert pc.struct_field(arr, indices=[1, 1]) == b
-    assert pc.struct_field(arr, (1, 1)) == b
-    assert pc.struct_field(arr, [0]) == a
-    assert pc.struct_field(arr, []) == arr
-
-    with pytest.raises(pa.ArrowInvalid, match="No match for FieldRef"):
-        pc.struct_field(arr, 'foo')
+    assert struct_field(arr, indices=[1, 1]) == b
+    assert struct_field(arr, (1, 1)) == b
+    assert struct_field(arr, [0]) == a
+    assert struct_field(arr, []) == arr
 
     with pytest.raises(pa.ArrowInvalid, match="No match for FieldRef"):
-        pc.struct_field(arr, '.c.foo')
+        struct_field(arr, 'foo')
+
+    with pytest.raises(pa.ArrowInvalid, match="No match for FieldRef"):
+        struct_field(arr, '.c.foo')
 
     # drill into a non-struct array and continue to ask for a field
     with pytest.raises(pa.ArrowInvalid, match="No match for FieldRef"):
-        pc.struct_field(arr, '.a.foo')
+        struct_field(arr, '.a.foo')
 
     # TODO: https://issues.apache.org/jira/browse/ARROW-14853
-    # assert pc.struct_field(arr) == arr
+    # assert struct_field(arr) == arr
 
 
 def test_case_when():
-    assert pc.case_when(pc.make_struct([True, False, None],
-                                       [False, True, None]),
-                        [1, 2, 3],
-                        [11, 12, 13]) == pa.array([1, 12, None])
+    assert case_when(make_struct([True, False, None],
+                                 [False, True, None]),
+                     [1, 2, 3],
+                     [11, 12, 13]) == pa.array([1, 12, None])
 
 
 def test_list_element():
@@ -3409,12 +3441,12 @@ def test_list_element():
     lists = pa.array([l1, l2], list_type)
 
     index = 1
-    result = pa.compute.list_element(lists, index)
+    result = list_element(lists, index)
     expected = pa.array([None, {'a': 0.52, 'b': 3}], element_type)
     assert result.equals(expected)
 
     index = 4
-    result = pa.compute.list_element(lists, index)
+    result = list_element(lists, index)
     expected = pa.array([{'a': 5.6, 'b': 6}, {'a': .6, 'b': 8}], element_type)
     assert result.equals(expected)
 
@@ -3422,28 +3454,28 @@ def test_list_element():
 def test_count_distinct():
     samples = [datetime.datetime(year=y, month=1, day=1) for y in range(1992, 2092)]
     arr = pa.array(samples, pa.timestamp("ns"))
-    assert pc.count_distinct(arr) == pa.scalar(len(samples), type=pa.int64())
+    assert count_distinct(arr) == pa.scalar(len(samples), type=pa.int64())
 
 
 def test_count_distinct_options():
     arr = pa.array([1, 2, 3, None, None])
-    assert pc.count_distinct(arr).as_py() == 3
-    assert pc.count_distinct(arr, mode='only_valid').as_py() == 3
-    assert pc.count_distinct(arr, mode='only_null').as_py() == 1
-    assert pc.count_distinct(arr, mode='all').as_py() == 4
-    assert pc.count_distinct(arr, 'all').as_py() == 4
+    assert count_distinct(arr).as_py() == 3
+    assert count_distinct(arr, mode='only_valid').as_py() == 3
+    assert count_distinct(arr, mode='only_null').as_py() == 1
+    assert count_distinct(arr, mode='all').as_py() == 4
+    assert count_distinct(arr, 'all').as_py() == 4
 
 
 def test_utf8_normalize():
     arr = pa.array(["01²3"])
-    assert pc.utf8_normalize(arr, form="NFC") == arr
-    assert pc.utf8_normalize(arr, form="NFKC") == pa.array(["0123"])
-    assert pc.utf8_normalize(arr, "NFD") == arr
-    assert pc.utf8_normalize(arr, "NFKD") == pa.array(["0123"])
+    assert utf8_normalize(arr, form="NFC") == arr
+    assert utf8_normalize(arr, form="NFKC") == pa.array(["0123"])
+    assert utf8_normalize(arr, "NFD") == arr
+    assert utf8_normalize(arr, "NFKD") == pa.array(["0123"])
     with pytest.raises(
             ValueError,
             match='"NFZ" is not a valid Unicode normalization form'):
-        pc.utf8_normalize(arr, form="NFZ")
+        utf8_normalize(arr, form="NFZ")
 
 
 def test_random():
@@ -3485,7 +3517,7 @@ def test_rank_options_tiebreaker(tiebreaker, expected_values):
     rank_options = pc.RankOptions(sort_keys="ascending",
                                   null_placement="at_end",
                                   tiebreaker=tiebreaker)
-    result = pc.rank(arr, options=rank_options)
+    result = rank(arr, options=rank_options)
     expected = pa.array(expected_values, type=pa.uint64())
     assert result.equals(expected)
 
@@ -3495,24 +3527,24 @@ def test_rank_options():
     expected = pa.array([3, 1, 4, 6, 5, 7, 2], type=pa.uint64())
 
     # Ensure rank can be called without specifying options
-    result = pc.rank(arr)
+    result = rank(arr)
     assert result.equals(expected)
 
     # Ensure default RankOptions
-    result = pc.rank(arr, options=pc.RankOptions())
+    result = rank(arr, options=pc.RankOptions())
     assert result.equals(expected)
 
     # Ensure sort_keys tuple usage
-    result = pc.rank(arr, options=pc.RankOptions(
+    result = rank(arr, options=pc.RankOptions(
         sort_keys=[("b", "ascending")])
     )
     assert result.equals(expected)
 
-    result = pc.rank(arr, null_placement="at_start")
+    result = rank(arr, null_placement="at_start")
     expected_at_start = pa.array([5, 3, 6, 1, 7, 2, 4], type=pa.uint64())
     assert result.equals(expected_at_start)
 
-    result = pc.rank(arr, sort_keys="descending")
+    result = rank(arr, sort_keys="descending")
     expected_descending = pa.array([3, 4, 1, 6, 2, 7, 5], type=pa.uint64())
     assert result.equals(expected_descending)
 
@@ -3528,29 +3560,29 @@ def test_rank_quantile_options():
     expected = pa.array([0.7, 0.1, 0.7, 0.3, 0.7], type=pa.float64())
 
     # Ensure rank_quantile can be called without specifying options
-    result = pc.rank_quantile(arr)
+    result = rank_quantile(arr)
     assert result.equals(expected)
 
     # Ensure default RankOptions
-    result = pc.rank_quantile(arr, options=pc.RankQuantileOptions())
+    result = rank_quantile(arr, options=pc.RankQuantileOptions())
     assert result.equals(expected)
 
     # Ensure sort_keys tuple usage
-    result = pc.rank_quantile(arr, options=pc.RankQuantileOptions(
+    result = rank_quantile(arr, options=pc.RankQuantileOptions(
         sort_keys=[("b", "ascending")])
     )
     assert result.equals(expected)
 
-    result = pc.rank_quantile(arr, null_placement="at_start")
+    result = rank_quantile(arr, null_placement="at_start")
     expected_at_start = pa.array([0.3, 0.7, 0.3, 0.9, 0.3], type=pa.float64())
     assert result.equals(expected_at_start)
 
-    result = pc.rank_quantile(arr, sort_keys="descending")
+    result = rank_quantile(arr, sort_keys="descending")
     expected_descending = pa.array([0.7, 0.3, 0.7, 0.1, 0.7], type=pa.float64())
     assert result.equals(expected_descending)
 
     with pytest.raises(ValueError, match="not a valid sort order"):
-        pc.rank_quantile(arr, sort_keys="XXX")
+        rank_quantile(arr, sort_keys="XXX")
 
 
 def test_rank_normal_options():
@@ -3559,21 +3591,21 @@ def test_rank_normal_options():
     expected = pytest.approx(
         [0.5244005127080407, -1.2815515655446004, 0.5244005127080407,
          -0.5244005127080409, 0.5244005127080407])
-    result = pc.rank_normal(arr)
+    result = rank_normal(arr)
     assert result.to_pylist() == expected
-    result = pc.rank_normal(arr, null_placement="at_end", sort_keys="ascending")
+    result = rank_normal(arr, null_placement="at_end", sort_keys="ascending")
     assert result.to_pylist() == expected
-    result = pc.rank_normal(arr, options=pc.RankQuantileOptions())
+    result = rank_normal(arr, options=pc.RankQuantileOptions())
     assert result.to_pylist() == expected
 
     expected = pytest.approx(
         [-0.5244005127080409, 1.2815515655446004, -0.5244005127080409,
          0.5244005127080407, -0.5244005127080409])
-    result = pc.rank_normal(arr, null_placement="at_start", sort_keys="descending")
+    result = rank_normal(arr, null_placement="at_start", sort_keys="descending")
     assert result.to_pylist() == expected
-    result = pc.rank_normal(arr,
-                            options=pc.RankQuantileOptions(null_placement="at_start",
-                                                           sort_keys="descending"))
+    result = rank_normal(arr,
+                         options=pc.RankQuantileOptions(null_placement="at_start",
+                                                        sort_keys="descending"))
     assert result.to_pylist() == expected
 
 
@@ -3601,17 +3633,17 @@ def create_sample_expressions():
 
     # These expressions include at least one function call
     exprs_with_call = [a == b, a != b, a > b, c & j, c | j, ~c, d.is_valid(),
-                       a + b, a - b, a * b, a / b, pc.negate(a),
-                       pc.add(a, b), pc.subtract(a, b), pc.divide(a, b),
-                       pc.multiply(a, b), pc.power(a, a), pc.sqrt(a),
-                       pc.exp(b), pc.cos(b), pc.sin(b), pc.tan(b),
-                       pc.acos(b), pc.atan(b), pc.asin(b), pc.atan2(b, b),
-                       pc.sinh(a), pc.cosh(a), pc.tanh(a),
-                       pc.asinh(a), pc.acosh(b), pc.atanh(k),
-                       pc.abs(b), pc.sign(a), pc.bit_wise_not(a),
-                       pc.bit_wise_and(a, a), pc.bit_wise_or(a, a),
-                       pc.bit_wise_xor(a, a), pc.is_nan(b), pc.is_finite(b),
-                       pc.coalesce(a, b),
+                       a + b, a - b, a * b, a / b, negate(a),
+                       pc_add(a, b), subtract(a, b), divide(a, b),
+                       multiply(a, b), power(a, a), sqrt(a),
+                       exp(b), cos(b), sin(b), tan(b),
+                       acos(b), atan(b), asin(b), atan2(b, b),
+                       sinh(a), cosh(a), tanh(a),
+                       asinh(a), acosh(b), atanh(k),
+                       pc_abs(b), sign(a), bit_wise_not(a),
+                       bit_wise_and(a, a), bit_wise_or(a, a),
+                       bit_wise_xor(a, a), is_nan(b), is_finite(b),
+                       coalesce(a, b),
                        a.cast(pa.int32(), safe=False)]
 
     # These expressions test out various reference styles and may include function
@@ -3775,29 +3807,29 @@ def test_expression_call_function():
     field = pc.field("field")
 
     # no options
-    assert str(pc.hour(field)) == "hour(field)"
+    assert str(hour(field)) == "hour(field)"
 
     # default options
-    assert str(pc.round(field)) == "round(field)"
+    assert str(pc_round(field)) == "round(field)"
     # specified options
-    assert str(pc.round(field, ndigits=1)) == \
+    assert str(pc_round(field, ndigits=1)) == \
         "round(field, {ndigits=1, round_mode=HALF_TO_EVEN})"
 
     # Will convert non-expression arguments if possible
-    assert str(pc.add(field, 1)) == "add(field, 1)"
-    assert str(pc.add(field, pa.scalar(1))) == "add(field, 1)"
+    assert str(pc_add(field, 1)) == "add(field, 1)"
+    assert str(pc_add(field, pa.scalar(1))) == "add(field, 1)"
 
     # Invalid pc.scalar input gives original error message
     msg = "only other expressions allowed as arguments"
     with pytest.raises(TypeError, match=msg):
-        pc.add(field, object)
+        pc_add(field, object)
 
 
 def test_cast_table_raises():
     table = pa.table({'a': [1, 2]})
 
-    with pytest.raises(pa.lib.ArrowTypeError):
-        pc.cast(table, pa.int64())
+    with pytest.raises(lib.ArrowTypeError):
+        cast(table, pa.int64())
 
 
 @pytest.mark.parametrize("start,stop,expected", (
@@ -3824,9 +3856,9 @@ def test_list_slice_output_fixed(start, stop, step, expected, value_type,
         msg = ("Unable to produce FixedSizeListArray from "
                "non-FixedSizeListArray without `stop` being set.")
         with pytest.raises(pa.ArrowInvalid, match=msg):
-            pc.list_slice(*args)
+            list_slice(*args)
     else:
-        result = pc.list_slice(*args)
+        result = list_slice(*args)
         pylist = result.cast(pa.list_(pa.int8(),
                              result.type.list_size)).to_pylist()
         assert pylist == [e[::step] if e else e for e in expected]
@@ -3857,8 +3889,8 @@ def test_list_slice_output_variable(start, stop, step, value_type, list_type):
     if list_type == "fixed":
         list_type = pa.list_  # non fixed output type
 
-    result = pc.list_slice(arr, start, stop, step,
-                           return_fixed_size_list=False)
+    result = list_slice(arr, start, stop, step,
+                        return_fixed_size_list=False)
     assert result.type == list_type(value_type())
 
     pylist = result.cast(pa.list_(pa.int8())).to_pylist()
@@ -3875,7 +3907,7 @@ def test_list_slice_output_variable(start, stop, step, value_type, list_type):
     lambda: pa.large_list(pa.field('col', pa.int8()))))
 def test_list_slice_field_names_retained(return_fixed_size, type):
     arr = pa.array([[1]], type())
-    out = pc.list_slice(arr, 0, 1, return_fixed_size_list=return_fixed_size)
+    out = list_slice(arr, 0, 1, return_fixed_size_list=return_fixed_size)
     assert arr.type.field(0).name == out.type.field(0).name
 
     # Verify out type matches in type if return_fixed_size_list==None
@@ -3887,27 +3919,27 @@ def test_list_slice_bad_parameters():
     arr = pa.array([[1]], pa.list_(pa.int8(), 1))
     msg = r"`start`(.*) should be greater than 0 and smaller than `stop`(.*)"
     with pytest.raises(pa.ArrowInvalid, match=msg):
-        pc.list_slice(arr, -1, 1)  # negative start?
+        list_slice(arr, -1, 1)  # negative start?
     with pytest.raises(pa.ArrowInvalid, match=msg):
-        pc.list_slice(arr, 2, 1)  # start > stop?
+        list_slice(arr, 2, 1)  # start > stop?
 
     # TODO(ARROW-18281): start==stop -> empty lists
     with pytest.raises(pa.ArrowInvalid, match=msg):
-        pc.list_slice(arr, 0, 0)  # start == stop?
+        list_slice(arr, 0, 0)  # start == stop?
 
     # Step not >= 1
     msg = "`step` must be >= 1, got: "
     with pytest.raises(pa.ArrowInvalid, match=msg + "0"):
-        pc.list_slice(arr, 0, 1, step=0)
+        list_slice(arr, 0, 1, step=0)
     with pytest.raises(pa.ArrowInvalid, match=msg + "-1"):
-        pc.list_slice(arr, 0, 1, step=-1)
+        list_slice(arr, 0, 1, step=-1)
 
 
 def check_run_end_encode_decode(value_type, run_end_encode_opts=None):
     values = [1, 1, 1, 2, 2, 1, 1, 1, 1, 1, 3, 3, 3, 3, 3, 3, 3, 3, 3]
     arr = pa.array(values, type=value_type)
-    encoded = pc.run_end_encode(arr, options=run_end_encode_opts)
-    decoded = pc.run_end_decode(encoded)
+    encoded = run_end_encode(arr, options=run_end_encode_opts)
+    decoded = run_end_decode(encoded)
     assert decoded.type == arr.type
     assert decoded.equals(arr)
 
@@ -3944,65 +3976,65 @@ def test_run_end_encode(value_type, option):
 def test_pairwise_diff():
     arr = pa.array([1, 2, 3, None, 4, 5])
     expected = pa.array([None, 1, 1, None, None, 1])
-    result = pa.compute.pairwise_diff(arr, period=1)
+    result = pairwise_diff(arr, period=1)
     assert result.equals(expected)
 
     arr = pa.array([1, 2, 3, None, 4, 5])
     expected = pa.array([None, None, 2, None, 1, None])
-    result = pa.compute.pairwise_diff(arr, period=2)
+    result = pairwise_diff(arr, period=2)
     assert result.equals(expected)
 
     # negative period
     arr = pa.array([1, 2, 3, None, 4, 5], type=pa.int8())
     expected = pa.array([-1, -1, None, None, -1, None], type=pa.int8())
-    result = pa.compute.pairwise_diff(arr, period=-1)
+    result = pairwise_diff(arr, period=-1)
     assert result.equals(expected)
 
     # wrap around overflow
     arr = pa.array([1, 2, 3, None, 4, 5], type=pa.uint8())
     expected = pa.array([255, 255, None, None, 255, None], type=pa.uint8())
-    result = pa.compute.pairwise_diff(arr, period=-1)
+    result = pairwise_diff(arr, period=-1)
     assert result.equals(expected)
 
     # fail on overflow
     arr = pa.array([1, 2, 3, None, 4, 5], type=pa.uint8())
     with pytest.raises(pa.ArrowInvalid,
                        match="overflow"):
-        pa.compute.pairwise_diff_checked(arr, period=-1)
+        pairwise_diff_checked(arr, period=-1)
 
 
 def test_pivot_wider():
     key_names = ["width", "height"]
 
-    result = pc.pivot_wider(["height", "width", "depth"], [10, None, 11])
+    result = pivot_wider(["height", "width", "depth"], [10, None, 11])
     assert result.as_py() == {}
 
-    result = pc.pivot_wider(["height", "width", "depth"], [10, None, 11],
-                            key_names)
+    result = pivot_wider(["height", "width", "depth"], [10, None, 11],
+                         key_names)
     assert result.as_py() == {"width": None, "height": 10}
     # check key order
     assert list(result.as_py()) == ["width", "height"]
 
-    result = pc.pivot_wider(["height", "width", "depth"], [10, None, 11],
-                            key_names=key_names)
+    result = pivot_wider(["height", "width", "depth"], [10, None, 11],
+                         key_names=key_names)
     assert result.as_py() == {"width": None, "height": 10}
 
     with pytest.raises(KeyError, match="Unexpected pivot key: depth"):
-        result = pc.pivot_wider(["height", "width", "depth"], [10, None, 11],
-                                key_names=key_names,
-                                unexpected_key_behavior="raise")
+        result = pivot_wider(["height", "width", "depth"], [10, None, 11],
+                             key_names=key_names,
+                             unexpected_key_behavior="raise")
 
     with pytest.raises(ValueError, match="Encountered more than one non-null value"):
-        result = pc.pivot_wider(["height", "width", "height"], [10, None, 11],
-                                key_names=key_names)
+        result = pivot_wider(["height", "width", "height"], [10, None, 11],
+                             key_names=key_names)
 
 
 def test_winsorize():
     arr = pa.array([10, 4, 9, 8, 5, 3, 7, 2, 1, 6])
 
-    result = pc.winsorize(arr, 0.1, 0.8)
+    result = winsorize(arr, 0.1, 0.8)
     assert result.to_pylist() == [8, 4, 8, 8, 5, 3, 7, 2, 2, 6]
 
-    result = pc.winsorize(
+    result = winsorize(
         arr, options=pc.WinsorizeOptions(lower_limit=0.1, upper_limit=0.8))
     assert result.to_pylist() == [8, 4, 8, 8, 5, 3, 7, 2, 2, 6]

@@ -28,11 +28,15 @@ import weakref
 try:
     import numpy as np
 except ImportError:
-    np = None
+    pass
 
 import pyarrow as pa
 from pyarrow.tests.util import changed_environ, invoke_script
 
+try:
+    from pyarrow import lib  # type: ignore[unresolved-attribute]
+except ImportError:
+    pass
 
 try:
     from pandas.testing import assert_frame_equal
@@ -1234,7 +1238,7 @@ def test_record_batch_reader_from_arrow_stream():
     assert reader.read_all() == expected.cast(good_schema)
 
     # If schema doesn't match, raises TypeError
-    with pytest.raises(pa.lib.ArrowTypeError, match='Field 0 cannot be cast'):
+    with pytest.raises(lib.ArrowTypeError, match='Field 0 cannot be cast'):
         pa.RecordBatchReader.from_stream(
             wrapper, schema=pa.schema([pa.field('a', pa.list_(pa.int32()))])
         )
@@ -1271,7 +1275,7 @@ def test_record_batch_reader_cast():
 
     # Check error for impossible cast in call to .cast()
     reader = pa.RecordBatchReader.from_batches(schema_src, data)
-    with pytest.raises(pa.lib.ArrowTypeError, match='Field 0 cannot be cast'):
+    with pytest.raises(lib.ArrowTypeError, match='Field 0 cannot be cast'):
         reader.cast(pa.schema([pa.field('a', pa.list_(pa.int32()))]))
 
     # Cast to same type should always work (also for types without a T->T cast function)
@@ -1309,7 +1313,7 @@ def test_record_batch_reader_cast_nulls():
     # when the batch is pulled
     reader = pa.RecordBatchReader.from_batches(schema_src, data_with_nulls)
     casted_reader = reader.cast(schema_dst)
-    with pytest.raises(pa.lib.ArrowInvalid, match="Can't cast array"):
+    with pytest.raises(lib.ArrowInvalid, match="Can't cast array"):
         casted_reader.read_all()
 
 

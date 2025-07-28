@@ -22,13 +22,16 @@ import pytest
 
 import pyarrow as pa
 import pyarrow.compute as pc
-from pyarrow.lib import tobytes
-from pyarrow.lib import ArrowInvalid, ArrowNotImplementedError
+from pyarrow.compute import equal  # type: ignore[unresolved-attribute]
+from pyarrow import _substrait  # type: ignore[unresolved-attribute]
+from pyarrow.lib import tobytes  # type: ignore[unresolved_import]
+from pyarrow.lib import ArrowInvalid, ArrowNotImplementedError \
+    # type: ignore[unresolved_import]
 
 try:
     import pyarrow.substrait as substrait
 except ImportError:
-    substrait = None
+    pass
 
 # Marks all of the tests in this module
 # Ignore these with pytest ... -m 'not substrait'
@@ -36,7 +39,7 @@ pytestmark = pytest.mark.substrait
 
 
 def mock_udf_context(batch_length=10):
-    from pyarrow._compute import _get_udf_context
+    from pyarrow._compute import _get_udf_context  # type: ignore[unresolved_import]
     return _get_udf_context(pa.default_memory_pool(), batch_length)
 
 
@@ -85,7 +88,7 @@ def test_run_serialized_query(tmpdir, use_threads):
     query = tobytes(substrait_query.replace(
         "FILENAME_PLACEHOLDER", pathlib.Path(path).as_uri()))
 
-    buf = pa._substrait._parse_json_plan(query)
+    buf = _substrait._parse_json_plan(query)
 
     reader = substrait.run_query(buf, use_threads=use_threads)
     res_tb = reader.read_all()
@@ -116,7 +119,7 @@ def test_invalid_plan():
         ]
     }
     """
-    buf = pa._substrait._parse_json_plan(tobytes(query))
+    buf = _substrait._parse_json_plan(tobytes(query))
     exec_message = "Plan has no relations"
     with pytest.raises(ArrowInvalid, match=exec_message):
         substrait.run_query(buf)
@@ -162,7 +165,7 @@ def test_binary_conversion_with_json_options(tmpdir, use_threads):
     path = _write_dummy_data_to_disk(tmpdir, file_name, table)
     query = tobytes(substrait_query.replace(
         "FILENAME_PLACEHOLDER", pathlib.Path(path).as_uri()))
-    buf = pa._substrait._parse_json_plan(tobytes(query))
+    buf = _substrait._parse_json_plan(tobytes(query))
 
     reader = substrait.run_query(buf, use_threads=use_threads)
     res_tb = reader.read_all()
@@ -181,7 +184,7 @@ def has_function(fns, ext_file, fn_name):
 
 
 def test_get_supported_functions():
-    supported_functions = pa._substrait.get_supported_functions()
+    supported_functions = _substrait.get_supported_functions()
     # It probably doesn't make sense to exhaustively verify this list but
     # we can check a sample aggregate and a sample non-aggregate entry
     assert has_function(supported_functions,
@@ -232,7 +235,7 @@ def test_named_table(use_threads):
     }
     """
 
-    buf = pa._substrait._parse_json_plan(tobytes(substrait_query))
+    buf = _substrait._parse_json_plan(tobytes(substrait_query))
     reader = pa.substrait.run_query(
         buf, table_provider=table_provider, use_threads=use_threads)
     res_tb = reader.read_all()
@@ -275,7 +278,7 @@ def test_named_table_invalid_table_name():
     }
     """
 
-    buf = pa._substrait._parse_json_plan(tobytes(substrait_query))
+    buf = _substrait._parse_json_plan(tobytes(substrait_query))
     exec_message = "Invalid NamedTable Source"
     with pytest.raises(ArrowInvalid, match=exec_message):
         substrait.run_query(buf, table_provider=table_provider)
@@ -317,7 +320,7 @@ def test_named_table_empty_names():
     }
     """
     query = tobytes(substrait_query)
-    buf = pa._substrait._parse_json_plan(tobytes(query))
+    buf = _substrait._parse_json_plan(tobytes(query))
     exec_message = "names for NamedTable not provided"
     with pytest.raises(ArrowInvalid, match=exec_message):
         substrait.run_query(buf, table_provider=table_provider)
@@ -436,7 +439,7 @@ def test_udf_via_substrait(unary_func_fixture, use_threads):
 }
     """
 
-    buf = pa._substrait._parse_json_plan(substrait_query)
+    buf = _substrait._parse_json_plan(substrait_query)
     reader = pa.substrait.run_query(
         buf, table_provider=table_provider, use_threads=use_threads)
     res_tb = reader.read_all()
@@ -559,7 +562,7 @@ def test_udf_via_substrait_wrong_udf_name():
 }
     """
 
-    buf = pa._substrait._parse_json_plan(substrait_query)
+    buf = _substrait._parse_json_plan(substrait_query)
     with pytest.raises(pa.ArrowKeyError) as excinfo:
         pa.substrait.run_query(buf, table_provider=table_provider)
     assert "No function registered" in str(excinfo.value)
@@ -598,7 +601,7 @@ def test_output_field_names(use_threads):
     }
     """
 
-    buf = pa._substrait._parse_json_plan(tobytes(substrait_query))
+    buf = _substrait._parse_json_plan(tobytes(substrait_query))
     reader = pa.substrait.run_query(
         buf, table_provider=table_provider, use_threads=use_threads)
     res_tb = reader.read_all()
@@ -744,7 +747,7 @@ def test_scalar_aggregate_udf_basic(varargs_agg_func_fixture):
   ],
 }
 """
-    buf = pa._substrait._parse_json_plan(substrait_query)
+    buf = _substrait._parse_json_plan(substrait_query)
     reader = pa.substrait.run_query(
         buf, table_provider=table_provider, use_threads=False)
     res_tb = reader.read_all()
@@ -913,7 +916,7 @@ def test_hash_aggregate_udf_basic(varargs_agg_func_fixture):
   ],
 }
 """
-    buf = pa._substrait._parse_json_plan(substrait_query)
+    buf = _substrait._parse_json_plan(substrait_query)
     reader = pa.substrait.run_query(
         buf, table_provider=table_provider, use_threads=False)
     res_tb = reader.read_all()
@@ -929,8 +932,8 @@ def test_hash_aggregate_udf_basic(varargs_agg_func_fixture):
 
 
 @pytest.mark.parametrize("expr", [
-    pc.equal(pc.field("x"), 7),
-    pc.equal(pc.field("x"), pc.field("y")),
+    equal(pc.field("x"), 7),
+    equal(pc.field("x"), pc.field("y")),
     pc.field("x") > 50
 ])
 def test_serializing_expressions(expr):
@@ -985,7 +988,7 @@ def test_arrow_one_way_types():
     )
 
     def check_one_way(field):
-        expr = pc.is_null(pc.field(field.name))
+        expr = pc.is_null(pc.field(field.name))  # type: ignore[unresolved-attribute]
         buf = pa.substrait.serialize_expressions([expr], ["test_expr"], schema)
         returned = pa.substrait.deserialize_expressions(buf)
         assert alt_schema == returned.schema
@@ -999,8 +1002,8 @@ def test_invalid_expression_ser_des():
         pa.field("x", pa.int32()),
         pa.field("y", pa.int32())
     ])
-    expr = pc.equal(pc.field("x"), 7)
-    bad_expr = pc.equal(pc.field("z"), 7)
+    expr = equal(pc.field("x"), 7)
+    bad_expr = equal(pc.field("z"), 7)
     # Invalid number of names
     with pytest.raises(ValueError) as excinfo:
         pa.substrait.serialize_expressions([expr], [], schema)
@@ -1019,13 +1022,13 @@ def test_serializing_multiple_expressions():
         pa.field("x", pa.int32()),
         pa.field("y", pa.int32())
     ])
-    exprs = [pc.equal(pc.field("x"), 7), pc.equal(pc.field("x"), pc.field("y"))]
+    exprs = [equal(pc.field("x"), 7), equal(pc.field("x"), pc.field("y"))]
     buf = pa.substrait.serialize_expressions(exprs, ["first", "second"], schema)
     returned = pa.substrait.deserialize_expressions(buf)
     assert schema == returned.schema
     assert len(returned.expressions) == 2
 
-    norm_exprs = [pc.equal(pc.field(0), 7), pc.equal(pc.field(0), pc.field(1))]
+    norm_exprs = [equal(pc.field(0), 7), equal(pc.field(0), pc.field(1))]
     assert str(returned.expressions["first"]) == str(norm_exprs[0])
     assert str(returned.expressions["second"]) == str(norm_exprs[1])
 
@@ -1035,8 +1038,8 @@ def test_serializing_with_compute():
         pa.field("x", pa.int32()),
         pa.field("y", pa.int32())
     ])
-    expr = pc.equal(pc.field("x"), 7)
-    expr_norm = pc.equal(pc.field(0), 7)
+    expr = equal(pc.field("x"), 7)
+    expr_norm = equal(pc.field(0), 7)
     buf = expr.to_substrait(schema)
     returned = pa.substrait.deserialize_expressions(buf)
 
@@ -1066,7 +1069,7 @@ def test_serializing_udfs():
     ])
     a = pc.scalar(10)
     b = pc.scalar(4)
-    exprs = [pc.shift_left(a, b)]
+    exprs = [pc.shift_left(a, b)]  # type: ignore[unresolved-attribute]
 
     with pytest.raises(ArrowNotImplementedError):
         pa.substrait.serialize_expressions(exprs, ["expr"], schema)

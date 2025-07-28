@@ -33,7 +33,12 @@ import weakref
 try:
     import numpy as np
 except ImportError:
-    np = None
+    pass
+
+try:
+    from pyarrow import lib  # type: ignore[unresolved-attribute]
+except ImportError:
+    pass
 
 from pyarrow.util import guid
 from pyarrow import Codec
@@ -812,7 +817,7 @@ def test_cache_options_pickling(pickle_module):
 @pytest.mark.numpy
 @pytest.mark.parametrize("compression", [
     pytest.param(
-        "bz2", marks=pytest.mark.xfail(raises=pa.lib.ArrowNotImplementedError)
+        "bz2", marks=pytest.mark.xfail(raises=lib.ArrowNotImplementedError)
     ),
     "brotli",
     "gzip",
@@ -853,7 +858,7 @@ def test_compress_decompress(compression):
 @pytest.mark.numpy
 @pytest.mark.parametrize("compression", [
     pytest.param(
-        "bz2", marks=pytest.mark.xfail(raises=pa.lib.ArrowNotImplementedError)
+        "bz2", marks=pytest.mark.xfail(raises=lib.ArrowNotImplementedError)
     ),
     "brotli",
     "gzip",
@@ -1725,7 +1730,7 @@ def test_output_stream_constructor(tmpdir):
 ])
 def test_compression_detection(path, expected_compression):
     if not Codec.is_available(expected_compression):
-        with pytest.raises(pa.lib.ArrowNotImplementedError):
+        with pytest.raises(lib.ArrowNotImplementedError):
             Codec.detect(path)
     else:
         codec = Codec.detect(path)
@@ -1750,7 +1755,7 @@ def test_unknown_compression_raises():
     "zstd",
     pytest.param(
         "snappy",
-        marks=pytest.mark.xfail(raises=pa.lib.ArrowNotImplementedError)
+        marks=pytest.mark.xfail(raises=lib.ArrowNotImplementedError)
     )
 ])
 def test_compressed_roundtrip(compression):

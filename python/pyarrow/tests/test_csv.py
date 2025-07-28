@@ -1502,7 +1502,7 @@ class BaseCSVTableRead(BaseTestCSV):
 
         # Interruption should have arrived timely
         assert last_duration <= 2.0
-        e = exc_info.__context__
+        e = exc_info.__context__  # type: ignore[possibly-unbound-attribute]
         assert isinstance(e, pa.ArrowCancelled)
         assert e.signum == signal.SIGINT
 
@@ -1989,7 +1989,8 @@ def test_write_quoting_style():
     buf = io.BytesIO()
     for write_options, res in [
         (WriteOptions(quoting_style='needed'), b'"c1"\n","\n""""\n'),
-        (WriteOptions(quoting_style='none'), pa.lib.ArrowInvalid),
+        (WriteOptions(quoting_style='none'), pa.lib.ArrowInvalid), \
+            # type: ignore[unresolved-attribute]
     ]:
         with CSVWriter(buf, t.schema, write_options=write_options) as writer:
             try:
