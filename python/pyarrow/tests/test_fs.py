@@ -39,6 +39,31 @@ from pyarrow.fs import (FileType, FileInfo, FileSelector, FileSystem,
                         copy_files)
 from pyarrow.util import find_free_port
 
+try:
+    from pyarrow.fs import (
+        AwsDefaultS3RetryStrategy,  # type: ignore[possibly-unbound-import]
+        AwsStandardS3RetryStrategy,  # type: ignore[possibly-unbound-import]
+        S3FileSystem,  # type: ignore[possibly-unbound-import]
+        resolve_s3_region,  # type: ignore[possibly-unbound-import]
+        S3RetryStrategy  # type: ignore[possibly-unbound-import]
+    )
+except ImportError:
+    pass
+
+try:
+    from pyarrow.fs import AzureFileSystem  # type: ignore[possibly-unbound-import]
+except ImportError:
+    pass
+
+try:
+    from pyarrow.fs import GcsFileSystem  # type: ignore[possibly-unbound-import]
+except ImportError:
+    pass
+
+try:
+    from pyarrow.fs import HadoopFileSystem  # type: ignore[possibly-unbound-import]
+except ImportError:
+    pass
 
 here = os.path.dirname(os.path.abspath(__file__))
 
@@ -211,7 +236,6 @@ def subtree_localfs(request, tempdir, localfs):
 @pytest.fixture
 def gcsfs(request, gcs_server):
     request.config.pyarrow.requires('gcs')
-    from pyarrow.fs import GcsFileSystem
 
     host, port = gcs_server['connection']
     bucket = 'pyarrow-filesystem/'
@@ -241,7 +265,6 @@ def gcsfs(request, gcs_server):
 @pytest.fixture
 def s3fs(request, s3_server):
     request.config.pyarrow.requires('s3')
-    from pyarrow.fs import S3FileSystem
 
     host, port, access_key, secret_key = s3_server['connection']
     bucket = 'pyarrow-filesystem/'
@@ -301,7 +324,6 @@ _minio_limited_policy = """{
 @pytest.fixture
 def azurefs(request, azure_server):
     request.config.pyarrow.requires('azure')
-    from pyarrow.fs import AzureFileSystem
 
     host, port, account_name, account_key = azure_server['connection']
     azurite_authority = f"{host}:{port}"
@@ -332,8 +354,6 @@ def hdfs(request, hdfs_connection):
     request.config.pyarrow.requires('hdfs')
     if not pa.have_libhdfs():
         pytest.skip('Cannot locate libhdfs')
-
-    from pyarrow.fs import HadoopFileSystem
 
     host, port, user = hdfs_connection
     fs = HadoopFileSystem(host, port=port, user=user)
@@ -515,7 +535,6 @@ def skip_azure(fs, reason):
 
 @pytest.mark.s3
 def test_s3fs_limited_permissions_create_bucket(s3_server):
-    from pyarrow.fs import S3FileSystem
     _configure_s3_limited_user(s3_server, _minio_limited_policy,
                                'test_fs_limited_user', 'limited123')
     host, port, _, _ = s3_server['connection']
@@ -1147,7 +1166,6 @@ def test_mockfs_mtime_roundtrip(mockfs):
 
 @pytest.mark.gcs
 def test_gcs_options(pickle_module):
-    from pyarrow.fs import GcsFileSystem
     dt = datetime.now()
     fs = GcsFileSystem(access_token='abc',
                        target_service_account='service_account@apache',
@@ -1185,10 +1203,6 @@ def test_gcs_options(pickle_module):
 
 @pytest.mark.s3
 def test_s3_options(pickle_module):
-    from pyarrow.fs import (AwsDefaultS3RetryStrategy,
-                            AwsStandardS3RetryStrategy, S3FileSystem,
-                            S3RetryStrategy)
-
     fs = S3FileSystem(access_key='access', secret_key='secret',
                       session_token='token', region='us-east-2',
                       scheme='https', endpoint_override='localhost:8999')
@@ -1289,8 +1303,6 @@ def test_s3_options(pickle_module):
 
 @pytest.mark.s3
 def test_s3_proxy_options(monkeypatch, pickle_module):
-    from pyarrow.fs import S3FileSystem
-
     # The following two are equivalent:
     proxy_opts_1_dict = {'scheme': 'http', 'host': 'localhost', 'port': 8999}
     proxy_opts_1_str = 'http://localhost:8999'
@@ -1430,8 +1442,6 @@ def test_s3_proxy_options(monkeypatch, pickle_module):
 
 @pytest.mark.s3
 def test_s3fs_wrong_region():
-    from pyarrow.fs import S3FileSystem
-
     # wrong region for bucket
     # anonymous=True incase CI/etc has invalid credentials
     fs = S3FileSystem(region='eu-north-1', anonymous=True)
@@ -1454,8 +1464,6 @@ def test_s3fs_wrong_region():
 
 @pytest.mark.azure
 def test_azurefs_options(pickle_module):
-    from pyarrow.fs import AzureFileSystem
-
     fs1 = AzureFileSystem(account_name='fake-account-name')
     assert isinstance(fs1, AzureFileSystem)
     assert pickle_module.loads(pickle_module.dumps(fs1)) == fs1
@@ -1548,7 +1556,6 @@ def test_azurefs_options(pickle_module):
 
 @pytest.mark.hdfs
 def test_hdfs_options(hdfs_connection, pickle_module):
-    from pyarrow.fs import HadoopFileSystem
     if not pa.have_libhdfs():
         pytest.skip('Cannot locate libhdfs')
 
@@ -1655,8 +1662,6 @@ def test_filesystem_from_path_object(path):
 
 @pytest.mark.s3
 def test_filesystem_from_uri_s3(s3_server):
-    from pyarrow.fs import S3FileSystem
-
     host, port, access_key, secret_key = s3_server['connection']
 
     uri = f"s3://{access_key}:{secret_key}@mybucket/foo/bar?scheme=http&" \
@@ -1674,8 +1679,6 @@ def test_filesystem_from_uri_s3(s3_server):
 
 @pytest.mark.gcs
 def test_filesystem_from_uri_gcs(gcs_server):
-    from pyarrow.fs import GcsFileSystem
-
     host, port = gcs_server['connection']
 
     uri = ("gs://anonymous@" +
@@ -1864,7 +1867,6 @@ def test_py_open_append_stream():
 def test_s3_real_aws():
     # Exercise connection code with an AWS-backed S3 bucket.
     # This is a minimal integration check for ARROW-9261 and similar issues.
-    from pyarrow.fs import S3FileSystem
     default_region = (os.environ.get('PYARROW_TEST_S3_REGION') or
                       'us-east-1')
     fs = S3FileSystem(anonymous=True)
@@ -1920,7 +1922,6 @@ def test_s3_real_aws_region_selection():
 
 @pytest.mark.s3
 def test_resolve_s3_region():
-    from pyarrow.fs import resolve_s3_region
     assert resolve_s3_region('voltrondata-labs-datasets') == 'us-east-2'
     assert resolve_s3_region('mf-nwp-models') == 'eu-west-1'
 
@@ -2168,7 +2169,7 @@ def test_fsspec_filesystem_from_uri():
 def test_huggingface_filesystem_from_uri():
     pytest.importorskip("fsspec")
     try:
-        from huggingface_hub import HfFileSystem
+        from huggingface_hub import HfFileSystem  # type: ignore[unresolved_import]
     except ImportError:
         pytest.skip("huggingface_hub not installed")
 

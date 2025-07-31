@@ -28,7 +28,7 @@ def application(env, start_response):
         # See test_fs::test_uwsgi_integration
         start_response('200 OK', [('Content-Type', 'text/html')])
         # flake8: noqa
-        fs = pyarrow.fs.S3FileSystem()
+        fs = pyarrow.fs.S3FileSystem()  # type: ignore[possibly-unbound-attribute]
         return [b"Hello World\n"]
     else:
         start_response('404 Not Found', [('Content-Type', 'text/html')])

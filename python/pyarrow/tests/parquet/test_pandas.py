@@ -16,12 +16,12 @@
 # under the License.
 
 import io
-import json
+from json import loads as json_loads
 
 try:
     import numpy as np
 except ImportError:
-    np = None
+    pass
 import pytest
 
 import pyarrow as pa
@@ -34,7 +34,7 @@ try:
     from pyarrow.tests.parquet.common import (_read_table, _test_dataframe,
                                               _write_table)
 except ImportError:
-    pq = None
+    pass
 
 
 try:
@@ -44,7 +44,7 @@ try:
     from pyarrow.tests.parquet.common import (_roundtrip_pandas_dataframe,
                                               alltypes_sample)
 except ImportError:
-    pd = tm = None
+    pass
 
 
 # Marks all of the tests in this module
@@ -65,7 +65,7 @@ def test_pandas_parquet_custom_metadata(tempdir):
     metadata = pq.read_metadata(filename).metadata
     assert b'pandas' in metadata
 
-    js = json.loads(metadata[b'pandas'].decode('utf8'))
+    js = json_loads(metadata[b'pandas'].decode('utf8'))
     assert js['index_columns'] == [{'kind': 'range',
                                     'name': None,
                                     'start': 0, 'stop': 10000,
@@ -260,7 +260,8 @@ def test_pandas_parquet_configuration_options(tempdir):
 
     for compression in ['NONE', 'SNAPPY', 'GZIP', 'LZ4', 'ZSTD']:
         if (compression != 'NONE' and
-                not pa.lib.Codec.is_available(compression)):
+                not pa.lib.Codec.is_available(compression)): \
+                # type: ignore[unresolved-attribute]
             continue
         _write_table(arrow_table, filename, version='2.6',
                      compression=compression)
@@ -425,7 +426,8 @@ def test_backwards_compatible_column_metadata_handling(datadir):
     table = _read_table(
         path, columns=['a'])
     result = table.to_pandas()
-    tm.assert_frame_equal(result, expected[['a']].reset_index(drop=True))
+    tm.assert_frame_equal(result, expected[['a']].reset_index(
+        drop=True))  # type: ignore[invalid-argument-type]
 
 
 @pytest.mark.pandas
@@ -485,7 +487,7 @@ def test_pandas_categorical_roundtrip():
     codes = np.array([2, 0, 0, 2, 0, -1, 2], dtype='int32')
     categories = ['foo', 'bar', 'baz']
     df = pd.DataFrame({'x': pd.Categorical.from_codes(
-        codes, categories=categories)})
+        codes, categories=pd.Index(categories))})
 
     buf = pa.BufferOutputStream()
     pq.write_table(pa.table(df), buf)
@@ -530,15 +532,18 @@ def test_write_to_dataset_pandas_preserve_extensiondtypes(tempdir):
         table, str(tempdir / "case1"), partition_cols=['part'],
     )
     result = pq.read_table(str(tempdir / "case1")).to_pandas()
-    tm.assert_frame_equal(result[["col"]], df[["col"]])
+    tm.assert_frame_equal(result[["col"]], df[["col"]]) \
+        # type: ignore[invalid-argument-type]
 
     pq.write_to_dataset(table, str(tempdir / "case2"))
     result = pq.read_table(str(tempdir / "case2")).to_pandas()
-    tm.assert_frame_equal(result[["col"]], df[["col"]])
+    tm.assert_frame_equal(result[["col"]], df[["col"]]) \
+        # type: ignore[invalid-argument-type]
 
     pq.write_table(table, str(tempdir / "data.parquet"))
     result = pq.read_table(str(tempdir / "data.parquet")).to_pandas()
-    tm.assert_frame_equal(result[["col"]], df[["col"]])
+    tm.assert_frame_equal(result[["col"]], df[["col"]]) \
+        # type: ignore[invalid-argument-type]
 
 
 @pytest.mark.pandas
@@ -555,7 +560,7 @@ def test_write_to_dataset_pandas_preserve_index(tempdir):
         table, str(tempdir / "case1"), partition_cols=['part'],
     )
     result = pq.read_table(str(tempdir / "case1")).to_pandas()
-    tm.assert_frame_equal(result, df_cat)
+    tm.assert_frame_equal(result, df_cat)  # type: ignore[invalid-argument-type]
 
     pq.write_to_dataset(table, str(tempdir / "case2"))
     result = pq.read_table(str(tempdir / "case2")).to_pandas()

@@ -42,8 +42,8 @@ cuda_ipc = pytest.mark.skipif(
     not has_ipc_support,
     reason='CUDA IPC not supported in platform `%s`' % (platform))
 
-global_context = None  # for flake8
-global_context1 = None  # for flake8
+global_context = cuda.Context(0)  # for flake8
+global_context1 = cuda.Context(0)  # for flake8
 
 
 def setup_module(module):
@@ -807,8 +807,9 @@ def test_create_table_with_device_buffers():
 
 
 def other_process_for_test_IPC(handle_buffer, expected_arr):
-    other_context = pa.cuda.Context(0)
-    ipc_handle = pa.cuda.IpcMemHandle.from_buffer(handle_buffer)
+    other_context = pa.cuda.Context(0)  # type: ignore[unresolved-attribute]
+    ipc_handle = pa.cuda.IpcMemHandle.from_buffer(handle_buffer) \
+        # type: ignore[unresolved-attribute]
     ipc_buf = other_context.open_ipc_buffer(ipc_handle)
     ipc_buf.context.synchronize()
     buf = ipc_buf.copy_to_host()

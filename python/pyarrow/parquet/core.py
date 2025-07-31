@@ -21,7 +21,7 @@ from contextlib import nullcontext
 from functools import reduce
 
 import inspect
-import json
+from json import loads as json_loads
 import os
 import re
 import operator
@@ -29,14 +29,14 @@ import operator
 import pyarrow as pa
 
 try:
-    import pyarrow._parquet as _parquet
+    import pyarrow._parquet as _parquet  # type: ignore[unresolved_import]
 except ImportError as exc:
     raise ImportError(
         "The pyarrow installation is not built with support "
         f"for the Parquet file format ({str(exc)})"
     ) from None
 
-from pyarrow._parquet import (ParquetReader, Statistics,  # noqa
+from pyarrow._parquet import (ParquetReader, Statistics,  # type: ignore[unresolved_import]  # noqa
                               FileMetaData, RowGroupMetaData,
                               ColumnChunkMetaData,
                               ParquetSchema, ColumnSchema,
@@ -1192,7 +1192,7 @@ Examples
 
 
 def _get_pandas_index_columns(keyvalues):
-    return (json.loads(keyvalues[b'pandas'].decode('utf8'))
+    return (json_loads(keyvalues[b'pandas'].decode('utf8'))
             ['index_columns'])
 
 
@@ -1404,7 +1404,8 @@ Examples
             else:
                 single_file = path_or_paths
 
-        parquet_format = ds.ParquetFileFormat(**read_options)
+        parquet_format = ds.ParquetFileFormat(**read_options) \
+            # type: ignore[possibly-unbound-attribute]
 
         if single_file is not None:
             fragment = parquet_format.make_fragment(single_file, filesystem)
@@ -2200,7 +2201,7 @@ def write_to_dataset(table, root_path, partition_cols=None,
             metadata_collector.append(written_file.metadata)
 
     # map format arguments
-    parquet_format = ds.ParquetFileFormat()
+    parquet_format = ds.ParquetFileFormat()  # type: ignore[possibly-unbound-attribute]
     write_options = parquet_format.make_write_options(**kwargs)
 
     # map old filesystems to new one

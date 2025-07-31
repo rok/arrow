@@ -15,7 +15,8 @@
 # specific language governing permissions and limitations
 # under the License.
 
-import json
+from json import dumps as json_dumps
+from json import loads as json_loads
 import os
 import pyarrow as pa
 import pyarrow.jvm as pa_jvm
@@ -42,7 +43,7 @@ def root_allocator():
         'POM:version',
         namespaces={
             'POM': 'http://maven.apache.org/POM/4.0.0'
-        }).text
+        }).text  # type: ignore[possibly-unbound-attribute]
     jar_path = os.path.join(
         arrow_dir, 'java', 'tools', 'target',
         f'arrow-tools-{version}-jar-with-dependencies.jar')
@@ -76,8 +77,8 @@ def test_jvm_buffer(root_allocator):
 
 
 def test_jvm_buffer_released(root_allocator):
-    import jpype.imports  # noqa
-    from java.lang import IllegalArgumentException
+    import jpype.imports  # type: ignore[unresolved_import]  # noqa
+    from java.lang import IllegalArgumentException  # type: ignore[unresolved_import]
 
     jvm_buffer = root_allocator.buffer(8)
     jvm_buffer.release()
@@ -171,27 +172,27 @@ def test_jvm_types(root_allocator, pa_type, jvm_spec, nullable):
     spec = {
         'name': 'field_name',
         'nullable': nullable,
-        'type': json.loads(jvm_spec),
+        'type': json_loads(jvm_spec),
         # TODO: This needs to be set for complex types
         'children': []
     }
-    jvm_field = _jvm_field(json.dumps(spec))
+    jvm_field = _jvm_field(json_dumps(spec))
     result = pa_jvm.field(jvm_field)
     expected_field = pa.field('field_name', pa_type, nullable=nullable)
     assert result == expected_field
 
-    jvm_schema = _jvm_schema(json.dumps(spec))
+    jvm_schema = _jvm_schema(json_dumps(spec))
     result = pa_jvm.schema(jvm_schema)
     assert result == pa.schema([expected_field])
 
     # Schema with custom metadata
-    jvm_schema = _jvm_schema(json.dumps(spec), {'meta': 'data'})
+    jvm_schema = _jvm_schema(json_dumps(spec), {'meta': 'data'})
     result = pa_jvm.schema(jvm_schema)
     assert result == pa.schema([expected_field], {'meta': 'data'})
 
     # Schema with custom field metadata
     spec['metadata'] = [{'key': 'field meta', 'value': 'field data'}]
-    jvm_schema = _jvm_schema(json.dumps(spec))
+    jvm_schema = _jvm_schema(json_dumps(spec))
     result = pa_jvm.schema(jvm_schema)
     expected_field = expected_field.with_metadata(
         {'field meta': 'field data'})
@@ -375,11 +376,11 @@ def test_jvm_record_batch(root_allocator, pa_type, py_data, jvm_type,
     spec = {
         'name': 'field_name',
         'nullable': False,
-        'type': json.loads(jvm_spec),
+        'type': json_loads(jvm_spec),
         # TODO: This needs to be set for complex types
         'children': []
     }
-    jvm_field = _jvm_field(json.dumps(spec))
+    jvm_field = _jvm_field(json_dumps(spec))
 
     # Create VectorSchemaRoot
     jvm_fields = jpype.JClass('java.util.ArrayList')()

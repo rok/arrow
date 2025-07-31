@@ -20,14 +20,14 @@ from collections import OrderedDict
 from decimal import Decimal
 import io
 import itertools
-import json
+from json import dumps as json_dumps
 import string
 import unittest
 
 try:
     import numpy as np
 except ImportError:
-    np = None
+    pass
 import pytest
 
 import pyarrow as pa
@@ -49,7 +49,7 @@ def make_random_json(num_cols=2, num_rows=10, linesep='\r\n'):
     lines = []
     for row in arr.T:
         json_obj = OrderedDict([(k, int(v)) for (k, v) in zip(col_names, row)])
-        lines.append(json.dumps(json_obj))
+        lines.append(json_dumps(json_obj))
     data = linesep.join(lines).encode()
     columns = [pa.array(col, type=pa.int64()) for col in arr]
     expected = pa.Table.from_arrays(columns, col_names)

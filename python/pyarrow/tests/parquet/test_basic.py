@@ -16,7 +16,6 @@
 # under the License.
 
 import os
-from collections import OrderedDict
 import io
 import warnings
 from shutil import copytree
@@ -34,7 +33,7 @@ try:
     import pyarrow.parquet as pq
     from pyarrow.tests.parquet.common import _read_table, _write_table
 except ImportError:
-    pq = None
+    pass
 
 
 try:
@@ -44,12 +43,12 @@ try:
     from pyarrow.tests.pandas_examples import dataframe_with_lists
     from pyarrow.tests.parquet.common import alltypes_sample
 except ImportError:
-    pd = tm = None
+    pass
 
 try:
     import numpy as np
 except ImportError:
-    np = None
+    pass
 
 # Marks all of the tests in this module
 # Ignore these with pytest ... -m 'not parquet'
@@ -230,11 +229,11 @@ def test_empty_table_no_columns():
 
 def test_write_nested_zero_length_array_chunk_failure():
     # Bug report in ARROW-3792
-    cols = OrderedDict(
+    cols = dict(
         int32=pa.int32(),
         list_string=pa.list_(pa.string())
     )
-    data = [[], [OrderedDict(int32=1, list_string=('G',)), ]]
+    data = [[], [dict(int32=1, list_string=('G',)), ]]
 
     # This produces a table with a column like
     # <Column name='list_string' type=ListType(list<item: string>)>

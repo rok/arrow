@@ -16,7 +16,7 @@
 # under the License.
 
 try:
-    from pyarrow._flight import (  # noqa:F401
+    from pyarrow._flight import (  # type: ignore[unresolved_import]  # noqa:F401
         connect,
         Action,
         ActionType,

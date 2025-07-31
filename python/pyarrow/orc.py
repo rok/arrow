@@ -19,8 +19,8 @@
 from numbers import Integral
 import warnings
 
-from pyarrow.lib import Table
-import pyarrow._orc as _orc
+from pyarrow.lib import Table  # type: ignore[unresolved_import]
+import pyarrow._orc as _orc  # type: ignore[unresolved_import]
 from pyarrow.fs import _resolve_filesystem_and_path
 
 
