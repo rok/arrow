@@ -43,12 +43,13 @@ is_64_bit = sys.maxsize > 2**32
 # We can't use sys.platform in a cross-compiling situation
 # as here it may be set to the host not target platform
 is_emscripten = (
-    sysconfig.get_config_var("SOABI")
-    and sysconfig.get_config_var("SOABI").find("emscripten") != -1
+    sysconfig.get_config_var("SOABI") and
+    sysconfig.get_config_var("SOABI").find("emscripten") != -1 \
+    # type: ignore[possibly-unbound-attribute]
 )
 
 
-if Cython.__version__ < '3':
+if Cython.__version__ < '3':  # type: ignore[unresolved-attribute]
     raise Exception(
         'Please update your Cython version. Supported Cython >= 3')
 
@@ -253,8 +254,9 @@ class build_ext(_build_ext):
             # Detect if we built elsewhere
             if os.path.isfile('CMakeCache.txt'):
                 cachefile = open('CMakeCache.txt', 'r')
-                cachedir = re.search('CMAKE_CACHEFILE_DIR:INTERNAL=(.*)',
-                                     cachefile.read()).group(1)
+                cachedir = re.search(  # type: ignore[possibly-unbound-attribute]
+                    'CMAKE_CACHEFILE_DIR:INTERNAL=(.*)',
+                    cachefile.read()).group(1)
                 cachefile.close()
                 if (cachedir != build_temp):
                     build_base = pjoin(saved_cwd, build_cmd.build_base)

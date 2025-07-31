@@ -17,7 +17,7 @@
 
 from __future__ import absolute_import
 
-import cffi
+from cffi import FFI  # type: ignore[unresolved-import]
 
 c_source = """
     struct ArrowSchema {
@@ -77,5 +77,5 @@ c_source = """
     """
 
 # TODO use out-of-line mode for faster import and avoid C parsing
-ffi = cffi.FFI()
+ffi = FFI()
 ffi.cdef(c_source)
