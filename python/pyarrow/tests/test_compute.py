@@ -28,31 +28,17 @@ import random
 import sys
 import textwrap
 
-try:
-    import numpy as np
-except ImportError:
-    np = None
-
-try:
-    import pandas as pd
-except ImportError:
-    pd = None
 
 import pyarrow as pa
 import pyarrow.compute as pc
-from pyarrow.lib import ArrowNotImplementedError
-
-try:
-    import pyarrow.substrait as pas
-except ImportError:
-    pas = None
+from pyarrow.lib import ArrowNotImplementedError, ArrowTypeError
 
 exported_functions = [
-    func for (name, func) in sorted(pc.__dict__.items())
+    func for (_, func) in sorted(pc.__dict__.items())
     if hasattr(func, '__arrow_compute_function__')]
 
 exported_option_classes = [
-    cls for (name, cls) in sorted(pc.__dict__.items())
+    cls for (_, cls) in sorted(pc.__dict__.items())
     if (isinstance(cls, type) and
         cls is not pc.FunctionOptions and
         issubclass(cls, pc.FunctionOptions))]
@@ -217,7 +203,7 @@ def test_option_class_equality(request):
             and cls != pc.AssumeTimezoneOptions
         ):
             try:
-                options.append(cls())
+                options.append(cls())  # type: ignore[reportArgumentType]
             except TypeError:
                 pytest.fail(f"Options class is not tested: {cls}")
 
@@ -276,6 +262,8 @@ def test_get_function_hash_aggregate():
 
 @pytest.mark.numpy
 def test_call_function_with_memory_pool():
+    import numpy as np
+
     arr = pa.array(["foo", "bar", "baz"])
     indices = np.array([2, 2, 1])
     result1 = arr.take(indices)
@@ -799,11 +787,11 @@ def test_min_max():
     # Wrong options type
     options = pc.TakeOptions()
     with pytest.raises(TypeError):
-        s = pc.min_max(data, options=options)
+        s = pc.min_max(data, options=options)  # type: ignore[reportCallIssue]
 
     # Missing argument
     with pytest.raises(TypeError, match="min_max takes 1 positional"):
-        s = pc.min_max()
+        s = pc.min_max()  # type: ignore[reportCallIssue]
 
 
 def test_any():
@@ -854,11 +842,11 @@ def test_all():
 
 def test_is_valid():
     # An example generated function wrapper without options
-    data = [4, 5, None]
+    data = pa.array([4, 5, None])
     assert pc.is_valid(data).to_pylist() == [True, True, False]
 
     with pytest.raises(TypeError):
-        pc.is_valid(data, options=None)
+        pc.is_valid(data, options=None)  # type: ignore[no-matching-overload]
 
 
 def test_generated_docstrings():
@@ -1037,21 +1025,6 @@ utf8proc_issue_is_lower = {
     0x2097, 0x2098, 0x2099, 0x209a, 0x209b, 0x209c,
     0x2c7c, 0x2c7d, 0xa69c, 0xa69d, 0xa770, 0xa7f8,
     0xa7f9, 0xab5c, 0xab5d, 0xab5e, 0xab5f, }
-# utf8proc does not store if a codepoint is numeric
-numeric_info_missing = {
-    0x3405, 0x3483, 0x382a, 0x3b4d, 0x4e00, 0x4e03,
-    0x4e07, 0x4e09, 0x4e5d, 0x4e8c, 0x4e94, 0x4e96,
-    0x4ebf, 0x4ec0, 0x4edf, 0x4ee8, 0x4f0d, 0x4f70,
-    0x5104, 0x5146, 0x5169, 0x516b, 0x516d, 0x5341,
-    0x5343, 0x5344, 0x5345, 0x534c, 0x53c1, 0x53c2,
-    0x53c3, 0x53c4, 0x56db, 0x58f1, 0x58f9, 0x5e7a,
-    0x5efe, 0x5eff, 0x5f0c, 0x5f0d, 0x5f0e, 0x5f10,
-    0x62fe, 0x634c, 0x67d2, 0x6f06, 0x7396, 0x767e,
-    0x8086, 0x842c, 0x8cae, 0x8cb3, 0x8d30, 0x9621,
-    0x9646, 0x964c, 0x9678, 0x96f6, 0xf96b, 0xf973,
-    0xf978, 0xf9b2, 0xf9d1, 0xf9d3, 0xf9fd, 0x10fc5,
-    0x10fc6, 0x10fc7, 0x10fc8, 0x10fc9, 0x10fca,
-    0x10fcb, }
 # utf8proc has no no digit/numeric information
 digit_info_missing = {
     0xb2, 0xb3, 0xb9, 0x1369, 0x136a, 0x136b, 0x136c,
@@ -1070,6 +1043,7 @@ digit_info_missing = {
     0x278f, 0x2790, 0x2791, 0x2792, 0x10a40, 0x10a41,
     0x10a42, 0x10a43, 0x10e60, 0x10e61, 0x10e62, 0x10e63,
     0x10e64, 0x10e65, 0x10e66, 0x10e67, 0x10e68, }
+# utf8proc does not store if a codepoint is numeric
 numeric_info_missing = {
     0x3405, 0x3483, 0x382a, 0x3b4d, 0x4e00, 0x4e03,
     0x4e07, 0x4e09, 0x4e5d, 0x4e8c, 0x4e94, 0x4e96,
@@ -1104,7 +1078,8 @@ def test_string_py_compat_boolean(function_name, variant):
     py_name = function_name.replace('_', '')
     ignore = codepoints_ignore.get(function_name, set()) | \
         find_new_unicode_codepoints()
-    for i in range(128 if ascii else 0x11000):
+    for i in range(128 if ascii  # type: ignore[reportUnnecessaryComparison]
+                   else 0x11000):
         if i in range(0xD800, 0xE000):
             continue  # bug? pyarrow doesn't allow utf16 surrogates
         # the issues we know of, we skip
@@ -1170,6 +1145,8 @@ def test_utf8_zfill():
 
 @pytest.mark.pandas
 def test_replace_slice():
+    import numpy as np
+
     offsets = range(-3, 4)
 
     arr = pa.array([None, '', 'a', 'ab', 'abc', 'abcd', 'abcde'])
@@ -1246,6 +1223,7 @@ def test_binary_join():
     expected = pa.array(['a1b', 'c2d'], type=pa.binary())
     ar_list = pa.array([['a', 'b'], ['c', 'd']], type=pa.list_(pa.binary()))
     assert pc.binary_join(ar_list, separator_array).equals(expected)
+    assert expected.equals(pc.binary_join(ar_list, separator_array))
 
 
 def test_binary_join_element_wise():
@@ -1309,7 +1287,8 @@ def test_take_indices_types():
 
     for indices_type in ['uint8', 'int8', 'uint16', 'int16',
                          'uint32', 'int32', 'uint64', 'int64']:
-        indices = pa.array([0, 4, 2, None], type=indices_type)
+        indices = pa.array(
+            [0, 4, 2, None], type=indices_type)  # type: ignore[reportArgumentType]
         result = arr.take(indices)
         result.validate()
         expected = pa.array([0, 4, 2, None])
@@ -1318,7 +1297,7 @@ def test_take_indices_types():
     for indices_type in [pa.float32(), pa.float64()]:
         indices = pa.array([0, 4, 2], type=indices_type)
         with pytest.raises(NotImplementedError):
-            arr.take(indices)
+            arr.take(indices)  # type: ignore[reportArgumentType]
 
 
 def test_take_on_chunked_array():
@@ -1486,6 +1465,8 @@ def test_filter(ty, values):
 @pytest.mark.numpy
 @pytest.mark.parametrize(('ty', 'values'), all_array_types)
 def test_filter_numpy_array_mask(ty, values):
+    import numpy as np
+
     arr = pa.array(values, type=ty)
     # same test as test_filter with different array type
     mask = np.array([True, False, False, True, None])
@@ -1562,7 +1543,7 @@ def test_filter_errors():
         # non-boolean dtype
         mask = pa.array([0, 1, 0, 1, 0])
         with pytest.raises(NotImplementedError):
-            obj.filter(mask)
+            obj.filter(mask)  # type: ignore[reportArgumentType]
 
         # wrong length
         mask = pa.array([True, False, True])
@@ -1573,7 +1554,7 @@ def test_filter_errors():
     scalar = pa.scalar(True)
     for filt in [batch, table, scalar]:
         with pytest.raises(TypeError):
-            table.filter(filt)
+            table.filter(filt)  # type: ignore[reportArgumentType]
 
 
 def test_filter_null_type():
@@ -1592,11 +1573,10 @@ def test_filter_null_type():
 
 @pytest.mark.parametrize("typ", ["array", "chunked_array"])
 def test_compare_array(typ):
-    if typ == "array":
-        def con(values):
+    def con(values):
+        if typ == "array":
             return pa.array(values)
-    else:
-        def con(values):
+        else:
             return pa.chunked_array([values])
 
     arr1 = con([1, 2, 3, 4, None])
@@ -1623,11 +1603,10 @@ def test_compare_array(typ):
 
 @pytest.mark.parametrize("typ", ["array", "chunked_array"])
 def test_compare_string_scalar(typ):
-    if typ == "array":
-        def con(values):
+    def con(values):
+        if typ == "array":
             return pa.array(values)
-    else:
-        def con(values):
+        else:
             return pa.chunked_array([values])
 
     arr = con(['a', 'b', 'c', None])
@@ -1660,11 +1639,10 @@ def test_compare_string_scalar(typ):
 
 @pytest.mark.parametrize("typ", ["array", "chunked_array"])
 def test_compare_scalar(typ):
-    if typ == "array":
-        def con(values):
+    def con(values):
+        if typ == "array":
             return pa.array(values)
-    else:
-        def con(values):
+        else:
             return pa.chunked_array([values])
 
     arr = con([1, 2, 3, None])
@@ -1757,14 +1735,17 @@ def test_round_to_integer(ty):
         "half_to_odd": [3, 3, 4, 5, -3, -3, -4, None],
     }
     for round_mode, expected in rmode_and_expected.items():
-        options = RoundOptions(round_mode=round_mode)
-        result = round(values, options=options)
+        options = RoundOptions(  # type: ignore[reportPossiblyUnboundVariable]
+            round_mode=round_mode)  # type: ignore[reportArgumentType]
+        result = round(values, options=options)  # type: ignore[reportArgumentType]
         expected_array = pa.array(expected, type=pa.float64())
         assert expected_array.equals(result)
 
 
 @pytest.mark.numpy
 def test_round():
+    import numpy as np
+
     values = [320, 3.5, 3.075, 4.5, -3.212, -35.1234, -3.045, None]
     ndigits_and_expected = {
         -2: [300, 0, 0, 0, -0, -0, -0, None],
@@ -1784,6 +1765,8 @@ def test_round():
 
 @pytest.mark.numpy
 def test_round_to_multiple():
+    import numpy as np
+
     values = [320, 3.5, 3.075, 4.5, -3.212, -35.1234, -3.045, None]
     multiple_and_expected = {
         0.05: [320, 3.5, 3.1, 4.5, -3.2, -35.1, -3.05, None],
@@ -1807,7 +1790,8 @@ def test_round_to_multiple():
 
     for multiple in [object, 99999999999999999999999]:
         with pytest.raises(TypeError, match="is not a valid multiple type"):
-            pc.round_to_multiple(values, multiple=multiple)
+            pc.round_to_multiple(
+                values, multiple=multiple)  # type: ignore[reportArgumentType]
 
 
 def test_round_binary():
@@ -1878,7 +1862,7 @@ def test_fill_null():
     fill_value = pa.array([5], type=pa.int8())
     with pytest.raises(pa.ArrowInvalid,
                        match="Array arguments must all be the same length"):
-        arr.fill_null(fill_value)
+        arr.fill_null(fill_value)  # type: ignore[reportArgumentType]
 
     arr = pa.array([None, None, None, None], type=pa.null())
     fill_value = pa.scalar(None, type=pa.null())
@@ -2075,14 +2059,16 @@ def test_fsl_to_fsl_cast(value_type):
     # Different sized FSL
     cast_type = pa.list_(pa.field("element", value_type), 3)
     err_msg = 'Size of FixedSizeList is not the same.'
-    with pytest.raises(pa.lib.ArrowTypeError, match=err_msg):
+    with pytest.raises(ArrowTypeError, match=err_msg):
         fsl.cast(cast_type)
 
 
 DecimalTypeTraits = namedtuple('DecimalTypeTraits',
+                               # type: ignore[reportUntypedNamedTuple]
                                ('name', 'factory', 'max_precision'))
 
 FloatToDecimalCase = namedtuple('FloatToDecimalCase',
+                                # type: ignore[reportUntypedNamedTuple]
                                 ('precision', 'scale', 'float_val'))
 
 decimal_type_traits = [DecimalTypeTraits('decimal32', pa.decimal32, 9),
@@ -2095,6 +2081,8 @@ def largest_scaled_float_not_above(val, scale):
     """
     Find the largest float f such as `f * 10**scale <= val`
     """
+    import numpy as np
+
     assert val >= 0
     assert scale >= 0
     float_val = float(val) / 10**scale
@@ -2155,7 +2143,7 @@ def random_float_to_decimal_cast_cases(float_ty, max_precision):
     r = random.Random(42)
     for precision in range(1, max_precision, 6):
         for scale in range(0, precision, 4):
-            for i in range(20):
+            for _ in range(20):
                 unscaled = r.randrange(0, 10**precision)
                 float_val = scaled_float(unscaled, scale)
                 assert float_val * 10**scale < 10**precision
@@ -2212,6 +2200,8 @@ def test_cast_float_to_decimal_random(float_ty, decimal_traits):
     """
     Test float-to-decimal conversion against exactly generated values.
     """
+    import numpy as np
+
     r = random.Random(43)
     np_float_ty = {
         pa.float32(): np.float32,
@@ -2252,10 +2242,13 @@ def test_cast_float_to_decimal_random(float_ty, decimal_traits):
             float_exp = (-mantissa_bits +
                          math.floor(math.log2(10**(precision - scale))))
             assert float_exp_min <= float_exp <= float_exp_max
-            for i in range(5):
+            for _ in range(5):
                 mantissa = r.randrange(0, 2**mantissa_bits)
-                float_val = np.ldexp(np_float_ty(mantissa), float_exp)
-                assert isinstance(float_val, np_float_ty)
+                float_val = np.ldexp(
+                    np_float_ty(mantissa), float_exp
+                )
+                assert isinstance(
+                    float_val, np_float_ty)  # type: ignore[reportArgumentType]
                 # Make sure we compute the exact expected value and
                 # round by half-to-even when converting to the expected precision.
                 if float_exp >= 0:
@@ -2301,6 +2294,8 @@ def test_strptime():
 @pytest.mark.pandas
 @pytest.mark.timezone_data
 def test_strftime():
+    import pandas as pd
+
     times = ["2018-03-10 09:00", "2038-01-31 12:23", None]
     timezones = ["CET", "UTC", "Europe/Ljubljana"]
 
@@ -2311,7 +2306,8 @@ def test_strftime():
         formats.extend(["%c", "%x", "%X"])
 
     for timezone in timezones:
-        ts = pd.to_datetime(times).tz_localize(timezone)
+        ts = pd.to_datetime(times  # type: ignore[reportArgumentType]
+                            ).tz_localize(timezone)
         for unit in ["s", "ms", "us", "ns"]:
             tsa = pa.array(ts, type=pa.timestamp(unit, timezone))
             for fmt in formats:
@@ -2358,7 +2354,7 @@ def test_strftime():
 
     # Test timestamps without timezone
     fmt = "%Y-%m-%dT%H:%M:%S"
-    ts = pd.to_datetime(times)
+    ts = pd.to_datetime(times)  # type: ignore[reportArgumentType]
     tsa = pa.array(ts, type=pa.timestamp("s"))
     result = pc.strftime(tsa, options=pc.StrftimeOptions(fmt))
     expected = pa.array(ts.strftime(fmt)).cast(result.type)
@@ -2377,6 +2373,7 @@ def test_strftime():
 
 def _check_datetime_components(timestamps, timezone=None):
     from pyarrow.vendored.version import Version
+    import pandas as pd
 
     ts = pd.to_datetime(timestamps).tz_localize(
         "UTC").tz_convert(timezone).to_series()
@@ -2392,9 +2389,15 @@ def _check_datetime_components(timestamps, timezone=None):
 
     if Version(pd.__version__) < Version("1.1.0"):
         # https://github.com/pandas-dev/pandas/issues/33206
-        iso_year = ts.map(lambda x: x.isocalendar()[0]).astype("int64")
-        iso_week = ts.map(lambda x: x.isocalendar()[1]).astype("int64")
-        iso_day = ts.map(lambda x: x.isocalendar()[2]).astype("int64")
+        iso_year = ts.map(
+            lambda x: x.isocalendar()[0]  # type: ignore[reportUnknownLambdaType]
+        ).astype("int64")
+        iso_week = ts.map(
+            lambda x: x.isocalendar()[1]  # type: ignore[reportUnknownLambdaType]
+        ).astype("int64")
+        iso_day = ts.map(
+            lambda x: x.isocalendar()[2]  # type: ignore[reportUnknownLambdaType]
+        ).astype("int64")
     else:
         # Casting is required because pandas isocalendar returns int32
         # while arrow isocalendar returns int64.
@@ -2444,7 +2447,8 @@ def _check_datetime_components(timestamps, timezone=None):
             # datetime with utc returns None for dst()
             is_dst = [False] * len(ts)
         else:
-            is_dst = ts.apply(lambda x: x.dst().seconds > 0)
+            is_dst = ts.apply(
+                lambda x: x.dst().seconds > 0)  # type: ignore[reportUnknownLambdaType]
         assert pc.is_dst(tsa).equals(pa.array(is_dst))
 
     day_of_week_options = pc.DayOfWeekOptions(
@@ -2505,6 +2509,9 @@ def test_iso_calendar_longer_array(unit):
 @pytest.mark.pandas
 @pytest.mark.timezone_data
 def test_assume_timezone():
+    import numpy as np
+    import pandas as pd
+
     ts_type = pa.timestamp("ns")
     timestamps = pd.to_datetime(["1970-01-01T00:00:59.123456789",
                                  "2000-02-29T23:23:23.999999999",
@@ -2529,9 +2536,9 @@ def test_assume_timezone():
     ambiguous_array = pa.array(ambiguous, type=ts_type)
     nonexistent_array = pa.array(nonexistent, type=ts_type)
 
+    ta = pa.array(timestamps, type=ts_type)
     for timezone in ["UTC", "America/Chicago", "Asia/Kolkata"]:
         options = pc.AssumeTimezoneOptions(timezone)
-        ta = pa.array(timestamps, type=ts_type)
         expected = timestamps.tz_localize(timezone)
         result = pc.assume_timezone(ta, options=options)
         assert result.equals(pa.array(expected))
@@ -2540,7 +2547,8 @@ def test_assume_timezone():
 
         ta_zoned = pa.array(timestamps, type=pa.timestamp("ns", timezone))
         with pytest.raises(pa.ArrowInvalid, match="already have a timezone:"):
-            pc.assume_timezone(ta_zoned, options=options)
+            pc.assume_timezone(
+                ta_zoned, options=options)  # type: ignore[reportArgumentType]
 
     invalid_options = pc.AssumeTimezoneOptions("Europe/Brusselsss")
     with pytest.raises(ValueError, match="not found in timezone database"):
@@ -2583,18 +2591,22 @@ def test_assume_timezone():
                              f"timezone '{timezone}'"):
         pc.assume_timezone(ambiguous_array, options=options_ambiguous_raise)
 
-    expected = ambiguous.tz_localize(timezone, ambiguous=[True, True, True])
+    expected = ambiguous.tz_localize(timezone, ambiguous=np.array([True, True, True]))
     result = pc.assume_timezone(
         ambiguous_array, options=options_ambiguous_earliest)
     result.equals(pa.array(expected))
 
-    expected = ambiguous.tz_localize(timezone, ambiguous=[False, False, False])
+    expected = ambiguous.tz_localize(
+        timezone, ambiguous=np.array([False, False, False]))
     result = pc.assume_timezone(
         ambiguous_array, options=options_ambiguous_latest)
     result.equals(pa.array(expected))
 
 
 def _check_temporal_rounding(ts, values, unit):
+    import numpy as np
+    import pandas as pd
+
     unit_shorthand = {
         "nanosecond": "ns",
         "microsecond": "us",
@@ -2638,7 +2650,7 @@ def _check_temporal_rounding(ts, values, unit):
                 value, unit, calendar_based_origin=True)
             origin = ts.dt.floor(greater_unit[unit])
 
-            if ta.type.tz is None:
+            if not hasattr(ta.type, "tz"):
                 result = pc.ceil_temporal(ta, options=options).to_pandas()
                 expected = (ts - origin).dt.ceil(frequency) + origin
                 np.testing.assert_array_equal(result, expected)
@@ -2669,16 +2681,20 @@ def _check_temporal_rounding(ts, values, unit):
     # to regular ceiled timestamp if it is equal to the original timestamp.
     # This does not work if timestamp is zoned since our logic will not
     # account for DST jumps.
-    if ta.type.tz is None:
+    if not hasattr(ta.type, "tz"):
         options = pc.RoundTemporalOptions(
-            value, unit, ceil_is_strictly_greater=True)
+            value,  # type: ignore[reportPossiblyUnboundVariable]
+            ceil_is_strictly_greater=True,
+            unit=unit)  # type: ignore[reportPossiblyUnboundVariable]
         result = pc.ceil_temporal(ta, options=options)
-        expected = ts.dt.ceil(frequency)
+        expected = ts.dt.ceil(frequency)  # type: ignore[reportPossiblyUnboundVariable]
 
         expected = np.where(
             expected == ts,
-            expected + pd.Timedelta(value, unit_shorthand[unit]),
-            expected)
+            expected + pd.Timedelta(
+                value,  # type: ignore[reportPossiblyUnboundVariable]
+                unit=unit_shorthand[unit]), expected  # type: ignore[reportArgumentType]
+        )
         np.testing.assert_array_equal(result, expected)
 
     # Check RoundTemporalOptions defaults
@@ -2703,8 +2719,10 @@ def _check_temporal_rounding(ts, values, unit):
                                   "second", "minute", "hour", "day"))
 @pytest.mark.pandas
 def test_round_temporal(unit):
+    import pandas as pd
+
     values = (1, 2, 3, 4, 5, 6, 7, 10, 15, 24, 60, 250, 500, 750)
-    timestamps = [
+    timestamps = pd.Series([
         "1923-07-07 08:52:35.203790336",
         "1931-03-17 10:45:00.641559040",
         "1932-06-16 01:16:42.911994368",
@@ -2717,7 +2735,7 @@ def test_round_temporal(unit):
         "1982-01-21 18:43:44.517366784",
         "1992-01-01 00:00:00.100000000",
         "1999-12-04 05:55:34.794991104",
-        "2026-10-26 08:39:00.316686848"]
+        "2026-10-26 08:39:00.316686848"])
     ts = pd.Series([pd.Timestamp(x, unit="ns") for x in timestamps])
     _check_temporal_rounding(ts, values, unit)
 
@@ -2739,7 +2757,7 @@ def test_count():
 
     with pytest.raises(ValueError,
                        match='"something else" is not a valid count mode'):
-        pc.count(arr, 'something else')
+        pc.count(arr, 'something else')  # type: ignore[invalid-argument-type]
 
 
 def test_index():
@@ -2789,7 +2807,7 @@ def test_partition_nth():
     with pytest.raises(
             ValueError,
             match="'partition_nth_indices' cannot be called without options"):
-        pc.partition_nth_indices(data)
+        pc.partition_nth_indices(data)  # type: ignore[no-matching-overload]
 
 
 def test_partition_nth_null_placement():
@@ -2816,10 +2834,13 @@ def test_select_k_array():
 
     arr = pa.array([1, 2, None, 0])
     for k in [0, 2, 4]:
-        for order in ["descending", "ascending"]:
-            result = pc.select_k_unstable(
-                arr, k=k, sort_keys=[("dummy", order)])
-            validate_select_k(result, arr, order)
+        result = pc.select_k_unstable(
+            arr, k=k, sort_keys=[("dummy", "ascending")])
+        validate_select_k(result, arr, "ascending")
+
+        result = pc.select_k_unstable(
+            arr, k=k, sort_keys=[("dummy", "descending")])
+        validate_select_k(result, arr, "descending")
 
         result = pc.top_k_unstable(arr, k=k)
         validate_select_k(result, arr, "descending")
@@ -2876,7 +2897,7 @@ def test_select_k_table():
     with pytest.raises(
             ValueError,
             match="'select_k_unstable' cannot be called without options"):
-        pc.select_k_unstable(table)
+        pc.select_k_unstable(table)  # type: ignore[no-matching-overload]
 
     with pytest.raises(ValueError,
                        match="select_k_unstable requires a nonnegative `k`"):
@@ -2885,14 +2906,19 @@ def test_select_k_table():
     with pytest.raises(ValueError,
                        match="select_k_unstable requires a "
                              "non-empty `sort_keys`"):
-        pc.select_k_unstable(table, k=2, sort_keys=[])
+        pc.select_k_unstable(table, sort_keys=[],
+                             k=2  # type: ignore[reportPossiblyUnboundVariable]
+                             )
 
     with pytest.raises(ValueError, match="not a valid sort order"):
-        pc.select_k_unstable(table, k=k, sort_keys=[("a", "nonscending")])
+        pc.select_k_unstable(
+            table, k=k,  # type: ignore[reportPossiblyUnboundVariable]
+            sort_keys=[("a", "nonscending")])  # type: ignore[reportArgumentType]
 
     with pytest.raises(ValueError,
                        match="Invalid sort key column: No match for.*unknown"):
-        pc.select_k_unstable(table, k=k, sort_keys=[("unknown", "ascending")])
+        pc.select_k_unstable(table, k=k,  # type: ignore[reportPossiblyUnboundVariable]
+                             sort_keys=[("unknown", "ascending")])
 
 
 def test_array_sort_indices():
@@ -2911,7 +2937,9 @@ def test_array_sort_indices():
     assert result.to_pylist() == [2, 1, 0, 3]
 
     with pytest.raises(ValueError, match="not a valid sort order"):
-        pc.array_sort_indices(arr, order="nonscending")
+        pc.array_sort_indices(arr,
+                              order="nonscending"  # type: ignore[reportArgumentType]
+                              )
 
 
 def test_sort_indices_array():
@@ -2967,14 +2995,19 @@ def test_sort_indices_table():
     assert result.to_pylist() == [2, 1, 0, 3]
 
     with pytest.raises(ValueError, match="Must specify one or more sort keys"):
-        pc.sort_indices(table)
+        pc.sort_indices(table)  # type: ignore[reportArgumentType]
 
     with pytest.raises(ValueError,
                        match="Invalid sort key column: No match for.*unknown"):
-        pc.sort_indices(table, sort_keys=[("unknown", "ascending")])
+        pc.sort_indices(
+            table,
+            sort_keys=[("unknown", "ascending")]  # type: ignore[reportArgumentType]
+        )
 
     with pytest.raises(ValueError, match="not a valid sort order"):
-        pc.sort_indices(table, sort_keys=[("a", "nonscending")])
+        pc.sort_indices(
+            table, sort_keys=[("a", "nonscending")]  # type: ignore[reportArgumentType]
+        )
 
 
 def test_is_in():
@@ -3052,9 +3085,9 @@ def test_quantile():
     assert result.to_pylist() == [1.25, 1.5, 1.75]
 
     with pytest.raises(ValueError, match="Quantile must be between 0 and 1"):
-        pc.quantile(arr, q=1.1)
+        pc.quantile(arr, q=1.1)  # type: ignore[invalid-argument-type]
     with pytest.raises(ValueError, match="not a valid quantile interpolation"):
-        pc.quantile(arr, interpolation='zzz')
+        pc.quantile(arr, interpolation='zzz')  # type: ignore[invalid-argument-type]
 
 
 def test_tdigest():
@@ -3120,6 +3153,8 @@ def test_min_max_element_wise():
 @pytest.mark.parametrize('start', (1.25, 10.5, -10.5))
 @pytest.mark.parametrize('skip_nulls', (True, False))
 def test_cumulative_sum(start, skip_nulls):
+    import numpy as np
+
     # Exact tests (e.g., integral types)
     start_int = int(start)
     starts = [None, start_int, pa.scalar(start_int, type=pa.int8()),
@@ -3168,13 +3203,15 @@ def test_cumulative_sum(start, skip_nulls):
 
     for strt in ['a', pa.scalar('arrow'), 1.1]:
         with pytest.raises(pa.ArrowInvalid):
-            pc.cumulative_sum([1, 2, 3], start=strt)
+            pc.cumulative_sum([1, 2, 3], start=strt)  # type: ignore[reportArgumentType]
 
 
 @pytest.mark.numpy
 @pytest.mark.parametrize('start', (1.25, 10.5, -10.5))
 @pytest.mark.parametrize('skip_nulls', (True, False))
 def test_cumulative_prod(start, skip_nulls):
+    import numpy as np
+
     # Exact tests (e.g., integral types)
     start_int = int(start)
     starts = [None, start_int, pa.scalar(start_int, type=pa.int8()),
@@ -3223,13 +3260,17 @@ def test_cumulative_prod(start, skip_nulls):
 
     for strt in ['a', pa.scalar('arrow'), 1.1]:
         with pytest.raises(pa.ArrowInvalid):
-            pc.cumulative_prod([1, 2, 3], start=strt)
+            pc.cumulative_prod(
+                [1, 2, 3], start=strt  # type: ignore[reportArgumentType]
+            )
 
 
 @pytest.mark.numpy
 @pytest.mark.parametrize('start', (0.5, 3.5, 6.5))
 @pytest.mark.parametrize('skip_nulls', (True, False))
 def test_cumulative_max(start, skip_nulls):
+    import numpy as np
+
     # Exact tests (e.g., integral types)
     start_int = int(start)
     starts = [None, start_int, pa.scalar(start_int, type=pa.int8()),
@@ -3281,13 +3322,15 @@ def test_cumulative_max(start, skip_nulls):
 
     for strt in ['a', pa.scalar('arrow'), 1.1]:
         with pytest.raises(pa.ArrowInvalid):
-            pc.cumulative_max([1, 2, 3], start=strt)
+            pc.cumulative_max([1, 2, 3], start=strt)  # type: ignore[reportArgumentType]
 
 
 @pytest.mark.numpy
 @pytest.mark.parametrize('start', (0.5, 3.5, 6.5))
 @pytest.mark.parametrize('skip_nulls', (True, False))
 def test_cumulative_min(start, skip_nulls):
+    import numpy as np
+
     # Exact tests (e.g., integral types)
     start_int = int(start)
     starts = [None, start_int, pa.scalar(start_int, type=pa.int8()),
@@ -3335,11 +3378,12 @@ def test_cumulative_min(start, skip_nulls):
                 expected_arrays[i], strt if strt is not None else 1e9,
                 skip_nulls=False)
             np.testing.assert_array_almost_equal(result.to_numpy(
+                # type: ignore[reportAttributeAccessIssue]
                 zero_copy_only=False), expected.to_numpy(zero_copy_only=False))
 
     for strt in ['a', pa.scalar('arrow'), 1.1]:
         with pytest.raises(pa.ArrowInvalid):
-            pc.cumulative_max([1, 2, 3], start=strt)
+            pc.cumulative_max([1, 2, 3], start=strt)  # type: ignore[reportArgumentType]
 
 
 def test_make_struct():
@@ -3431,12 +3475,12 @@ def test_list_element():
     lists = pa.array([l1, l2], list_type)
 
     index = 1
-    result = pa.compute.list_element(lists, index)
+    result = pc.list_element(lists, index)
     expected = pa.array([None, {'a': 0.52, 'b': 3}], element_type)
     assert result.equals(expected)
 
     index = 4
-    result = pa.compute.list_element(lists, index)
+    result = pc.list_element(lists, index)
     expected = pa.array([{'a': 5.6, 'b': 6}, {'a': .6, 'b': 8}], element_type)
     assert result.equals(expected)
 
@@ -3475,7 +3519,7 @@ def test_random():
             pa.array([], type=pa.float64())
 
     # System random initialization => outputs all distinct
-    arrays = [tuple(pc.random(100).to_pylist()) for i in range(10)]
+    arrays = [tuple(pc.random(100).to_pylist()) for _ in range(10)]
     assert len(set(arrays)) == len(arrays)
 
     arrays = [tuple(pc.random(100, initializer=i % 7).to_pylist())
@@ -3484,15 +3528,14 @@ def test_random():
 
     # Arbitrary hashable objects can be given as initializer
     initializers = [object(), (4, 5, 6), "foo"]
-    initializers.extend(os.urandom(10) for i in range(10))
-    arrays = [tuple(pc.random(100, initializer=i).to_pylist())
-              for i in initializers]
+    initializers.extend(os.urandom(10) for _ in range(10))
+    arrays = [tuple(pc.random(100, initializer=i).to_pylist()) for i in initializers]
     assert len(set(arrays)) == len(arrays)
 
     with pytest.raises(TypeError,
                        match=r"initializer should be 'system', an integer, "
                              r"or a hashable object; got \[\]"):
-        pc.random(100, initializer=[])
+        pc.random(100, initializer=[])  # type: ignore[invalid-argument-type]
 
 
 @pytest.mark.parametrize(
@@ -3542,7 +3585,7 @@ def test_rank_options():
                        match=r'"NonExisting" is not a valid tiebreaker'):
         pc.RankOptions(sort_keys="descending",
                        null_placement="at_end",
-                       tiebreaker="NonExisting")
+                       tiebreaker="NonExisting")  # type: ignore[invalid-argument-type]
 
 
 def test_rank_quantile_options():
@@ -3572,7 +3615,7 @@ def test_rank_quantile_options():
     assert result.equals(expected_descending)
 
     with pytest.raises(ValueError, match="not a valid sort order"):
-        pc.rank_quantile(arr, sort_keys="XXX")
+        pc.rank_quantile(arr, sort_keys="XXX")  # type: ignore[reportArgumentType]
 
 
 def test_rank_normal_options():
@@ -3600,6 +3643,8 @@ def test_rank_normal_options():
 
 
 def create_sample_expressions():
+    import numpy as np
+
     # We need a schema for substrait conversion
     schema = pa.schema([pa.field("i64", pa.int64()), pa.field(
         "foo", pa.struct([pa.field("bar", pa.string())]))])
@@ -3614,7 +3659,7 @@ def create_sample_expressions():
     e = pc.scalar(None)
     f = pc.scalar({'a': 1})
     g = pc.scalar(pa.scalar(1))
-    h = pc.scalar(np.int64(2))
+    h = pc.scalar(np.int64(2))  # type: ignore[reportOptionalMemberAccess]
     j = pc.scalar(False)
     k = pc.scalar(0)
 
@@ -3689,20 +3734,22 @@ def test_expression_serialization_arrow(pickle_module):
 def test_expression_serialization_substrait():
 
     exprs = create_sample_expressions()
-    schema = exprs["schema"]
+    schema = pa.schema(exprs["schema"])  # type: ignore[reportAttributeAccessIssue]
 
     # Basic literals don't change on binding and so they will round
     # trip without any change
-    for expr in exprs["literals"]:
-        serialized = expr.to_substrait(schema)
+    for expr in exprs["literals"]:  # type: ignore[reportAttributeAccessIssue]
+        serialized = \
+            expr.to_substrait(schema)  # type: ignore[reportAttributeAccessIssue]
         deserialized = pc.Expression.from_substrait(serialized)
-        assert expr.equals(deserialized)
+        assert expr.equals(deserialized)  # type: ignore[reportAttributeAccessIssue]
 
     # Expressions are bound when they get serialized.  Since bound
     # expressions are not equal to their unbound variants we cannot
     # compare the round tripped with the original
-    for expr in exprs["calls"]:
-        serialized = expr.to_substrait(schema)
+    for expr in exprs["calls"]:  # type: ignore[reportAttributeAccessIssue]
+        serialized = \
+            expr.to_substrait(schema)  # type: ignore[reportAttributeAccessIssue]
         deserialized = pc.Expression.from_substrait(serialized)
         # We can't compare the expressions themselves because of the bound
         # unbound difference. But we can compare the string representation
@@ -3712,7 +3759,8 @@ def test_expression_serialization_substrait():
         assert deserialized.equals(deserialized_again)
 
     for expr, expr_norm in zip(exprs["refs"], exprs["numeric_refs"]):
-        serialized = expr.to_substrait(schema)
+        serialized = \
+            expr.to_substrait(schema)  # type: ignore[reportAttributeAccessIssue]
         deserialized = pc.Expression.from_substrait(serialized)
         assert str(deserialized) == str(expr_norm)
         serialized_again = deserialized.to_substrait(schema)
@@ -3722,15 +3770,16 @@ def test_expression_serialization_substrait():
     # For the special cases we get various wrinkles in serialization but we
     # should always get the same thing from round tripping twice
     for expr in exprs["special"]:
-        serialized = expr.to_substrait(schema)
+        serialized = \
+            expr.to_substrait(schema)  # type: ignore[reportAttributeAccessIssue]
         deserialized = pc.Expression.from_substrait(serialized)
         serialized_again = deserialized.to_substrait(schema)
         deserialized_again = pc.Expression.from_substrait(serialized_again)
         assert deserialized.equals(deserialized_again)
 
     # Special case, we lose the field names of struct literals
-    f = exprs["special"][0]
-    serialized = f.to_substrait(schema)
+    f = exprs["special"][0]  # type: ignore[reportAttributeAccessIssue]
+    serialized = f.to_substrait(schema)  # type: ignore[reportAttributeAccessIssue]
     deserialized = pc.Expression.from_substrait(serialized)
     assert deserialized.equals(pc.scalar({'': 1}))
 
@@ -3758,10 +3807,10 @@ def test_expression_construction():
     nested_field = pc.field(("nested", "field"))
     nested_field2 = pc.field("nested", "field")
 
-    zero | one == string
-    ~true == false
+    _ = zero | one == string
+    _ = ~true == false
     for typ in ("bool", pa.bool_()):
-        field.cast(typ) == true
+        _ = field.cast(typ) == true
 
     field.isin([1, 2])
     nested_mixed_types.isin(["foo", "bar"])
@@ -3769,10 +3818,10 @@ def test_expression_construction():
     nested_field2.isin(["foo", "bar"])
 
     with pytest.raises(TypeError):
-        field.isin(1)
+        field.isin(1)  # type: ignore[invalid-argument-type]
 
     with pytest.raises(pa.ArrowInvalid):
-        field != object()
+        _ = field != object()
 
 
 def test_expression_boolean_operators():
@@ -3781,16 +3830,16 @@ def test_expression_boolean_operators():
     false = pc.scalar(False)
 
     with pytest.raises(ValueError, match="cannot be evaluated to python True"):
-        true and false
+        _ = true and false
 
     with pytest.raises(ValueError, match="cannot be evaluated to python True"):
-        true or false
+        _ = true or false
 
     with pytest.raises(ValueError, match="cannot be evaluated to python True"):
         bool(true)
 
     with pytest.raises(ValueError, match="cannot be evaluated to python True"):
-        not true
+        _ = not true
 
 
 def test_expression_call_function():
@@ -3812,14 +3861,14 @@ def test_expression_call_function():
     # Invalid pc.scalar input gives original error message
     msg = "only other expressions allowed as arguments"
     with pytest.raises(TypeError, match=msg):
-        pc.add(field, object)
+        pc.add(field, object)  # type: ignore[reportArgumentType]
 
 
 def test_cast_table_raises():
     table = pa.table({'a': [1, 2]})
 
-    with pytest.raises(pa.lib.ArrowTypeError):
-        pc.cast(table, pa.int64())
+    with pytest.raises(ArrowTypeError):
+        pc.cast(table, pa.int64())  # type: ignore[reportArgumentType]
 
 
 @pytest.mark.parametrize("start,stop,expected", (
@@ -3966,31 +4015,31 @@ def test_run_end_encode(value_type, option):
 def test_pairwise_diff():
     arr = pa.array([1, 2, 3, None, 4, 5])
     expected = pa.array([None, 1, 1, None, None, 1])
-    result = pa.compute.pairwise_diff(arr, period=1)
+    result = pc.pairwise_diff(arr, period=1)
     assert result.equals(expected)
 
     arr = pa.array([1, 2, 3, None, 4, 5])
     expected = pa.array([None, None, 2, None, 1, None])
-    result = pa.compute.pairwise_diff(arr, period=2)
+    result = pc.pairwise_diff(arr, period=2)
     assert result.equals(expected)
 
     # negative period
     arr = pa.array([1, 2, 3, None, 4, 5], type=pa.int8())
     expected = pa.array([-1, -1, None, None, -1, None], type=pa.int8())
-    result = pa.compute.pairwise_diff(arr, period=-1)
+    result = pc.pairwise_diff(arr, period=-1)
     assert result.equals(expected)
 
     # wrap around overflow
     arr = pa.array([1, 2, 3, None, 4, 5], type=pa.uint8())
     expected = pa.array([255, 255, None, None, 255, None], type=pa.uint8())
-    result = pa.compute.pairwise_diff(arr, period=-1)
+    result = pc.pairwise_diff(arr, period=-1)
     assert result.equals(expected)
 
     # fail on overflow
     arr = pa.array([1, 2, 3, None, 4, 5], type=pa.uint8())
     with pytest.raises(pa.ArrowInvalid,
                        match="overflow"):
-        pa.compute.pairwise_diff_checked(arr, period=-1)
+        pc.pairwise_diff_checked(arr, period=-1)
 
 
 def test_pivot_wider():
