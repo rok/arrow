@@ -297,6 +297,7 @@ class StructScalar(Scalar[types.StructType], collections.abc.Mapping[str, Scalar
     def __iter__(self) -> Iterator[str]: ...
     def __getitem__(self, __key: str) -> Scalar[Any]: ...  # type: ignore[override]
     def _as_py_tuple(self) -> list[tuple[str, Any]]: ...
+    def tolist(self) -> list[Any]: ...
 
 class MapScalar(Scalar[types.MapType[types._K, types._ValueT]]):
     @property
@@ -573,7 +574,7 @@ def scalar(
 @overload
 def scalar(
     value: Any,
-    type: types.BoolType,
+    type: types.BoolType | Literal["bool"],
     *,
     from_pandas: bool | None = None,
     memory_pool: MemoryPool | None = None,
@@ -581,7 +582,7 @@ def scalar(
 @overload
 def scalar(
     value: Any,
-    type: types.UInt8Type,
+    type: types.UInt8Type | Literal["uint8"],
     *,
     from_pandas: bool | None = None,
     memory_pool: MemoryPool | None = None,
@@ -589,7 +590,7 @@ def scalar(
 @overload
 def scalar(
     value: Any,
-    type: types.Int8Type,
+    type: types.Int8Type | Literal["int8"],
     *,
     from_pandas: bool | None = None,
     memory_pool: MemoryPool | None = None,
@@ -597,7 +598,7 @@ def scalar(
 @overload
 def scalar(
     value: Any,
-    type: types.UInt16Type,
+    type: types.UInt16Type | Literal["uint16"],
     *,
     from_pandas: bool | None = None,
     memory_pool: MemoryPool | None = None,
@@ -605,7 +606,7 @@ def scalar(
 @overload
 def scalar(
     value: Any,
-    type: types.Int16Type,
+    type: types.Int16Type | Literal["int16"],
     *,
     from_pandas: bool | None = None,
     memory_pool: MemoryPool | None = None,
@@ -613,7 +614,7 @@ def scalar(
 @overload
 def scalar(
     value: Any,
-    type: types.Uint32Type,
+    type: types.Uint32Type | Literal["uint32"],
     *,
     from_pandas: bool | None = None,
     memory_pool: MemoryPool | None = None,
@@ -621,7 +622,7 @@ def scalar(
 @overload
 def scalar(
     value: Any,
-    type: types.Int32Type,
+    type: types.Int32Type | Literal["int32"],
     *,
     from_pandas: bool | None = None,
     memory_pool: MemoryPool | None = None,
@@ -629,7 +630,7 @@ def scalar(
 @overload
 def scalar(
     value: Any,
-    type: types.UInt64Type,
+    type: types.UInt64Type | Literal["uint64"],
     *,
     from_pandas: bool | None = None,
     memory_pool: MemoryPool | None = None,
@@ -637,7 +638,7 @@ def scalar(
 @overload
 def scalar(
     value: Any,
-    type: types.Int64Type,
+    type: types.Int64Type | Literal["int64"],
     *,
     from_pandas: bool | None = None,
     memory_pool: MemoryPool | None = None,
@@ -645,7 +646,7 @@ def scalar(
 @overload
 def scalar(
     value: Any,
-    type: types.Float16Type,
+    type: types.Float16Type | Literal["f16"],
     *,
     from_pandas: bool | None = None,
     memory_pool: MemoryPool | None = None,
@@ -653,7 +654,7 @@ def scalar(
 @overload
 def scalar(
     value: Any,
-    type: types.Float32Type,
+    type: types.Float32Type | Literal["f32"],
     *,
     from_pandas: bool | None = None,
     memory_pool: MemoryPool | None = None,
@@ -661,7 +662,7 @@ def scalar(
 @overload
 def scalar(
     value: Any,
-    type: types.Float64Type,
+    type: types.Float64Type | Literal["f64"],
     *,
     from_pandas: bool | None = None,
     memory_pool: MemoryPool | None = None,
@@ -693,7 +694,7 @@ def scalar(
 @overload
 def scalar(
     value: Any,
-    type: types.StringType,
+    type: types.StringType | Literal["string"],
     *,
     from_pandas: bool | None = None,
     memory_pool: MemoryPool | None = None,
@@ -1014,4 +1015,5 @@ __all__ = [
     "JsonScalar",
     "OpaqueScalar",
     "scalar",
+    "NullableCollection",
 ]
