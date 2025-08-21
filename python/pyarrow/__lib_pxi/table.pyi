@@ -53,11 +53,11 @@ from pyarrow.lib import Device, MemoryManager, MemoryPool, MonthDayNano, Schema
 from pyarrow.lib import Field as _Field
 
 from . import array, scalar, types
-from .array import Array, NullableCollection, StructArray, _CastAs, _PandasConvertible
+from .array import Array, StructArray, _CastAs, _PandasConvertible
 from .device import DeviceAllocationType
 from .io import Buffer
 from .ipc import RecordBatchReader
-from .scalar import Int64Scalar, Scalar
+from .scalar import Int64Scalar, Scalar, NullableCollection
 from .tensor import Tensor
 from .types import DataType, _AsPyType, _BasicDataType, _DataTypeT
 
@@ -389,7 +389,7 @@ class ChunkedArray(_PandasConvertible[pd.Series], Generic[_Scalar_co]):
           ]
         ]
         """
-    def fill_null(self, fill_value: Scalar[_DataTypeT]) -> Self:
+    def fill_null(self, fill_value: Scalar[_DataTypeT] | _AsPyType | str | None) -> Self:
         """
         Replace each null element in values with fill_value.
 
@@ -423,7 +423,7 @@ class ChunkedArray(_PandasConvertible[pd.Series], Generic[_Scalar_co]):
           ]
         ]
         """
-    def equals(self, other: Self) -> bool:
+    def equals(self, other: Self | Array[Any] | Iterable[Any]) -> bool:
         """
         Return whether the contents of two chunked arrays are equal.
 
@@ -1521,6 +1521,11 @@ def chunked_array(
     values: Iterable[NullableCollection[list[Any]]],
     type: None = None,
 ) -> ChunkedArray[scalar.ListScalar[Any]]: ...
+@overload
+def chunked_array(
+    values: Iterable[NullableCollection[types.Decimal128Type[Any, Any]]],
+    type: types.Decimal128Type,
+) -> ChunkedArray[types.Decimal128Type]: ...
 @overload
 def chunked_array(
     values: Iterable[Iterable[Any] | SupportArrowStream | SupportArrowArray],
@@ -5083,8 +5088,9 @@ class Table(_Tabular[ChunkedArray[Any]]):
         """
 
 def record_batch(
-    data: dict[str, list[Any] | Array[Any]]
-    | Collection[Array[Any]]
+    data: list[ArrayOrChunkedArray[Any]]
+    | dict[str, list[Any] | Array[Any]]
+    | Iterable[Array[Any]]
     | pd.DataFrame
     | SupportArrowArray
     | SupportArrowDeviceArray,

@@ -1,6 +1,23 @@
-# ruff: noqa: I001
-from typing import Literal, TypeAlias, TypeVar, overload, Any, Iterable, ParamSpec, Sequence
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
+from typing import Literal, TypeAlias, TypeVar, overload, Any, Iterable, ParamSpec, Sequence, Hashable
 from collections.abc import Callable
+from numpy.typing import NDArray
 
 # Option classes
 from pyarrow._compute import ArraySortOptions as ArraySortOptions
@@ -68,6 +85,7 @@ from pyarrow._compute import TDigestOptions as TDigestOptions
 from pyarrow._compute import TrimOptions as TrimOptions
 from pyarrow._compute import UdfContext as UdfContext
 from pyarrow._compute import Utf8NormalizeOptions as Utf8NormalizeOptions
+from pyarrow._compute import ZeroFillOptions as ZeroFillOptions
 from pyarrow._compute import VarianceOptions as VarianceOptions
 from pyarrow._compute import VectorFunction as VectorFunction
 from pyarrow._compute import VectorKernel as VectorKernel
@@ -90,11 +108,12 @@ from pyarrow._compute import register_vector_function as register_vector_functio
 from pyarrow._compute import _Order, _Placement
 from pyarrow._stubs_typing import ArrayLike, ScalarLike
 from . import lib
+from _stubs_typing import Indices
 
 _P = ParamSpec("_P")
 _R = TypeVar("_R")
 
-def field(*name_or_index: str | tuple[str, ...] | int) -> Expression:
+def field(*name_or_index: str | bytes | tuple[str | int, ...] | int) -> Expression:
     """Reference a column of the dataset.
 
     Stores only the field's name. Type and other information is known only when
@@ -128,7 +147,7 @@ def field(*name_or_index: str | tuple[str, ...] | int) -> Expression:
     <pyarrow.compute.Expression FieldRef.Nested(FieldRef.Name(a) ...
     """
 
-def scalar(value: bool | float | str) -> Expression:
+def scalar(value: bool | int | float | NumericScalar | None | str | dict[bool | float | str, bool | float | str]) -> Expression:
     """Expression representing a scalar value.
 
     Creates an Expression object representing a scalar value that can be used
@@ -166,6 +185,10 @@ _ArrayT = TypeVar("_ArrayT", bound=lib.Array | lib.ChunkedArray)
 _ScalarOrArrayT = TypeVar("_ScalarOrArrayT", bound=lib.Array | lib.Scalar | lib.ChunkedArray)
 ArrayOrChunkedArray: TypeAlias = lib.Array[_Scalar_CoT] | lib.ChunkedArray[_Scalar_CoT]
 ScalarOrArray: TypeAlias = ArrayOrChunkedArray[_Scalar_CoT] | _Scalar_CoT
+_ZonedTimestampArrayT: TypeAlias = ArrayOrChunkedArray[lib.Scalar[lib.TimestampType[Any, Any]]]
+_ZonelessTimestampArrayT: TypeAlias = ArrayOrChunkedArray[lib.Scalar[lib.TimestampType[Any, None]]]
+_ZonedTimestampScalarT: TypeAlias = lib.Scalar[lib.TimestampType[Any, Any]]
+_ZonelessTimestampScalarT: TypeAlias = lib.Scalar[lib.TimestampType[Any, None]]
 
 SignedIntegerScalar: TypeAlias = (
     lib.Scalar[lib.Int8Type]
@@ -209,6 +232,7 @@ TemporalScalar: TypeAlias = (
     | lib.Time32Scalar[Any]
     | lib.Time64Scalar[Any]
     | lib.TimestampScalar[Any]
+    | lib.TimestampScalar[Any, None]
     | lib.DurationScalar[Any]
     | lib.MonthDayNanoIntervalScalar
 )
@@ -216,9 +240,9 @@ NumericOrDurationScalar: TypeAlias = NumericScalar | lib.DurationScalar
 NumericOrTemporalScalar: TypeAlias = NumericScalar | TemporalScalar
 
 _NumericOrTemporalScalarT = TypeVar("_NumericOrTemporalScalarT", bound=NumericOrTemporalScalar)
+_NumericScalarT = TypeVar("_NumericScalarT", bound=NumericScalar)
 NumericArray: TypeAlias = ArrayOrChunkedArray[_NumericScalarT]
 _NumericArrayT = TypeVar("_NumericArrayT", bound=NumericArray)
-_NumericScalarT = TypeVar("_NumericScalarT", bound=NumericScalar)
 _NumericOrDurationT = TypeVar("_NumericOrDurationT", bound=NumericOrDurationScalar)
 NumericOrDurationArray: TypeAlias = ArrayOrChunkedArray[NumericOrDurationScalar]
 _NumericOrDurationArrayT = TypeVar("_NumericOrDurationArrayT", bound=NumericOrDurationArray)
@@ -245,6 +269,9 @@ _TemporalArrayT = TypeVar("_TemporalArrayT", bound=TemporalArray)
 _ListArray: TypeAlias = ArrayOrChunkedArray[_ListScalar[_DataTypeT]]
 _LargeListArray: TypeAlias = ArrayOrChunkedArray[_LargeListScalar[_DataTypeT]]
 ListArray: TypeAlias = ArrayOrChunkedArray[ListScalar[_DataTypeT]]
+_DecimalScalarT = TypeVar("_DecimalScalarT", bound=DecimalScalar)
+DecimalArray: TypeAlias = lib.Array[_DecimalScalarT] | lib.ChunkedArray[_DecimalScalarT]
+_DecimalArrayT = TypeVar("_DecimalArrayT", bound=DecimalArray)
 # =============================== 1. Aggregation ===============================
 
 # ========================= 1.1 functions =========================
@@ -423,12 +450,12 @@ def first(
     """
 
 def first_last(
-    array: lib.Array[Any] | lib.ChunkedArray[Any],
+    array: lib.Array[Any] | lib.ChunkedArray[Any] | Sequence[Any],
     /,
     *,
     skip_nulls: bool = True,
     min_count: int = 1,
-    options: ScalarAggregateOptions | None = None,
+    options: ScalarAggregateOptions | dict[str, Any] | None = None,
     memory_pool: lib.MemoryPool | None = None,
 ) -> lib.StructScalar:
     """
@@ -742,7 +769,7 @@ def product(
 def quantile(
     array: NumericScalar | NumericArray,
     /,
-    q: float = 0.5,
+    q: float | list[float] = 0.5,
     *,
     interpolation: Literal["linear", "lower", "higher", "nearest", "midpoint"] = "linear",
     skip_nulls: bool = True,
@@ -823,8 +850,64 @@ def stddev(
         If not passed, will allocate memory from the default memory pool.
     """
 
+def skew(
+    array: NumericArray | Sequence[int | None],
+    /,
+    *,
+    skip_nulls: bool = True,
+    biased: bool = True,
+    min_count: int = 0,
+    options: SkewOptions | None = None,
+) -> NumericScalar:
+    """
+    Calculate the skewness of a numeric array
+    Nulls are ignored by default.  If there are not enough non-null values
+    in the array to satisfy `min_count`, null is returned.
+    The behavior of nulls and the `min_count` parameter can be changed.
+
+    Parameters
+    ----------
+    array : Array-like
+        Argument to compute function.
+    skip_nulls : bool, default True
+        Whether to skip (ignore) nulls in the input.
+        If False, any null in the input forces the output to null.
+    biased : bool, default True
+        Whether the calculated value is biased.
+        If False, the value computed includes a correction factor to reduce bias.
+    min_count : int, default 0
+        Minimum number of non-null values in the input.  If the number
+        of non-null values is below `min_count`, the output is null.
+    options : SkewOptions, optional
+        Options for the `skew` and `kurtosis` functions.
+    """
+
+kurtosis = _clone_signature(skew)
+"""
+Calculate the kurtosis of a numeric array
+Nulls are ignored by default. If there are not enough non-null values
+in the array to satisfy `min_count`, null is returned.
+The behavior of nulls and the `min_count` parameter can be changed.
+
+Parameters
+----------
+array : Array-like
+    Argument to compute function.
+skip_nulls : bool, default True
+    Whether to skip (ignore) nulls in the input.
+    If False, any null in the input forces the output to null.
+biased : bool, default True
+    Whether the calculated value is biased.
+    If False, the value computed includes a correction factor to reduce bias.
+min_count : int, default 0
+    Minimum number of non-null values in the input.  If the number
+    of non-null values is below `min_count`, the output is null.
+options : SkewOptions, optional
+    Options for the `skew` and `kurtosis` functions.
+"""
+
 def sum(
-    array: _NumericScalarT | NumericArray[_NumericScalarT],
+    array: _NumericScalarT | NumericArray[_NumericScalarT] | _DecimalArrayT,
     /,
     *,
     skip_nulls: bool = True,
@@ -858,7 +941,7 @@ def sum(
 def tdigest(
     array: NumericScalar | NumericArray,
     /,
-    q: float = 0.5,
+    q: float | list[float] = 0.5,
     *,
     delta: int = 100,
     buffer_size: int = 500,
@@ -899,7 +982,7 @@ def tdigest(
     """
 
 def variance(
-    array: NumericScalar | NumericArray,
+    array: NumericScalar | NumericArray | list[int] | list[int | None],
     /,
     *,
     ddof: int = 0,
@@ -1022,6 +1105,113 @@ def bottom_k_unstable(
     ]
     """
 
+def winsorize(
+    values: lib.Array | lib.ChunkedArray,
+	lower_limit: float | None = None,
+	upper_limit: float | None = None,
+	/,
+	*,
+    options: WinsorizeOptions | None = None,
+    memory_pool: lib.MemoryPool | None = None,
+) -> lib.Array:
+    """
+    Apply a winsorization transform to the input array so as to reduce the influence of potential outliers.
+    NaNs and nulls in the input are ignored for the purpose of computing the lower and upper quantiles.
+    The quantile limits can be changed in WinsorizeOptions.
+
+    Parameters
+    ----------
+    values : Array, ChunkedArray, RecordBatch, or Table
+        Data to sort and get bottom indices from.
+
+    lower_limit : float, between 0 and 1
+        The quantile below which all values are replaced with the quantile's value.
+		For example, if lower_limit = 0.05, then all values in the lower 5% percentile will be replaced with the 5% percentile value.
+
+    upper_limit : float, between 0 and 1
+		The quantile above which all values are replaced with the quantile’s value.
+		For example, if upper_limit = 0.95, then all values in the upper 95% percentile will be replaced with the 95% percentile value.
+
+    options : pyarrow.compute.WinsorizeOptions, optional
+        Alternative way of passing options.
+
+    memory_pool : MemoryPool, optional
+        If not passed, will allocate memory from the default memory pool.
+
+    Returns
+    -------
+    result : Array of indices
+        Winsorized array
+
+    Examples
+    --------
+    >>> import pyarrow as pa
+    >>> import pyarrow.compute as pc
+    >>> arr = pa.array([10, 4, 9, 8, 5, 3, 7, 2, 1, 6])
+    >>> pc.winsorize(arr, 0.1, 0.8)
+    <pyarrow.lib.UInt64Array object at ...>
+    [
+     8,
+     4,
+     8,
+     8,
+     5,
+     3,
+     7,
+     2,
+     2,
+     6
+    ]
+    """
+
+def pivot_wider(
+    pivot_keys: lib.Array | lib.ChunkedArray | list[Any],
+	pivot_values: lib.Array | lib.ChunkedArray | list[Any],
+	/,
+	key_names: list[Any] | None = None,
+	*,
+	unexpected_key_behavior: str | None = None,
+	options: PivotWiderOptions | None = None,
+    memory_pool: lib.MemoryPool | None = None,
+) -> lib.StructScalar:
+    """
+	Pivot values according to a pivot key column.
+
+	Output is a struct with as many fields as PivotWiderOptions.key_names.
+	All output struct fields have the same type as pivot_values. Each pivot
+	key decides in which output field the corresponding pivot value is emitted.
+	If a pivot key doesn’t appear, null is emitted. If more than one non-null
+	value is encountered for a given pivot key, Invalid is raised. The pivot
+	key column can be string, binary or integer. The key_names will be cast
+	to the pivot key column type for matching. Behavior of unexpected pivot
+	keys is controlled by unexpected_key_behavior.
+
+    Parameters
+    ----------
+    pivot_keys : sequence
+        Array, ChunkedArray, list
+    pivot_values : sequence
+		Array, ChunkedArray, list
+    key_names : sequence of str
+        The pivot key names expected in the pivot key column.
+        For each entry in `key_names`, a column with the same name is emitted
+        in the struct output.
+    unexpected_key_behavior : str, default "ignore"
+        The behavior when pivot keys not in `key_names` are encountered.
+        Accepted values are "ignore", "raise".
+        If "ignore", unexpected keys are silently ignored.
+        If "raise", unexpected keys raise a KeyError.
+    options : pyarrow.compute.PivotWiderOptions, optional
+        Alternative way of passing options.
+    memory_pool : MemoryPool, optional
+        If not passed, will allocate memory from the default memory pool.
+
+    Returns
+    -------
+    result : Array of indices
+        Pivoted struct array
+    """
+
 # ========================= 2. Element-wise (“scalar”) functions =========================
 
 # ========================= 2.1 Arithmetic =========================
@@ -1076,8 +1266,8 @@ def add(
 ) -> _NumericOrTemporalScalarT: ...
 @overload
 def add(
-    x: _NumericOrTemporalArrayT,
-    y: _NumericOrTemporalArrayT,
+    x: _NumericOrTemporalArrayT | NDArray[Any] | list[lib._AsPyType | None],
+    y: _NumericOrTemporalArrayT | NDArray[Any] | list[lib._AsPyType | None],
     /,
     *,
     memory_pool: lib.MemoryPool | None = None,
@@ -1088,27 +1278,27 @@ def add(
 ) -> Expression: ...
 @overload
 def add(
-    x: NumericOrTemporalScalar,
-    y: _NumericOrTemporalArrayT,
+    x: NumericOrTemporalScalar | lib._AsPyType,
+    y: _NumericOrTemporalArrayT | NDArray[Any] | list[lib._AsPyType | None],
     /,
     *,
     memory_pool: lib.MemoryPool | None = None,
 ) -> _NumericOrTemporalArrayT: ...
 @overload
 def add(
-    x: _NumericOrTemporalArrayT,
-    y: NumericOrTemporalScalar,
+    x: _NumericOrTemporalArrayT | NDArray[Any] | list[lib._AsPyType | None],
+    y: NumericOrTemporalScalar | lib._AsPyType,
     /,
     *,
     memory_pool: lib.MemoryPool | None = None,
 ) -> _NumericOrTemporalArrayT: ...
 @overload
 def add(
-    x: NumericOrTemporalScalar, y: Expression, /, *, memory_pool: lib.MemoryPool | None = None
+    x: NumericOrTemporalScalar | lib._AsPyType, y: Expression, /, *, memory_pool: lib.MemoryPool | None = None
 ) -> Expression: ...
 @overload
 def add(
-    x: Expression, y: NumericOrTemporalScalar, /, *, memory_pool: lib.MemoryPool | None = None
+    x: Expression, y: NumericOrTemporalScalar | lib._AsPyType, /, *, memory_pool: lib.MemoryPool | None = None
 ) -> Expression: ...
 def add(*args, **kwargs):
     """
@@ -1772,7 +1962,7 @@ memory_pool : pyarrow.MemoryPool, optional
 
 @overload
 def round(
-    x: _NumericScalarT,
+    x: _NumericScalarT | int | float,
     /,
     ndigits: int = 0,
     round_mode: Literal[
@@ -1793,7 +1983,7 @@ def round(
 ) -> _NumericScalarT: ...
 @overload
 def round(
-    x: _NumericArrayT,
+    x: _NumericArrayT | Sequence[int | float | None],
     /,
     ndigits: int = 0,
     round_mode: Literal[
@@ -1860,9 +2050,9 @@ def round(*args, **kwargs):
 
 @overload
 def round_to_multiple(
-    x: _NumericScalarT,
+    x: int | float | _NumericScalarT,
     /,
-    multiple: int = 0,
+    multiple: int | float | _NumericScalarT = 0,
     round_mode: Literal[
         "down",
         "up",
@@ -1881,9 +2071,9 @@ def round_to_multiple(
 ) -> _NumericScalarT: ...
 @overload
 def round_to_multiple(
-    x: _NumericArrayT,
+    x: _NumericArrayT | Sequence[int | float | None],
     /,
-    multiple: int = 0,
+    multiple: int | float | _NumericScalarT = 0,
     round_mode: Literal[
         "down",
         "up",
@@ -1904,7 +2094,7 @@ def round_to_multiple(
 def round_to_multiple(
     x: Expression,
     /,
-    multiple: int = 0,
+    multiple: int | float | _NumericScalarT = 0,
     round_mode: Literal[
         "down",
         "up",
@@ -1949,7 +2139,7 @@ def round_to_multiple(*args, **kwargs):
 
 @overload
 def round_binary(
-    x: _NumericScalarT,
+    x: _NumericScalarT | float,
     s: int | lib.Int8Scalar | lib.Int16Scalar | lib.Int32Scalar | lib.Int64Scalar,
     /,
     round_mode: Literal[
@@ -1970,7 +2160,7 @@ def round_binary(
 ) -> _NumericScalarT: ...
 @overload
 def round_binary(
-    x: _NumericScalarT,
+    x: _NumericScalarT | float,
     s: Iterable,
     /,
     round_mode: Literal[
@@ -1991,7 +2181,7 @@ def round_binary(
 ) -> lib.NumericArray[_NumericScalarT]: ...
 @overload
 def round_binary(
-    x: _NumericArrayT,
+    x: _NumericArrayT | Sequence[float],
     s: int | lib.Int8Scalar | lib.Int16Scalar | lib.Int32Scalar | lib.Int64Scalar | Iterable,
     /,
     round_mode: Literal[
@@ -2305,6 +2495,18 @@ x : Array-like or scalar-like
 memory_pool : pyarrow.MemoryPool, optional
     If not passed, will allocate memory from the default memory pool.
 """
+asinh = _clone_signature(ln)
+"""
+Compute the inverse hyperbolic sine.
+NaN is returned for invalid input values.
+
+Parameters
+----------
+x : Array-like or scalar-like
+    Argument to compute function.
+memory_pool : pyarrow.MemoryPool, optional
+    If not passed, will allocate memory from the default memory pool.
+"""
 asin_checked = _clone_signature(ln)
 """
 Compute the inverse sine.
@@ -2333,12 +2535,49 @@ x : Array-like or scalar-like
 memory_pool : pyarrow.MemoryPool, optional
     If not passed, will allocate memory from the default memory pool.
 """
+atanh = _clone_signature(ln)
+"""
+Compute the inverse hyperbolic tangent of x.
+The return value is in the range [-1, 1].
+NaN is returned for invalid input values.
+
+Parameters
+----------
+x : Array-like or scalar-like
+    Argument to compute function.
+memory_pool : pyarrow.MemoryPool, optional
+    If not passed, will allocate memory from the default memory pool.
+"""
 cos = _clone_signature(ln)
 """
 Compute the cosine.
 
 NaN is returned for invalid input values;
 to raise an error instead, see "cos_checked".
+
+Parameters
+----------
+x : Array-like or scalar-like
+    Argument to compute function.
+memory_pool : pyarrow.MemoryPool, optional
+    If not passed, will allocate memory from the default memory pool.
+"""
+cosh = _clone_signature(ln)
+"""
+Compute the hyperbolic cosine.
+NaN is returned for invalid input values.
+
+Parameters
+----------
+x : Array-like or scalar-like
+    Argument to compute function.
+memory_pool : pyarrow.MemoryPool, optional
+    If not passed, will allocate memory from the default memory pool.
+"""
+acosh = _clone_signature(ln)
+"""
+Compute the inverse hyperbolic cosine.
+NaN is returned for invalid input values.
 
 Parameters
 ----------
@@ -2389,6 +2628,18 @@ x : Array-like or scalar-like
 memory_pool : pyarrow.MemoryPool, optional
     If not passed, will allocate memory from the default memory pool.
 """
+sinh = _clone_signature(ln)
+"""
+Compute the hyperbolic sine.
+NaN is returned for invalid input values.
+
+Parameters
+----------
+x : Array-like or scalar-like
+    Argument to compute function.
+memory_pool : pyarrow.MemoryPool, optional
+    If not passed, will allocate memory from the default memory pool.
+"""
 tan = _clone_signature(ln)
 """
 Compute the tangent.
@@ -2409,6 +2660,18 @@ Compute the tangent.
 
 Infinite values raise an error;
 to return NaN instead, see "tan".
+
+Parameters
+----------
+x : Array-like or scalar-like
+    Argument to compute function.
+memory_pool : pyarrow.MemoryPool, optional
+    If not passed, will allocate memory from the default memory pool.
+"""
+tanh = _clone_signature(ln)
+"""
+Compute the hyperbolic tangent.
+NaN is returned for invalid input values.
 
 Parameters
 ----------
@@ -2473,16 +2736,16 @@ def equal(
 ) -> lib.BooleanScalar: ...
 @overload
 def equal(
-    x: lib.Scalar,
-    y: lib.Array | lib.ChunkedArray,
+    x: lib.Scalar | lib._AsPyType,
+    y: lib.Array | lib.ChunkedArray | list[lib._AsPyType],
     /,
     *,
     memory_pool: lib.MemoryPool | None = None,
 ) -> lib.BooleanArray: ...
 @overload
 def equal(
-    x: lib.Array | lib.ChunkedArray,
-    y: lib.Scalar,
+    x: lib.Array | lib.ChunkedArray | list[lib._AsPyType],
+    y: lib.Scalar | lib._AsPyType,
     /,
     *,
     memory_pool: lib.MemoryPool | None = None,
@@ -2613,11 +2876,11 @@ memory_pool : pyarrow.MemoryPool, optional
 
 @overload
 def max_element_wise(
-    *args: ScalarOrArray[_Scalar_CoT],
+    *args: ScalarOrArray[_Scalar_CoT] | NDArray[Any] | float,
     skip_nulls: bool = True,
     options: ElementWiseAggregateOptions | None = None,
     memory_pool: lib.MemoryPool | None = None,
-) -> _Scalar_CoT: ...
+) -> lib.Array[_Scalar_CoT] | lib.ChunkedArray[_Scalar_CoT]: ...
 @overload
 def max_element_wise(
     *args: Expression,
@@ -3774,6 +4037,25 @@ memory_pool : pyarrow.MemoryPool, optional
     If not passed, will allocate memory from the default memory poo
 """
 
+def utf8_normalize(
+    strings: _StringArrayT, /, form: str, *, options: Utf8NormalizeOptions | None = None, memory_pool: lib.MemoryPool | None = None
+) -> _StringArrayT:
+    """
+    Utf8-normalize input
+
+    For each string in `strings`, return the normal form.
+    The normalization form must be given in the Utf8NormalizeOptions.
+    Null inputs emit null.
+
+    Parameters
+    ----------
+    strings : Array-like or scalar-like
+        Argument to compute function.
+    form : str
+        Unicode normalization form.
+        Accepted values are "NFC", "NFKC", "NFD", NFKD".
+    """
+
 # ========================= 2.12 String padding =========================
 @overload
 def ascii_center(
@@ -3959,6 +4241,60 @@ options : pyarrow.compute.PadOptions, optional
 memory_pool : pyarrow.MemoryPool, optional
     If not passed, will allocate memory from the default memory pool.
 """
+
+@overload
+def utf8_zero_fill(
+    strings: _StringScalarT,
+    /,
+    width: int,
+    padding: str = '0',
+    *,
+    options: ZeroFillOptions | None = None,
+    memory_pool: lib.MemoryPool | None = None,
+) -> _StringScalarT: ...
+@overload
+def utf8_zero_fill(
+    strings: _StringArrayT,
+    /,
+    width: int | None = None,
+    padding: str | None = '0',
+    *,
+    options: ZeroFillOptions | None = None,
+    memory_pool: lib.MemoryPool | None = None,
+) -> _StringArrayT: ...
+@overload
+def utf8_zero_fill(
+    strings: Expression,
+    /,
+    width: int,
+    padding: str = '0',
+    *,
+    options: ZeroFillOptions | None = None,
+    memory_pool: lib.MemoryPool | None = None,
+) -> Expression: ...
+def utf8_zero_fill(*args, **kwargs):
+    """
+    Left-pad strings to a given width, preserving leading sign characters
+
+    For each string in `strings`, emit a string of length `width` by
+    prepending the given padding character (defaults to '0' if not specified).
+    If the string starts with '+' or '-', the sign is preserved and padding
+    occurs after the sign. Null values emit null.
+
+    Parameters
+    ----------
+    strings : Array-like or scalar-like
+        Argument to compute function.
+    width : int
+        Desired string length.
+    padding : str, default "0"
+        Padding character. Should be one Unicode codepoint.
+    options : pyarrow.compute.ZeroFillOptions, optional
+        Alternative way of passing options.
+    memory_pool : pyarrow.MemoryPool, optional
+        If not passed, will allocate memory from the default memory pool.
+    """
+utf8_zfill = _clone_signature(utf8_zero_fill)
 
 # ========================= 2.13 String trimming =========================
 @overload
@@ -4448,38 +4784,74 @@ def extract_regex(*args, **kwargs):
         If not passed, will allocate memory from the default memory pool.
     """
 
-# ========================= 2.16 String join =========================
-def binary_join(
-    strings, separator, /, *, memory_pool: lib.MemoryPool | None = None
-) -> StringScalar | StringArray:
+def extract_regex_span(
+    strings: StringOrBinaryArray,
+    /,
+    pattern: str,
+    *,
+    options: ExtractRegexSpanOptions | None = None,
+    memory_pool: lib.MemoryPool | None = None,
+) -> lib.StructArray:
     """
-    Join a list of strings together with a separator.
+    Extract string spans captured by a regex pattern
 
-    Concatenate the strings in `list`. The `separator` is inserted
-    between each given string.
-    Any null input and any null `list` element emits a null output.
+    For each string in `strings`, match the regular expression and, if
+    successful, emit a struct with field names and values coming from the
+    regular expression's named capture groups. Each struct field value
+    will be a fixed_size_list(offset_type, 2) where offset_type is int32
+    or int64, depending on the input string type. The two elements in
+    each fixed-size list are the index and the length of the substring
+    matched by the corresponding named capture group.
+
+    If the input is null or the regular expression fails matching,
+    a null output value is emitted.
+
+    Regular expression matching is done using the Google RE2 library.
 
     Parameters
     ----------
     strings : Array-like or scalar-like
         Argument to compute function.
-    separator : Array-like or scalar-like
-        Argument to compute function.
+    pattern : str
+        Regular expression with named capture fields.
+    options : pyarrow.compute.ExtractRegexSpanOptions, optional
+        Alternative way of passing options.
     memory_pool : pyarrow.MemoryPool, optional
         If not passed, will allocate memory from the default memory pool.
     """
 
+# ========================= 2.16 String join =========================
+def binary_join(
+    strings: ArrayOrChunkedArray[lib.ListType[lib.BinaryType]], separator, /, *, memory_pool: lib.MemoryPool | None = None,
+) -> StringArray | BinaryArray: ...
+"""
+Join a list of strings together with a separator.
+
+Concatenate the strings in `list`. The `separator` is inserted
+between each given string.
+Any null input and any null `list` element emits a null output.
+
+Parameters
+----------
+strings : Array-like or scalar-like
+    Argument to compute function.
+separator : Array-like or scalar-like
+    Argument to compute function.
+memory_pool : pyarrow.MemoryPool, optional
+    If not passed, will allocate memory from the default memory pool.
+"""
+
 @overload
 def binary_join_element_wise(
-    *strings: _StringOrBinaryScalarT,
+    *strings: _StringOrBinaryScalarT | str,
     null_handling: Literal["emit_null", "skip", "replace"] = "emit_null",
     null_replacement: str = "",
     options: JoinOptions | None = None,
     memory_pool: lib.MemoryPool | None = None,
-) -> _StringOrBinaryScalarT: ...
+) -> _StringScalarT | _BinaryScalarT: ...
 @overload
 def binary_join_element_wise(
-    *strings: _StringOrBinaryArrayT,
+    *strings: _StringOrBinaryArrayT | Sequence[str | None],
     null_handling: Literal["emit_null", "skip", "replace"] = "emit_null",
     null_replacement: str = "",
     options: JoinOptions | None = None,
@@ -4646,55 +5018,30 @@ def utf8_slice_codeunits(*args, **kwargs):
 # ========================= 2.18 Containment tests =========================
 @overload
 def count_substring(
-    strings: lib.StringScalar | lib.BinaryScalar,
+    strings: lib.Scalar[lib.StringType | lib.BinaryType | lib.LargeStringType | lib.LargeBinaryType],
     /,
     pattern: str,
     *,
     ignore_case: bool = False,
     options: MatchSubstringOptions | None = None,
     memory_pool: lib.MemoryPool | None = None,
-) -> lib.Int32Scalar: ...
+) -> lib.Int32Scalar | lib.Int64Scalar: ...
 @overload
 def count_substring(
-    strings: lib.LargeStringScalar | lib.LargeBinaryScalar,
+    strings: lib.Array[lib.Scalar[lib.StringType | lib.BinaryType | lib.LargeStringType | lib.LargeBinaryType]]
+    | lib.ChunkedArray[lib.Scalar[lib.StringType | lib.BinaryType | lib.LargeStringType | lib.LargeBinaryType]],
     /,
     pattern: str,
     *,
     ignore_case: bool = False,
     options: MatchSubstringOptions | None = None,
     memory_pool: lib.MemoryPool | None = None,
-) -> lib.Int64Scalar: ...
-@overload
-def count_substring(
-    strings: lib.StringArray
-    | lib.BinaryArray
-    | lib.ChunkedArray[lib.StringScalar]
-    | lib.ChunkedArray[lib.BinaryScalar],
-    /,
-    pattern: str,
-    *,
-    ignore_case: bool = False,
-    options: MatchSubstringOptions | None = None,
-    memory_pool: lib.MemoryPool | None = None,
-) -> lib.Int32Array: ...
-@overload
-def count_substring(
-    strings: lib.LargeStringArray
-    | lib.LargeBinaryArray
-    | lib.ChunkedArray[lib.LargeStringScalar]
-    | lib.ChunkedArray[lib.LargeBinaryScalar],
-    /,
-    pattern: str,
-    *,
-    ignore_case: bool = False,
-    options: MatchSubstringOptions | None = None,
-    memory_pool: lib.MemoryPool | None = None,
-) -> lib.Int64Array: ...
+) -> lib.Int32Array | lib.Int64Array: ...
 @overload
 def count_substring(
     strings: Expression,
     /,
-    pattern: str,
+    pattern: Any,
     *,
     ignore_case: bool = False,
     options: MatchSubstringOptions | None = None,
@@ -5236,7 +5583,7 @@ def choose(indices, /, *values, memory_pool: lib.MemoryPool | None = None):
     """
 
 def coalesce(
-    *values: _ScalarOrArrayT, memory_pool: lib.MemoryPool | None = None
+    *values: _ScalarOrArrayT | Expression, memory_pool: lib.MemoryPool | None = None
 ) -> _ScalarOrArrayT:
     """
     Select the first non-null value.
@@ -5380,7 +5727,7 @@ def list_value_length(*args, **kwargs):
 
 @overload
 def make_struct(
-    *args: lib.Scalar,
+    *args: lib.Scalar | lib._AsPyType,
     field_names: list[str] | tuple[str, ...] = (),
     field_nullability: bool | None = None,
     field_metadata: list[lib.KeyValueMetadata] | None = None,
@@ -5389,7 +5736,7 @@ def make_struct(
 ) -> lib.StructScalar: ...
 @overload
 def make_struct(
-    *args: lib.Array | lib.ChunkedArray,
+    *args: lib.Array | lib.ChunkedArray | list[lib._AsPyType],
     field_names: list[str] | tuple[str, ...] = (),
     field_nullability: bool | None = None,
     field_metadata: list[lib.KeyValueMetadata] | None = None,
@@ -5430,6 +5777,59 @@ def make_struct(*args, **kwargs):
     """
 
 # ========================= 2.22 Conversions =========================
+
+def run_end_decode(
+	array: lib.Array,
+	/,
+	*,
+	memory_pool: lib.MemoryPool | None = None,
+) -> lib.Array:
+    """
+    Decode run-end encoded array.
+
+	Return a decoded version of a run-end encoded input array.
+
+	Parameters
+    ----------
+	array : Array-like
+		Argument to compute function.
+
+	memory_pool : pyarrow.MemoryPool, optional
+		If not passed, will allocate memory from the default memory pool.
+    """
+
+
+def run_end_encode(
+	array: lib.Array,
+	/,
+	run_end_type: lib.Type_INT16 | lib.Type_INT32 | lib.Type_INT64 = lib.Type_INT32,
+	*,
+	options: RunEndEncodeOptions | None = None,
+	memory_pool: lib.MemoryPool | None = None,
+) -> lib.Array:
+    """
+	Run-end encode array.
+
+	Return a run-end encoded version of the input array.
+
+	Parameters
+    ----------
+
+	array : Array-like
+		Argument to compute function.
+
+	run_end_type : DataType, default pyarrow.int32()
+		The data type of the run_ends array.
+
+		Accepted values are pyarrow.{int16(), int32(), int64()}.
+
+	options : pyarrow.compute.RunEndEncodeOptions, optional
+		Alternative way of passing options.
+
+	memory_pool : pyarrow.MemoryPool, optional
+		If not passed, will allocate memory from the default memory pool.
+    """
+
 @overload
 def ceil_temporal(
     timestamps: _TemporalScalarT,
@@ -5666,7 +6066,7 @@ memory_pool : pyarrow.MemoryPool, optional
 @overload
 def cast(
     arr: lib.Scalar,
-    target_type: _DataTypeT,
+    target_type: _DataTypeT | None = None,
     safe: bool | None = None,
     options: CastOptions | None = None,
     memory_pool: lib.MemoryPool | None = None,
@@ -5674,7 +6074,7 @@ def cast(
 @overload
 def cast(
     arr: lib.Array,
-    target_type: _DataTypeT,
+    target_type: _DataTypeT | str | None = None,
     safe: bool | None = None,
     options: CastOptions | None = None,
     memory_pool: lib.MemoryPool | None = None,
@@ -5682,7 +6082,7 @@ def cast(
 @overload
 def cast(
     arr: lib.ChunkedArray,
-    target_type: _DataTypeT,
+    target_type: _DataTypeT | None = None,
     safe: bool | None = None,
     options: CastOptions | None = None,
     memory_pool: lib.MemoryPool | None = None,
@@ -5744,7 +6144,7 @@ def cast(*args, **kwargs):
 
 @overload
 def strftime(
-    timestamps: TemporalScalar,
+    timestamps: _ZonedTimestampScalarT | _ZonelessTimestampScalarT,
     /,
     format: str = "%Y-%m-%dT%H:%M:%S",
     locale: str = "C",
@@ -5754,7 +6154,7 @@ def strftime(
 ) -> lib.StringScalar: ...
 @overload
 def strftime(
-    timestamps: TemporalArray,
+    timestamps: _ZonedTimestampArrayT | _ZonelessTimestampArrayT,
     /,
     format: str = "%Y-%m-%dT%H:%M:%S",
     locale: str = "C",
@@ -5866,11 +6266,11 @@ def strptime(*args, **kwargs):
 # ========================= 2.23 Temporal component extraction =========================
 @overload
 def day(
-    values: TemporalScalar, /, *, memory_pool: lib.MemoryPool | None = None
+    values: _ZonedTimestampScalarT | _ZonelessTimestampScalarT, /, *, memory_pool: lib.MemoryPool | None = None
 ) -> lib.Int64Scalar: ...
 @overload
 def day(
-    values: TemporalArray, /, *, memory_pool: lib.MemoryPool | None = None
+    values: _ZonedTimestampArrayT | _ZonelessTimestampArrayT, /, *, memory_pool: lib.MemoryPool | None = None
 ) -> lib.Int64Array: ...
 @overload
 def day(values: Expression, /, *, memory_pool: lib.MemoryPool | None = None) -> Expression: ...
@@ -5892,7 +6292,7 @@ def day(*args, **kwargs):
 
 @overload
 def day_of_week(
-    values: TemporalScalar,
+    values: _ZonedTimestampScalarT | _ZonelessTimestampScalarT,
     /,
     *,
     count_from_zero: bool = True,
@@ -5902,7 +6302,7 @@ def day_of_week(
 ) -> lib.Int64Scalar: ...
 @overload
 def day_of_week(
-    values: TemporalArray,
+    values: _ZonedTimestampArrayT | _ZonelessTimestampArrayT,
     /,
     *,
     count_from_zero: bool = True,
@@ -5967,17 +6367,17 @@ memory_pool : pyarrow.MemoryPool, optional
 
 @overload
 def hour(
-    values: lib.TimestampScalar[Any] | lib.Time32Scalar[Any] | lib.Time64Scalar[Any],
+    values: _ZonedTimestampScalarT | _ZonelessTimestampScalarT | lib.Time32Scalar[Any] | lib.Time64Scalar[Any],
     /,
     *,
     memory_pool: lib.MemoryPool | None = None,
 ) -> lib.Int64Scalar: ...
 @overload
 def hour(
-    values: lib.TimestampArray[Any]
+    values: _ZonedTimestampArrayT
+    | _ZonelessTimestampArrayT
     | lib.Time32Array[Any]
     | lib.Time64Array[Any]
-    | lib.ChunkedArray[lib.TimestampScalar[Any]]
     | lib.ChunkedArray[lib.Time32Scalar[Any]]
     | lib.ChunkedArray[lib.Time64Scalar[Any]],
     /,
@@ -6009,11 +6409,11 @@ def hour(*args, **kwargs):
 
 @overload
 def is_dst(
-    values: lib.TimestampScalar[Any], /, *, memory_pool: lib.MemoryPool | None = None
+    values: _ZonedTimestampScalarT | _ZonelessTimestampScalarT, /, *, memory_pool: lib.MemoryPool | None = None
 ) -> lib.BooleanScalar: ...
 @overload
 def is_dst(
-    values: lib.TimestampArray[Any] | lib.ChunkedArray[lib.TimestampScalar[Any]],
+    values: _ZonedTimestampArrayT | _ZonelessTimestampArrayT,
     /,
     *,
     memory_pool: lib.MemoryPool | None = None,
@@ -6039,11 +6439,11 @@ def is_dst(*args, **kwargs):
 
 @overload
 def iso_week(
-    values: lib.TimestampScalar[Any], /, *, memory_pool: lib.MemoryPool | None = None
+    values: _ZonedTimestampScalarT | _ZonelessTimestampScalarT, /, *, memory_pool: lib.MemoryPool | None = None
 ) -> lib.Int64Scalar: ...
 @overload
 def iso_week(
-    values: lib.TimestampArray[Any] | lib.ChunkedArray[lib.TimestampScalar[Any]],
+    values: _ZonedTimestampArrayT | _ZonelessTimestampArrayT,
     /,
     *,
     memory_pool: lib.MemoryPool | None = None,
@@ -6089,15 +6489,47 @@ memory_pool : pyarrow.MemoryPool, optional
 """
 
 @overload
+def iso_calendar(
+    values: _ZonedTimestampScalarT | _ZonelessTimestampScalarT, /, *, memory_pool: lib.MemoryPool | None = None
+) -> lib.StructScalar: ...
+@overload
+def iso_calendar(
+    values: _ZonedTimestampArrayT | _ZonelessTimestampArrayT,
+    /,
+    *,
+    memory_pool: lib.MemoryPool | None = None,
+) -> lib.StructArray: ...
+@overload
+def iso_calendar(
+    values: Expression, /, *, memory_pool: lib.MemoryPool | None = None
+) -> Expression: ...
+def iso_calendar(*args, **kwargs):
+    """
+    Extract (ISO year, ISO week, ISO day of week) struct.
+
+    ISO week starts on Monday denoted by 1 and ends on Sunday denoted by 7.
+    Null values emit null. An error is returned if the values have a defined
+    timezone, but it cannot be found in the timezone database.
+
+    Parameters
+    ----------
+    values : Array-like or scalar-like
+        Argument to compute function.
+    memory_pool : pyarrow.MemoryPool, optional
+        If not passed, will allocate memory from the default memory pool.
+    """
+
+@overload
 def is_leap_year(
-    values: lib.TimestampScalar[Any] | lib.Date32Scalar | lib.Date64Scalar,
+    values: _ZonedTimestampScalarT | _ZonelessTimestampScalarT | lib.Date32Scalar | lib.Date64Scalar,
     /,
     *,
     memory_pool: lib.MemoryPool | None = None,
 ) -> lib.BooleanScalar: ...
 @overload
 def is_leap_year(
-    values: lib.TimestampArray
+    values: _ZonedTimestampArrayT
+    | _ZonelessTimestampArrayT
     | lib.Date32Array
     | lib.Date64Array
     | lib.ChunkedArray[lib.TimestampScalar]
@@ -6310,7 +6742,7 @@ memory_pool : pyarrow.MemoryPool, optional
 
 @overload
 def week(
-    values: lib.TimestampScalar,
+    values: lib.Scalar[lib.TimestampType[Any, Any]],
     /,
     *,
     week_starts_monday: bool = True,
@@ -6321,7 +6753,7 @@ def week(
 ) -> lib.Int64Scalar: ...
 @overload
 def week(
-    values: lib.TimestampArray | lib.ChunkedArray[lib.TimestampScalar],
+    values: _ZonedTimestampArrayT | _ZonelessTimestampArrayT,
     /,
     *,
     week_starts_monday: bool = True,
@@ -6677,7 +7109,7 @@ memory_pool : pyarrow.MemoryPool, optional
 # ========================= 2.25 Timezone handling =========================
 @overload
 def assume_timezone(
-    timestamps: lib.TimestampScalar,
+    timestamps: _ZonelessTimestampScalarT,
     /,
     timezone: str,
     *,
@@ -6685,10 +7117,10 @@ def assume_timezone(
     nonexistent: Literal["raise", "earliest", "latest"] = "raise",
     options: AssumeTimezoneOptions | None = None,
     memory_pool: lib.MemoryPool | None = None,
-) -> lib.TimestampScalar: ...
+) -> _ZonedTimestampScalarT: ...
 @overload
 def assume_timezone(
-    timestamps: lib.TimestampArray | lib.ChunkedArray[lib.TimestampScalar],
+    timestamps: _ZonelessTimestampArrayT,
     /,
     timezone: str,
     *,
@@ -6696,7 +7128,23 @@ def assume_timezone(
     nonexistent: Literal["raise", "earliest", "latest"] = "raise",
     options: AssumeTimezoneOptions | None = None,
     memory_pool: lib.MemoryPool | None = None,
-) -> lib.TimestampArray: ...
+) -> _ZonedTimestampArrayT: ...
+@overload
+def assume_timezone(
+    timestamps: _ZonelessTimestampScalarT,
+    /,
+    *,
+    options: AssumeTimezoneOptions,
+    memory_pool: lib.MemoryPool | None = None,
+) -> _ZonedTimestampScalarT: ...
+@overload
+def assume_timezone(
+    timestamps: _ZonelessTimestampArrayT,
+    /,
+    *,
+    options: AssumeTimezoneOptions,
+    memory_pool: lib.MemoryPool | None = None,
+) -> _ZonedTimestampArrayT: ...
 @overload
 def assume_timezone(
     timestamps: Expression,
@@ -6741,15 +7189,15 @@ def assume_timezone(*args, **kwargs):
 
 @overload
 def local_timestamp(
-    timestamps: lib.TimestampScalar, /, *, memory_pool: lib.MemoryPool | None = None
-) -> lib.TimestampScalar: ...
+    timestamps: _ZonedTimestampScalarT, /, *, memory_pool: lib.MemoryPool | None = None
+) -> _ZonelessTimestampScalarT: ...
 @overload
 def local_timestamp(
-    timestamps: lib.TimestampArray | lib.ChunkedArray[lib.TimestampScalar],
+    timestamps: _ZonedTimestampArrayT,
     /,
     *,
     memory_pool: lib.MemoryPool | None = None,
-) -> lib.TimestampArray: ...
+) -> _ZonelessTimestampArrayT: ...
 @overload
 def local_timestamp(
     timestamps: Expression, /, *, memory_pool: lib.MemoryPool | None = None
@@ -6777,7 +7225,7 @@ def local_timestamp(*args, **kwargs):
 def random(
     n: int,
     *,
-    initializer: Literal["system"] | int = "system",
+    initializer: Hashable = "system",
     options: RandomOptions | None = None,
     memory_pool: lib.MemoryPool | None = None,
 ) -> lib.DoubleArray:
@@ -6810,7 +7258,7 @@ def random(
 def cumulative_sum(
     values: _NumericArrayT,
     /,
-    start: lib.Scalar | None = None,
+    start: lib.Scalar | int | None = None,
     *,
     skip_nulls: bool = False,
     options: CumulativeSumOptions | None = None,
@@ -7009,6 +7457,22 @@ def dictionary_encode(
     memory_pool: lib.MemoryPool | None = None,
 ) -> Expression: ...
 @overload
+def dictionary_decode(array: _ScalarOrArrayT, /, *, memory_pool: lib.MemoryPool | None = None) -> _ScalarOrArrayT: ...
+@overload
+def dictionary_decode(array: Expression, /, *, memory_pool: lib.MemoryPool | None = None) -> Expression: ...
+def dictionary_decode(*args, **kwargs):
+    """
+    Decodes a DictionaryArray to an Array
+
+    Return a plain-encoded version of the array input.
+    This function does nothing if the input is not a dictionary.
+
+    Parameters
+    ----------
+    array : Array-like
+        Argument to compute function.
+    """
+@overload
 def unique(array: _ArrayT, /, *, memory_pool: lib.MemoryPool | None = None) -> _ArrayT: ...
 @overload
 def unique(array: Expression, /, *, memory_pool: lib.MemoryPool | None = None) -> Expression: ...
@@ -7045,14 +7509,7 @@ def array_filter(
 @overload
 def array_take(
     array: _ArrayT,
-    indices: list[int]
-    | list[int | None]
-    | lib.Int16Array
-    | lib.Int32Array
-    | lib.Int64Array
-    | lib.ChunkedArray[lib.Int16Scalar]
-    | lib.ChunkedArray[lib.Int32Scalar]
-    | lib.ChunkedArray[lib.Int64Scalar],
+    indices: Indices | list[int | None],
     /,
     *,
     boundscheck: bool = True,
@@ -7210,7 +7667,7 @@ def array_sort_indices(*args, **kwargs):
 
 @overload
 def partition_nth_indices(
-    array: lib.Array | lib.ChunkedArray,
+    array: lib.Array | lib.ChunkedArray | Sequence[int | float | str | None],
     /,
     pivot: int,
     *,
@@ -7315,12 +7772,92 @@ def rank(
         If not passed, will allocate memory from the default memory pool.
     """
 
-@overload
-def select_k_unstable(
+def rank_quantile(
     input: lib.Array | lib.ChunkedArray,
     /,
+    sort_keys: _Order = "ascending",
+    *,
+    null_placement: _Placement = "at_end",
+    options: RankQuantileOptions | None = None,
+    memory_pool: lib.MemoryPool | None = None,
+) -> lib.UInt64Array:
+    """
+    Compute quantile ranks of an array (1-based).
+
+    This function computes a quantile rank of the input array.
+    By default, null values are considered greater than any other value and
+    are therefore sorted at the end of the input. For floating-point types,
+    NaNs are considered greater than any other non-null value, but smaller
+    than null values.
+
+    The results are real values strictly between 0 and 1. They are
+    computed as in https://en.wikipedia.org/wiki/Quantile_rank
+    but without multiplying by 100.
+
+    The handling of nulls and NaNs can be changed in RankQuantileOptions.
+
+    Parameters
+    ----------
+    input : Array-like or scalar-like
+        Argument to compute function.
+    sort_keys : sequence of (name, order) tuples or str, default "ascending"
+        Names of field/column keys to sort the input on,
+        along with the order each field/column is sorted in.
+        Accepted values for `order` are "ascending", "descending".
+        The field name can be a string column name or expression.
+        Alternatively, one can simply pass "ascending" or "descending" as a string
+        if the input is array-like.
+    null_placement : str, default "at_end"
+        Where nulls in input should be sorted.
+        Accepted values are "at_start", "at_end".
+    options : pyarrow.compute.RankQuantileOptions, optional
+        Alternative way of passing options.
+    memory_pool : pyarrow.MemoryPool, optional
+        If not passed, will allocate memory from the default memory pool.
+    """
+
+
+rank_normal = _clone_signature(rank_quantile)
+"""
+Compute normal (gaussian) ranks of an array (1-based).
+
+This function computes a normal (gaussian) rank of the input array.
+By default, null values are considered greater than any other value and
+are therefore sorted at the end of the input. For floating-point types,
+NaNs are considered greater than any other non-null value, but smaller
+than null values.
+The results are finite real values. They are obtained as if first
+calling the "rank_quantile" function and then applying the normal
+percent-point function (PPF) to the resulting quantile values.
+
+The handling of nulls and NaNs can be changed in RankQuantileOptions.
+
+Parameters
+----------
+input : Array-like or scalar-like
+    Argument to compute function.
+sort_keys : sequence of (name, order) tuples or str, default "ascending"
+    Names of field/column keys to sort the input on,
+    along with the order each field/column is sorted in.
+    Accepted values for `order` are "ascending", "descending".
+    The field name can be a string column name or expression.
+    Alternatively, one can simply pass "ascending" or "descending" as a string
+    if the input is array-like.
+null_placement : str, default "at_end"
+    Where nulls in input should be sorted.
+    Accepted values are "at_start", "at_end".
+options : pyarrow.compute.RankQuantileOptions, optional
+    Alternative way of passing options.
+memory_pool : pyarrow.MemoryPool, optional
+    If not passed, will allocate memory from the default memory pool.
+"""
+
+@overload
+def select_k_unstable(
+    input: lib.Array | lib.ChunkedArray | lib.Table,
+    /,
     k: int,
-    sort_keys: list[tuple[str, _Order]],
+    sort_keys: list[tuple[str | Expression, _Order]] | None = None,
     *,
     options: SelectKOptions | None = None,
     memory_pool: lib.MemoryPool | None = None,
@@ -7330,9 +7867,25 @@ def select_k_unstable(
     input: Expression,
     /,
     k: int,
-    sort_keys: list[tuple[str, _Order]],
+    sort_keys: list[tuple[str | Expression, _Order]] | None = None,
     *,
     options: SelectKOptions | None = None,
+    memory_pool: lib.MemoryPool | None = None,
+) -> Expression: ...
+@overload
+def select_k_unstable(
+    input: lib.Array | lib.ChunkedArray | lib.Table,
+    /,
+    options: SelectKOptions,
+    *,
+    memory_pool: lib.MemoryPool | None = None,
+) -> lib.UInt64Array: ...
+@overload
+def select_k_unstable(
+    input: Expression,
+    /,
+    options: SelectKOptions,
+    *,
     memory_pool: lib.MemoryPool | None = None,
 ) -> Expression: ...
 def select_k_unstable(*args, **kwargs):
@@ -7369,7 +7922,7 @@ def select_k_unstable(*args, **kwargs):
 def sort_indices(
     input: lib.Array | lib.ChunkedArray | lib.RecordBatch | lib.Table,
     /,
-    sort_keys: Sequence[tuple[str, _Order]] = (),
+    sort_keys: Sequence[tuple[str|Expression, _Order]] = (),
     *,
     null_placement: _Placement = "at_end",
     options: SortOptions | None = None,
@@ -7379,7 +7932,7 @@ def sort_indices(
 def sort_indices(
     input: Expression,
     /,
-    sort_keys: Sequence[tuple[str, _Order]] = (),
+    sort_keys: Sequence[tuple[str|Expression, _Order]] = (),
     *,
     null_placement: _Placement = "at_end",
     options: SortOptions | None = None,
@@ -7423,7 +7976,7 @@ def list_element(
 ) -> Expression: ...
 @overload
 def list_element(
-    lists: lib.Array[ListScalar[_DataTypeT]],
+    lists: lib.Array[ListScalar[_DataTypeT]] | lib.Array[lib.Scalar[lib.ListType[lib.StructType]]],
     index: ScalarLike,
     /,
     *,

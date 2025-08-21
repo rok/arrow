@@ -14,6 +14,7 @@ from typing import (
     Iterable,
     Iterator,
     Literal,
+    LiteralString,
     TypeVar,
     overload,
 )
@@ -49,6 +50,7 @@ from .types import (
     DataType,
     Field,
     MapType,
+    ListType,
     _AsPyType,
     _BasicDataType,
     _BasicValueT,
@@ -1944,7 +1946,7 @@ class Array(_PandasConvertible[pd.Series], Generic[_Scalar_co]):
             or if each element should be on its own line.
         """
     format = to_string
-    def equals(self, other: Self) -> bool: ...
+    def equals(self, other: Self | Iterable[Any]) -> bool: ...
     def __len__(self) -> int: ...
     def is_null(self, *, nan_is_null: bool = False) -> BooleanArray:
         """
@@ -1972,7 +1974,7 @@ class Array(_PandasConvertible[pd.Series], Generic[_Scalar_co]):
         Return BooleanArray indicating the non-null values.
         """
     def fill_null(
-        self: Array[Scalar[_BasicDataType[_AsPyType]]], fill_value: _AsPyType
+        self: Array[Scalar[_BasicDataType[_AsPyType]]] | Array[Scalar[_DataTypeT]], fill_value: Scalar[_DataTypeT] | _AsPyType | str | None
     ) -> Array[Scalar[_BasicDataType[_AsPyType]]]:
         """
         See :func:`pyarrow.compute.fill_null` for usage.
@@ -2078,7 +2080,7 @@ class Array(_PandasConvertible[pd.Series], Generic[_Scalar_co]):
     @overload
     def index(
         self: Array[Scalar[_BasicDataType[_AsPyType]]],
-        value: _AsPyType,
+        value: _AsPyType | None,
         start: int | None = None,
         end: int | None = None,
         *,
@@ -2152,7 +2154,7 @@ class Array(_PandasConvertible[pd.Series], Generic[_Scalar_co]):
         array : numpy.ndarray
         """
     def to_pylist(
-        self: Array[Scalar[_BasicDataType[_AsPyType]]],
+        self: Array[Scalar[_BasicDataType[_AsPyType]]] | Array[Scalar[ListType[Any]]] | StructArray | DictionaryArray[Unknown, Unknown],
         *,
         map_as_pydicts: Literal["lossy", "strict"] | None = None,
     ) -> list[_AsPyType | None]:
@@ -3209,7 +3211,7 @@ class FixedSizeListArray(BaseListArray[scalar.FixedSizeListScalar[_DataTypeT, _S
         cls,
         values: Array[Scalar[_DataTypeT]],
         *,
-        type: None = None,
+        type: types.FixedSizeListType[_DataTypeT, Literal[int]] | None = None,
         mask: Mask | None = None,
     ) -> FixedSizeListArray[_DataTypeT, None]: ...
     @overload
@@ -3661,7 +3663,7 @@ class DictionaryArray(Array[scalar.DictionaryScalar[_IndexT, _BasicValueT]]):
     @staticmethod
     def from_arrays(
         indices: Indices,
-        dictionary: Array | np.ndarray | pd.Series,
+        dictionary: Array | np.ndarray | pd.Series | list[Any],
         mask: np.ndarray | pd.Series | BooleanArray | None = None,
         ordered: bool = False,
         from_pandas: bool = False,
@@ -3724,8 +3726,8 @@ class StructArray(Array[scalar.StructScalar]):
         """
     @staticmethod
     def from_arrays(
-        arrays: Iterable[Array],
-        names: list[str] | None = None,
+        arrays: Iterable[Array] | list[list[Any]],
+        names: list[str] | list[LiteralString] | None = None,
         fields: list[Field] | None = None,
         mask=None,
         memory_pool: MemoryPool | None = None,
@@ -4217,6 +4219,7 @@ __all__ = [
     "repeat",
     "infer_type",
     "_PandasConvertible",
+    "_CastAs",
     "Array",
     "NullArray",
     "BooleanArray",

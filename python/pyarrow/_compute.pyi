@@ -10,6 +10,7 @@ from typing import (
 )
 
 from . import lib
+from .compute import _NumericScalarT
 
 _Order: TypeAlias = Literal["ascending", "descending"]
 _Placement: TypeAlias = Literal["at_start", "at_end"]
@@ -74,6 +75,11 @@ class Function(lib._Weakrefable):
     def num_kernels(self) -> int:
         """
         The number of kernels implementing this function.
+        """
+    @property
+    def kernels(self) -> list[ScalarKernel]:
+        """
+        A list of all kernels implementing this function.
         """
     def call(
         self,
@@ -307,7 +313,7 @@ class RunEndEncodeOptions(FunctionOptions):
         Accepted values are pyarrow.{int16(), int32(), int64()}.
     """
     # TODO: default is DataType(int32)
-    def __init__(self, run_end_type: lib.DataType = ...) -> None: ...
+    def __init__(self, run_end_type: lib.DataType | Literal["int16","int32","int64"] = Literal["int32"]) -> None: ...
 
 class ElementWiseAggregateOptions(FunctionOptions):
     """
@@ -589,7 +595,7 @@ class QuantileOptions(FunctionOptions):
     """
     def __init__(
         self,
-        q: float | Sequence[float],
+        q: float | Sequence[float] = 0.5,
         *,
         interpolation: Literal["linear", "lower", "higher", "nearest", "midpoint"] = "linear",
         skip_nulls: bool = True,
@@ -859,7 +865,7 @@ class RoundToMultipleOptions(FunctionOptions):
         "half_down", "half_up", "half_towards_zero", "half_towards_infinity",
         "half_to_even", "half_to_odd".
     """
-    def __init__(self, multiple: float = 1.0, round_mode: _RoundMode = "half_to_even") -> None: ...
+    def __init__(self, multiple: int | float | _NumericScalarT = 1.0, round_mode: _RoundMode = "half_to_even") -> None: ...
 
 class ScalarAggregateOptions(FunctionOptions):
     """
@@ -1094,6 +1100,19 @@ class Utf8NormalizeOptions(FunctionOptions):
     """
 
     def __init__(self, form: Literal["NFC", "NFKC", "NFD", "NFKD"]) -> None: ...
+
+class ZeroFillOptions(FunctionOptions):
+    """
+    Options for utf8_zero_fill.
+
+    Parameters
+    ----------
+    width : int
+        Desired string length.
+    padding : str, default "0"
+        Padding character. Should be one Unicode codepoint.
+    """
+    def __init__(self, width: int, padding: str = '0') -> None: ...
 
 class VarianceOptions(FunctionOptions):
     """
@@ -1584,8 +1603,19 @@ class Expression(lib._Weakrefable):
     ], null_matching_behavior=MATCH})>
     """
 
+    def equals(self, other: Expression | lib.Array | Iterable) -> bool:
+        """
+        Parameters
+        ----------
+        other : pyarrow.dataset.Expression
+
+        Returns
+        -------
+        bool
+        """
+
     @staticmethod
-    def from_substrait(buffer: bytes | lib.Buffer) -> Expression:
+    def from_substrait(message: bytes | lib.Buffer) -> Expression:
         """
         Deserialize an expression from Substrait
 
@@ -1678,7 +1708,7 @@ class Expression(lib._Weakrefable):
         is_nan : Expression
         """
     def cast(
-        self, type: lib.DataType, safe: bool = True, options: CastOptions | None = None
+        self, type: lib.DataType | Literal["bool"], safe: bool = True, options: CastOptions | None = None
     ) -> Expression:
         """
         Explicitly set or change the expression's data type.
