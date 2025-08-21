@@ -1532,7 +1532,7 @@ class KeyValueMetadata(_Metadata, Mapping[bytes, bytes]):
     **kwargs : optional
         additional key-value metadata
     """
-    def __init__(self, __arg0__: Mapping[bytes, bytes] | None = None, **kwargs) -> None: ...
+    def __init__(self, __arg0__: Mapping[bytes, bytes] | Mapping[str, str] | None = None, **kwargs) -> None: ...
     def equals(self, other: KeyValueMetadata) -> bool: ...
     def __len__(self) -> int: ...
     def __contains__(self, __key: object) -> bool: ...
@@ -2771,9 +2771,9 @@ def string_to_tzinfo(name: str) -> dt.tzinfo:
     """
 
 @overload
-def timestamp(unit: _Unit) -> TimestampType[_Unit, _Tz]: ...
+def timestamp(unit: _Unit | str) -> TimestampType[_Unit, _Tz]: ...
 @overload
-def timestamp(unit: _Unit, tz: _Tz) -> TimestampType[_Unit, _Tz]: ...
+def timestamp(unit: _Unit | str, tz: _Tz) -> TimestampType[_Unit, _Tz]: ...
 def timestamp(*args, **kwargs):
     """
     Create instance of timestamp type with resolution and optional time zone.
@@ -4290,7 +4290,9 @@ def is_float_value(obj: Any) -> bool:
 __all__ = [
     "_Weakrefable",
     "_Metadata",
+    "_AsPyType",
     "DataType",
+    "_DataTypeT",
     "_BasicDataType",
     "NullType",
     "BoolType",
