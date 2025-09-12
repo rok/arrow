@@ -1,0 +1,174 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
+# ruff: noqa: F403
+from collections.abc import Mapping
+import datetime as dt
+from typing import NamedTuple, Literal
+from typing_extensions import TypeVar
+
+from .__lib_pxi.array import *
+# TODO
+# from .__lib_pxi.benchmark import *
+# from .__lib_pxi.builder import *
+# from .__lib_pxi.compat import *
+# from .__lib_pxi.config import *
+# from .__lib_pxi.device import *
+# from .__lib_pxi.error import *
+from .__lib_pxi.io import *
+# from .__lib_pxi.ipc import *
+from .__lib_pxi.memory import *
+# from .__lib_pxi.pandas_shim import *
+from .__lib_pxi.scalar import *
+# from .__lib_pxi.table import *
+from .__lib_pxi.tensor import *
+from .__lib_pxi.types import *
+
+_DataTypeT = TypeVar("_DataTypeT", bound=DataType)
+
+class MonthDayNano(NamedTuple):
+    days: int
+    months: int
+    nanoseconds: int
+
+def cpu_count() -> int:
+    """
+    Return the number of threads to use in parallel operations.
+
+    The number of threads is determined at startup by inspecting the
+    ``OMP_NUM_THREADS`` and ``OMP_THREAD_LIMIT`` environment variables.
+    If neither is present, it will default to the number of hardware threads
+    on the system. It can be modified at runtime by calling
+    :func:`set_cpu_count()`.
+
+    See Also
+    --------
+    set_cpu_count : Modify the size of this pool.
+    io_thread_count : The analogous function for the I/O thread pool.
+    """
+
+def set_cpu_count(count: int) -> None:
+    """
+    Set the number of threads to use in parallel operations.
+
+    Parameters
+    ----------
+    count : int
+        The number of concurrent threads that should be used.
+
+    See Also
+    --------
+    cpu_count : Get the size of this pool.
+    set_io_thread_count : The analogous function for the I/O thread pool.
+    """
+
+def is_threading_enabled() -> bool:
+    """
+    Returns True if threading is enabled in libarrow.
+
+    If it isn't enabled, then python shouldn't create any
+    threads either, because we're probably on a system where
+    threading doesn't work (e.g. Emscripten).
+    """
+
+def ensure_metadata(
+    meta: Mapping[bytes | str, bytes | str] | KeyValueMetadata | None, allow_none: bool = False
+) -> KeyValueMetadata | None: ...
+
+def tzinfo_to_string(tz: dt.tzinfo) -> str:
+    """
+    Converts a time zone object into a string indicating the name of a time
+    zone, one of:
+    * As used in the Olson time zone database (the "tz database" or
+      "tzdata"), such as "America/New_York"
+    * An absolute time zone offset of the form +XX:XX or -XX:XX, such as +07:30
+
+    Parameters
+    ----------
+      tz : datetime.tzinfo
+        Time zone object
+
+    Returns
+    -------
+      name : str
+        Time zone name
+    """
+
+def string_to_tzinfo(name: str) -> dt.tzinfo:
+    """
+    Convert a time zone name into a time zone object.
+
+    Supported input strings are:
+    * As used in the Olson time zone database (the "tz database" or
+      "tzdata"), such as "America/New_York"
+    * An absolute time zone offset of the form +XX:XX or -XX:XX, such as +07:30
+
+    Parameters
+    ----------
+      name: str
+        Time zone name.
+
+    Returns
+    -------
+      tz : datetime.tzinfo
+        Time zone object
+    """
+
+def ensure_type(ty: _DataTypeT | None, allow_none: Literal[True] | Literal[False] | None = None) -> _DataTypeT | None: ...
+
+Type_NA: int
+Type_BOOL: int
+Type_UINT8: int
+Type_INT8: int
+Type_UINT16: int
+Type_INT16: int
+Type_UINT32: int
+Type_INT32: int
+Type_UINT64: int
+Type_INT64: int
+Type_HALF_FLOAT: int
+Type_FLOAT: int
+Type_DOUBLE: int
+Type_DECIMAL128: int
+Type_DECIMAL256: int
+Type_DATE32: int
+Type_DATE64: int
+Type_TIMESTAMP: int
+Type_TIME32: int
+Type_TIME64: int
+Type_DURATION: int
+Type_INTERVAL_MONTH_DAY_NANO: int
+Type_BINARY: int
+Type_STRING: int
+Type_LARGE_BINARY: int
+Type_LARGE_STRING: int
+Type_FIXED_SIZE_BINARY: int
+Type_BINARY_VIEW: int
+Type_STRING_VIEW: int
+Type_LIST: int
+Type_LARGE_LIST: int
+Type_LIST_VIEW: int
+Type_LARGE_LIST_VIEW: int
+Type_MAP: int
+Type_FIXED_SIZE_LIST: int
+Type_STRUCT: int
+Type_SPARSE_UNION: int
+Type_DENSE_UNION: int
+Type_DICTIONARY: int
+Type_RUN_END_ENCODED: int
+UnionMode_SPARSE: int
+UnionMode_DENSE: int
