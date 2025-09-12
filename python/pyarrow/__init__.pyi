@@ -15,34 +15,43 @@
 # specific language governing permissions and limitations
 # under the License.
 
+# ruff: noqa: F401, I001, E402
 __version__: str
 
 import pyarrow.lib as _lib
 
 _gc_enabled: bool
 
+# TODO
 from pyarrow.lib import (
-    BuildInfo,
-    RuntimeInfo,
-    set_timezone_db_path,
+    # BuildInfo,
+    # RuntimeInfo,
+    # set_timezone_db_path,
     MonthDayNano,
-    VersionInfo,
-    cpp_build_info,
-    cpp_version,
-    cpp_version_info,
-    runtime_info,
+    # VersionInfo,
+    # cpp_build_info,
+    # cpp_version,
+    # cpp_version_info,
+    # runtime_info,
     cpu_count,
     set_cpu_count,
-    enable_signal_handlers,
+    # enable_signal_handlers,
     io_thread_count,
     set_io_thread_count,
 )
 
-def show_versions() -> None: ...
-def show_info() -> None: ...
+def show_versions() -> None:
+    """
+    Print various version information, to help with error reporting.
+    """
+def show_info() -> None:
+    """
+    Print detailed version and platform information, for error reporting
+    """
 def _module_is_available(module: str) -> bool: ...
 def _filesystem_is_available(fs: str) -> bool: ...
 
+# TODO
 from pyarrow.lib import (
     null,
     bool_,
@@ -123,7 +132,6 @@ from pyarrow.lib import (
     UuidType,
     JsonType,
     OpaqueType,
-    PyExtensionType,
     UnknownExtensionType,
     register_extension_type,
     unregister_extension_type,
@@ -136,8 +144,8 @@ from pyarrow.lib import (
     Array,
     Tensor,
     array,
-    chunked_array,
-    record_batch,
+    # chunked_array,
+    # record_batch,
     nulls,
     repeat,
     SparseCOOTensor,
@@ -249,7 +257,7 @@ from pyarrow.lib import (
 )
 
 # Buffers, allocation
-from pyarrow.lib import DeviceAllocationType, Device, MemoryManager, default_cpu_memory_manager
+# from pyarrow.lib import DeviceAllocationType, Device, MemoryManager, default_cpu_memory_manager
 
 from pyarrow.lib import (
     Buffer,
@@ -303,79 +311,108 @@ from pyarrow.lib import (
     have_libhdfs,
 )
 
+# TODO
 from pyarrow.lib import (
-    ChunkedArray,
-    RecordBatch,
-    Table,
-    table,
+    # ChunkedArray,
+    # RecordBatch,
+    # Table,
+    # table,
     concat_arrays,
-    concat_tables,
-    TableGroupBy,
-    RecordBatchReader,
+    # concat_tables,
+    # TableGroupBy,
+    # RecordBatchReader,
 )
 
 # Exceptions
-from pyarrow.lib import (
-    ArrowCancelled,
-    ArrowCapacityError,
-    ArrowException,
-    ArrowKeyError,
-    ArrowIndexError,
-    ArrowInvalid,
-    ArrowIOError,
-    ArrowMemoryError,
-    ArrowNotImplementedError,
-    ArrowTypeError,
-    ArrowSerializationError,
-)
+# from pyarrow.lib import (
+#     ArrowCancelled,
+#     ArrowCapacityError,
+#     ArrowException,
+#     ArrowKeyError,
+#     ArrowIndexError,
+#     ArrowInvalid,
+#     ArrowIOError,
+#     ArrowMemoryError,
+#     ArrowNotImplementedError,
+#     ArrowTypeError,
+#     ArrowSerializationError,
+# )
 
-from pyarrow.ipc import serialize_pandas, deserialize_pandas
-import pyarrow.ipc as ipc
+# TODO
+# from ipc import serialize_pandas, deserialize_pandas
+# import ipc as ipc
 
-import pyarrow.types as types
+import types as types
 
 # ----------------------------------------------------------------------
 # Deprecations
 
-from pyarrow.util import _deprecate_api, _deprecate_class
+# from util import _deprecate_api, _deprecate_class
 
-from pyarrow.ipc import (
-    Message,
-    MessageReader,
-    MetadataVersion,
-    RecordBatchFileReader,
-    RecordBatchFileWriter,
-    RecordBatchStreamReader,
-    RecordBatchStreamWriter,
-)
+# TODO
+# from pyarrow.ipc import (
+#     Message,
+#     MessageReader,
+#     MetadataVersion,
+#     RecordBatchFileReader,
+#     RecordBatchFileWriter,
+#     RecordBatchStreamReader,
+#     RecordBatchStreamWriter,
+# )
 
 # ----------------------------------------------------------------------
 # Returning absolute path to the pyarrow include directory (if bundled, e.g. in
 # wheels)
-def get_include() -> str: ...
+def get_include() -> str:
+    """
+    Return absolute path to directory containing Arrow C++ include
+    headers. Similar to numpy.get_include
+    """
 def _get_pkg_config_executable() -> str: ...
 def _has_pkg_config(pkgname: str) -> bool: ...
 def _read_pkg_config_variable(pkgname: str, cli_args: list[str]) -> str: ...
-def get_libraries() -> list[str]: ...
-def create_library_symlinks() -> None: ...
-def get_library_dirs() -> list[str]: ...
+def get_libraries() -> list[str]:
+    """
+    Return list of library names to include in the `libraries` argument for C
+    or Cython extensions using pyarrow
+    """
+def create_library_symlinks() -> None:
+    """
+    With Linux and macOS wheels, the bundled shared libraries have an embedded
+    ABI version like libarrow.so.17 or libarrow.17.dylib and so linking to them
+    with -larrow won't work unless we create symlinks at locations like
+    site-packages/pyarrow/libarrow.so. This unfortunate workaround addresses
+    prior problems we had with shipping two copies of the shared libraries to
+    permit third party projects like turbodbc to build their C++ extensions
+    against the pyarrow wheels.
+
+    This function must only be invoked once and only when the shared libraries
+    are bundled with the Python package, which should only apply to wheel-based
+    installs. It requires write access to the site-packages/pyarrow directory
+    and so depending on your system may need to be run with root.
+    """
+def get_library_dirs() -> list[str]:
+    """
+    Return lists of directories likely to contain Arrow C++ libraries for
+    linking C or Cython extensions using pyarrow
+    """
 
 __all__ = [
     "__version__",
     "_lib",
     "_gc_enabled",
-    "BuildInfo",
-    "RuntimeInfo",
-    "set_timezone_db_path",
+    # "BuildInfo",
+    # "RuntimeInfo",
+    # "set_timezone_db_path",
     "MonthDayNano",
-    "VersionInfo",
-    "cpp_build_info",
-    "cpp_version",
-    "cpp_version_info",
-    "runtime_info",
+    # "VersionInfo",
+    # "cpp_build_info",
+    # "cpp_version",
+    # "cpp_version_info",
+    # "runtime_info",
     "cpu_count",
     "set_cpu_count",
-    "enable_signal_handlers",
+    # "enable_signal_handlers",
     "io_thread_count",
     "set_io_thread_count",
     "show_versions",
@@ -461,7 +498,6 @@ __all__ = [
     "UuidType",
     "JsonType",
     "OpaqueType",
-    "PyExtensionType",
     "UnknownExtensionType",
     "register_extension_type",
     "unregister_extension_type",
@@ -474,8 +510,8 @@ __all__ = [
     "Array",
     "Tensor",
     "array",
-    "chunked_array",
-    "record_batch",
+    # "chunked_array",
+    # "record_batch",
     "nulls",
     "repeat",
     "SparseCOOTensor",
@@ -584,10 +620,10 @@ __all__ = [
     "UuidScalar",
     "JsonScalar",
     "OpaqueScalar",
-    "DeviceAllocationType",
-    "Device",
-    "MemoryManager",
-    "default_cpu_memory_manager",
+    # "DeviceAllocationType",
+    # "Device",
+    # "MemoryManager",
+    # "default_cpu_memory_manager",
     "Buffer",
     "ResizableBuffer",
     "foreign_buffer",
@@ -630,38 +666,38 @@ __all__ = [
     "input_stream",
     "output_stream",
     "have_libhdfs",
-    "ChunkedArray",
-    "RecordBatch",
-    "Table",
-    "table",
+    # "ChunkedArray",
+    # "RecordBatch",
+    # "Table",
+    # "table",
     "concat_arrays",
-    "concat_tables",
-    "TableGroupBy",
-    "RecordBatchReader",
-    "ArrowCancelled",
-    "ArrowCapacityError",
-    "ArrowException",
-    "ArrowKeyError",
-    "ArrowIndexError",
-    "ArrowInvalid",
-    "ArrowIOError",
-    "ArrowMemoryError",
-    "ArrowNotImplementedError",
-    "ArrowTypeError",
-    "ArrowSerializationError",
-    "serialize_pandas",
-    "deserialize_pandas",
-    "ipc",
+    # "concat_tables",
+    # "TableGroupBy",
+    # "RecordBatchReader",
+    # "ArrowCancelled",
+    # "ArrowCapacityError",
+    # "ArrowException",
+    # "ArrowKeyError",
+    # "ArrowIndexError",
+    # "ArrowInvalid",
+    # "ArrowIOError",
+    # "ArrowMemoryError",
+    # "ArrowNotImplementedError",
+    # "ArrowTypeError",
+    # "ArrowSerializationError",
+    # "serialize_pandas",
+    # "deserialize_pandas",
+    # "ipc",
     "types",
-    "_deprecate_api",
-    "_deprecate_class",
-    "Message",
-    "MessageReader",
-    "MetadataVersion",
-    "RecordBatchFileReader",
-    "RecordBatchFileWriter",
-    "RecordBatchStreamReader",
-    "RecordBatchStreamWriter",
+    # "_deprecate_api",
+    # "_deprecate_class",
+    # "Message",
+    # "MessageReader",
+    # "MetadataVersion",
+    # "RecordBatchFileReader",
+    # "RecordBatchFileWriter",
+    # "RecordBatchStreamReader",
+    # "RecordBatchStreamWriter",
     "get_include",
     "_get_pkg_config_executable",
     "_has_pkg_config",

@@ -31,12 +31,12 @@ if sys.version_info >= (3, 10):
 else:
     from typing_extensions import TypeAlias
 
-from typing import Any, Literal, SupportsIndex, overload
+from typing import Any, Literal, SupportsIndex
 
 from pyarrow._stubs_typing import Compression, SupportPyBuffer
 from pyarrow.lib import MemoryPool, _Weakrefable
 
-from .device import Device, DeviceAllocationType, MemoryManager
+# from .device import Device, DeviceAllocationType, MemoryManager
 from .types import KeyValueMetadata
 
 def have_libhdfs() -> bool:
@@ -113,7 +113,10 @@ class NativeFile(_Weakrefable):
     def readable(self) -> bool: ...
     def seekable(self) -> bool: ...
     def isatty(self) -> bool: ...
-    def fileno(self) -> int: ...
+    def fileno(self) -> int:
+        """
+        NOT IMPLEMENTED
+        """
     @property
     def closed(self) -> bool: ...
     def close(self) -> None: ...
@@ -216,7 +219,8 @@ class NativeFile(_Weakrefable):
         data : bytes
         """
     def read1(self) -> bytes:
-        """Read and return up to n bytes.
+        """
+        Read and return up to n bytes.
 
         Unlike read(), if *nbytes* is None then a chunk is read, not the
         entire file.
@@ -259,14 +263,18 @@ class NativeFile(_Weakrefable):
             maximum number of bytes read
         """
     def readlines(self, hint: int | None = None) -> list[bytes]:
-        """Read lines of the file
+        """
+        NOT IMPLEMENTED. Read lines of the file
 
         Parameters
         ----------
         hint : int
             maximum number of bytes read until we stop
         """
-    def __iter__(self) -> Self: ...
+    def __iter__(self) -> Self:
+        """
+        Implement iter(self).
+        """
     def __next__(self) -> bytes: ...
     def read_buffer(self, nbytes: int | None = None) -> Buffer:
         """
@@ -277,7 +285,10 @@ class NativeFile(_Weakrefable):
         nbytes : int, optional
             maximum number of bytes read
         """
-    def truncate(self) -> None: ...
+    def truncate(self) -> None:
+        """
+        NOT IMPLEMENTED
+        """
     def writelines(self, lines: list[bytes]):
         """
         Write lines to the file.
@@ -337,10 +348,10 @@ class PythonFile(NativeFile):
     Create a stream for writing:
 
     >>> buf = io.BytesIO()
-    >>> f = pa.PythonFile(buf, mode="w")
+    >>> f =  pa.PythonFile(buf, mode = 'w')
     >>> f.writable()
     True
-    >>> f.write(b"PythonFile")
+    >>> f.write(b'PythonFile')
     10
     >>> buf.getvalue()
     b'PythonFile'
@@ -350,8 +361,8 @@ class PythonFile(NativeFile):
 
     Create a stream for reading:
 
-    >>> buf = io.BytesIO(b"PythonFile")
-    >>> f = pa.PythonFile(buf, mode="r")
+    >>> buf = io.BytesIO(b'PythonFile')
+    >>> f =  pa.PythonFile(buf, mode = 'r')
     >>> f.mode
     'rb'
     >>> f.read()
@@ -381,15 +392,16 @@ class MemoryMappedFile(NativeFile):
     Create a new file with memory map:
 
     >>> import pyarrow as pa
-    >>> mmap = pa.create_memory_map("example_mmap.dat", 10)
+    >>> mmap = pa.create_memory_map('example_mmap.dat', 10)
     >>> mmap
     <pyarrow.MemoryMappedFile closed=False own_file=False is_seekable=True is_writable=True is_readable=True>
     >>> mmap.close()
 
     Open an existing file with memory map:
 
-    >>> with pa.memory_map("example_mmap.dat") as mmap:
+    >>> with pa.memory_map('example_mmap.dat') as mmap:
     ...     mmap
+    ...
     <pyarrow.MemoryMappedFile closed=False own_file=False is_seekable=True is_writable=False is_readable=True>
     """
     @classmethod
@@ -436,11 +448,13 @@ def memory_map(
     Reading from a memory map without any memory allocation or copying:
 
     >>> import pyarrow as pa
-    >>> with pa.output_stream("example_mmap.txt") as stream:
-    ...     stream.write(b"Constructing a buffer referencing the mapped memory")
+    >>> with pa.output_stream('example_mmap.txt') as stream:
+    ...     stream.write(b'Constructing a buffer referencing the mapped memory')
+    ...
     51
-    >>> with pa.memory_map("example_mmap.txt") as mmap:
-    ...     mmap.read_at(6, 45)
+    >>> with pa.memory_map('example_mmap.txt') as mmap:
+    ...     mmap.read_at(6,45)
+    ...
     b'memory'
     """
 
@@ -455,36 +469,40 @@ class OSFile(NativeFile):
     Create a new file to write to:
 
     >>> import pyarrow as pa
-    >>> with pa.OSFile("example_osfile.arrow", mode="w") as f:
+    >>> with pa.OSFile('example_osfile.arrow', mode='w') as f:
     ...     f.writable()
-    ...     f.write(b"OSFile")
+    ...     f.write(b'OSFile')
     ...     f.seekable()
+    ...
     True
     6
     False
 
     Open the file to read:
 
-    >>> with pa.OSFile("example_osfile.arrow", mode="r") as f:
+    >>> with pa.OSFile('example_osfile.arrow', mode='r') as f:
     ...     f.mode
     ...     f.read()
+    ...
     'rb'
     b'OSFile'
 
     Open the file to append:
 
-    >>> with pa.OSFile("example_osfile.arrow", mode="ab") as f:
+    >>> with pa.OSFile('example_osfile.arrow', mode='ab') as f:
     ...     f.mode
-    ...     f.write(b" is super!")
+    ...     f.write(b' is super!')
+    ...
     'ab'
     10
-    >>> with pa.OSFile("example_osfile.arrow") as f:
+    >>> with pa.OSFile('example_osfile.arrow') as f:
     ...     f.read()
+    ...
     b'OSFile is super!'
 
     Inspect created OSFile:
 
-    >>> pa.OSFile("example_osfile.arrow")
+    >>> pa.OSFile('example_osfile.arrow')
     <pyarrow.OSFile closed=False own_file=False is_seekable=True is_writable=False is_readable=True>
     """
     def __init__(
@@ -505,8 +523,9 @@ class FixedSizeBufferWriter(NativeFile):
     >>> import pyarrow as pa
     >>> buf = pa.allocate_buffer(5)
     >>> with pa.output_stream(buf) as stream:
-    ...     stream.write(b"abcde")
+    ...     stream.write(b'abcde')
     ...     stream
+    ...
     5
     <pyarrow.FixedSizeBufferWriter closed=False own_file=False is_seekable=False is_writable=True is_readable=False>
 
@@ -518,9 +537,24 @@ class FixedSizeBufferWriter(NativeFile):
     <pyarrow.Buffer address=... size=5 is_cpu=True is_mutable=True>
     """
     def __init__(self, buffer: Buffer) -> None: ...
-    def set_memcopy_threads(self, num_threads: int) -> None: ...
-    def set_memcopy_blocksize(self, blocksize: int) -> None: ...
-    def set_memcopy_threshold(self, threshold: int) -> None: ...
+    def set_memcopy_threads(self, num_threads: int) -> None:
+        """
+        Parameters
+        ----------
+        num_threads : int
+        """
+    def set_memcopy_blocksize(self, blocksize: int) -> None:
+        """
+        Parameters
+        ----------
+        blocksize : int64
+        """
+    def set_memcopy_threshold(self, threshold: int) -> None:
+        """
+        Parameters
+        ----------
+        threshold : int64
+        """
 
 # ----------------------------------------------------------------------
 # Arrow buffers
@@ -532,7 +566,10 @@ class Buffer(_Weakrefable):
     A buffer represents a contiguous memory area.  Many buffers will own
     their memory, though not all of them do.
     """
-    def __len__(self) -> int: ...
+    def __len__(self) -> int:
+        """
+        Return len(self).
+        """
     def _assert_cpu(self) -> None: ...
     @property
     def size(self) -> int:
@@ -565,39 +602,40 @@ class Buffer(_Weakrefable):
         """
         Whether the buffer is CPU-accessible.
         """
-    @property
-    def device(self) -> Device:
-        """
-        The device where the buffer resides.
-
-        Returns
-        -------
-        Device
-        """
-    @property
-    def memory_manager(self) -> MemoryManager:
-        """
-        The memory manager associated with the buffer.
-
-        Returns
-        -------
-        MemoryManager
-        """
-    @property
-    def device_type(self) -> DeviceAllocationType:
-        """
-        The device type where the buffer resides.
-
-        Returns
-        -------
-        DeviceAllocationType
-        """
+    # TODO
+    # @property
+    # def device(self) -> Device:
+    #     """
+    #     The device where the buffer resides.
+    #
+    #     Returns
+    #     -------
+    #     Device
+    #     """
+    # @property
+    # def memory_manager(self) -> MemoryManager:
+    #     """
+    #     The memory manager associated with the buffer.
+    #
+    #     Returns
+    #     -------
+    #     MemoryManager
+    #     """
+    # @property
+    # def device_type(self) -> DeviceAllocationType:
+    #     """
+    #     The device type where the buffer resides.
+    #
+    #     Returns
+    #     -------
+    #     DeviceAllocationType
+    #     """
     @property
     def parent(self) -> Buffer | None: ...
-    @overload
-    def __getitem__(self, key: slice) -> Self: ...
-    @overload
-    def __getitem__(self, key: int) -> int: ...
+    def __getitem__(self, key: slice | int) -> Self | int:
+        """
+        Return self[key].
+        """
     def slice(self, offset: int = 0, length: int | None = None) -> Self:
         """
         Slice this buffer.  Memory is not copied.
@@ -635,7 +673,6 @@ class Buffer(_Weakrefable):
         """
         Return this buffer as a Python bytes object. Memory is copied.
         """
-    def __buffer__(self, flags: int, /) -> memoryview: ...
 
 class ResizableBuffer(Buffer):
     """
@@ -656,17 +693,9 @@ class ResizableBuffer(Buffer):
             If this is false, the buffer is never shrunk.
         """
 
-@overload
-def allocate_buffer(size: int, memory_pool: MemoryPool | None = None) -> Buffer: ...
-@overload
 def allocate_buffer(
-    size: int, memory_pool: MemoryPool | None, resizable: Literal[False]
-) -> Buffer: ...
-@overload
-def allocate_buffer(
-    size: int, memory_pool: MemoryPool | None, resizable: Literal[True]
-) -> ResizableBuffer: ...
-def allocate_buffer(*args, **kwargs):
+    size: int, memory_pool: MemoryPool | None = None, resizable: Literal[False] | Literal[True] | None = None
+) -> Buffer | ResizableBuffer:
     """
     Allocate a mutable buffer.
 
@@ -700,7 +729,7 @@ class BufferOutputStream(NativeFile):
 
     >>> import pyarrow as pa
     >>> f = pa.BufferOutputStream()
-    >>> f.write(b"pyarrow.Buffer")
+    >>> f.write(b'pyarrow.Buffer')
     14
     >>> f.closed
     False
@@ -734,19 +763,23 @@ class BufferReader(NativeFile):
     Create an Arrow input stream and inspect it:
 
     >>> import pyarrow as pa
-    >>> data = b"reader data"
+    >>> data = b'reader data'
     >>> buf = memoryview(data)
     >>> with pa.input_stream(buf) as stream:
     ...     stream.size()
     ...     stream.read(6)
     ...     stream.seek(7)
     ...     stream.read(15)
+    ...
     11
     b'reader'
     7
     b'data'
     """
-    def __init__(self, obj) -> None: ...
+    def __init__(self, obj) -> None:
+        """
+        Initialize self.  See help(type(self)) for accurate signature.
+        """
 
 class CompressedInputStream(NativeFile):
     """
@@ -768,6 +801,7 @@ class CompressedInputStream(NativeFile):
     >>> raw = pa.BufferOutputStream()
     >>> with pa.CompressedOutputStream(raw, "gzip") as compressed:
     ...     compressed.write(data)
+    ...
     17
 
     Create an input stream with decompression referencing the
@@ -776,6 +810,7 @@ class CompressedInputStream(NativeFile):
     >>> cdata = raw.getvalue()
     >>> with pa.input_stream(cdata, compression="gzip") as compressed:
     ...     compressed.read()
+    ...
     b'Compressed stream'
 
     which actually translates to the use of ``BufferReader``and
@@ -784,6 +819,7 @@ class CompressedInputStream(NativeFile):
     >>> raw = pa.BufferReader(cdata)
     >>> with pa.CompressedInputStream(raw, "gzip") as compressed:
     ...     compressed.read()
+    ...
     b'Compressed stream'
     """
 
@@ -791,7 +827,10 @@ class CompressedInputStream(NativeFile):
         self,
         stream: StrPath | NativeFile | IOBase,
         compression: Literal["bz2", "brotli", "gzip", "lz4", "zstd"],
-    ) -> None: ...
+    ) -> None:
+        """
+        Initialize self.  See help(type(self)) for accurate signature.
+        """
 
 class CompressedOutputStream(NativeFile):
     """
@@ -813,13 +852,17 @@ class CompressedOutputStream(NativeFile):
     >>> raw = pa.BufferOutputStream()
     >>> with pa.CompressedOutputStream(raw, "gzip") as compressed:
     ...     compressed.write(data)
+    ...
     17
     """
     def __init__(
         self,
         stream: StrPath | NativeFile | IOBase,
         compression: Literal["bz2", "brotli", "gzip", "lz4", "zstd"],
-    ) -> None: ...
+    ) -> None:
+        """
+        Initialize self.  See help(type(self)) for accurate signature.
+        """
 
 class BufferedInputStream(NativeFile):
     """
@@ -838,7 +881,10 @@ class BufferedInputStream(NativeFile):
     """
     def __init__(
         self, stream: NativeFile, buffer_size: int, memory_pool: MemoryPool | None = None
-    ) -> None: ...
+    ) -> None:
+        """
+        Initialize self.  See help(type(self)) for accurate signature.
+        """
     def detach(self) -> NativeFile:
         """
         Release the raw InputStream.
@@ -867,7 +913,10 @@ class BufferedOutputStream(NativeFile):
     """
     def __init__(
         self, stream: NativeFile, buffer_size: int, memory_pool: MemoryPool | None = None
-    ) -> None: ...
+    ) -> None:
+        """
+        Initialize self.  See help(type(self)) for accurate signature.
+        """
     def detach(self) -> NativeFile:
         """
         Flush any buffered writes and release the raw OutputStream.
@@ -890,7 +939,10 @@ class TransformInputStream(NativeFile):
     transform_func : callable
         The transformation to apply.
     """
-    def __init__(self, stream: NativeFile, transform_func: Callable[[Buffer], Any]) -> None: ...
+    def __init__(self, stream: NativeFile, transform_func: Callable[[Buffer], Any]) -> None:
+        """
+        Initialize self.  See help(type(self)) for accurate signature.
+        """
 
 class Transcoder:
     def __init__(self, decoder, encoder) -> None: ...
@@ -986,7 +1038,10 @@ class CacheOptions(_Weakrefable):
         range_size_limit: int | None = None,
         lazy: bool = True,
         prefetch_limit: int = 0,
-    ) -> None: ...
+    ) -> None:
+        """
+        Initialize self.  See help(type(self)) for accurate signature.
+        """
     @classmethod
     def from_network_metrics(
         cls,
@@ -1073,15 +1128,18 @@ class Codec(_Weakrefable):
     Examples
     --------
     >>> import pyarrow as pa
-    >>> pa.Codec.is_available("gzip")
+    >>> pa.Codec.is_available('gzip')
     True
-    >>> codec = pa.Codec("gzip")
+    >>> codec = pa.Codec('gzip')
     >>> codec.name
     'gzip'
     >>> codec.compression_level
     9
     """
-    def __init__(self, compression: Compression, compression_level: int | None = None) -> None: ...
+    def __init__(self, compression: Compression, compression_level: int | None = None) -> None:
+        """
+        Initialize self.  See help(type(self)) for accurate signature.
+        """
     @classmethod
     def detect(cls, path: StrPath) -> Self:
         """
@@ -1166,34 +1224,21 @@ class Codec(_Weakrefable):
         """
     @property
     def name(self) -> Compression:
-        """Returns the name of the codec"""
+        """
+        Returns the name of the codec
+        """
     @property
     def compression_level(self) -> int:
-        """Returns the compression level parameter of the codec"""
-    @overload
+        """
+        Returns the compression level parameter of the codec
+        """
     def compress(
         self,
         buf: Buffer | bytes | SupportPyBuffer,
         *,
+        asbytes: Literal[False] | Literal[True] | None = None,
         memory_pool: MemoryPool | None = None,
-    ) -> Buffer: ...
-    @overload
-    def compress(
-        self,
-        buf: Buffer | bytes | SupportPyBuffer,
-        *,
-        asbytes: Literal[False],
-        memory_pool: MemoryPool | None = None,
-    ) -> Buffer: ...
-    @overload
-    def compress(
-        self,
-        buf: Buffer | bytes | SupportPyBuffer,
-        *,
-        asbytes: Literal[True],
-        memory_pool: MemoryPool | None = None,
-    ) -> bytes: ...
-    def compress(self, *args, **kwargs):
+    ) -> Buffer | bytes:
         """
         Compress data from buffer-like object.
 
@@ -1209,33 +1254,14 @@ class Codec(_Weakrefable):
         -------
         compressed : pyarrow.Buffer or bytes (if asbytes=True)
         """
-    @overload
     def decompress(
         self,
         buf: Buffer | bytes | SupportPyBuffer,
         decompressed_size: int | None = None,
         *,
+        asbytes: Literal[False] | Literal[True] | None = None,
         memory_pool: MemoryPool | None = None,
-    ) -> Buffer: ...
-    @overload
-    def decompress(
-        self,
-        buf: Buffer | bytes | SupportPyBuffer,
-        decompressed_size: int | None = None,
-        *,
-        asbytes: Literal[False],
-        memory_pool: MemoryPool | None = None,
-    ) -> Buffer: ...
-    @overload
-    def decompress(
-        self,
-        buf: Buffer | bytes | SupportPyBuffer,
-        decompressed_size: int | None = None,
-        *,
-        asbytes: Literal[True],
-        memory_pool: MemoryPool | None = None,
-    ) -> bytes: ...
-    def decompress(self, *args, **kwargs):
+    ) -> Buffer | bytes:
         """
         Decompress data from buffer-like object.
 
@@ -1254,30 +1280,13 @@ class Codec(_Weakrefable):
         uncompressed : pyarrow.Buffer or bytes (if asbytes=True)
         """
 
-@overload
 def compress(
     buf: Buffer | bytes | SupportPyBuffer,
     codec: Compression = "lz4",
     *,
+    asbytes: Literal[False] | Literal[True] | None = None,
     memory_pool: MemoryPool | None = None,
-) -> Buffer: ...
-@overload
-def compress(
-    buf: Buffer | bytes | SupportPyBuffer,
-    codec: Compression = "lz4",
-    *,
-    asbytes: Literal[False],
-    memory_pool: MemoryPool | None = None,
-) -> Buffer: ...
-@overload
-def compress(
-    buf: Buffer | bytes | SupportPyBuffer,
-    codec: Compression = "lz4",
-    *,
-    asbytes: Literal[True],
-    memory_pool: MemoryPool | None = None,
-) -> bytes: ...
-def compress(*args, **kwargs):
+) -> Buffer | bytes:
     """
     Compress data from buffer-like object.
 
@@ -1297,33 +1306,14 @@ def compress(*args, **kwargs):
     compressed : pyarrow.Buffer or bytes (if asbytes=True)
     """
 
-@overload
 def decompress(
     buf: Buffer | bytes | SupportPyBuffer,
     decompressed_size: int | None = None,
     codec: Compression = "lz4",
     *,
+    asbytes: Literal[False] | Literal[True] | None = None,
     memory_pool: MemoryPool | None = None,
-) -> Buffer: ...
-@overload
-def decompress(
-    buf: Buffer | bytes | SupportPyBuffer,
-    decompressed_size: int | None = None,
-    codec: Compression = "lz4",
-    *,
-    asbytes: Literal[False],
-    memory_pool: MemoryPool | None = None,
-) -> Buffer: ...
-@overload
-def decompress(
-    buf: Buffer | bytes | SupportPyBuffer,
-    decompressed_size: int | None = None,
-    codec: Compression = "lz4",
-    *,
-    asbytes: Literal[True],
-    memory_pool: MemoryPool | None = None,
-) -> bytes: ...
-def decompress(*args, **kwargs):
+) -> Buffer | bytes:
     """
     Decompress data from buffer-like object.
 
@@ -1376,25 +1366,30 @@ def input_stream(
     >>> buf = memoryview(b"some data")
     >>> with pa.input_stream(buf) as stream:
     ...     stream.read(4)
+    ...
     b'some'
 
     Create a readable OSFile (NativeFile) from a string or file path:
 
     >>> import gzip
-    >>> with gzip.open("example.gz", "wb") as f:
-    ...     f.write(b"some data")
+    >>> with gzip.open('example.gz', 'wb') as f:
+    ...     f.write(b'some data')
+    ...
     9
-    >>> with pa.input_stream("example.gz") as stream:
+    >>> with pa.input_stream('example.gz') as stream:
     ...     stream.read()
+    ...
     b'some data'
 
     Create a readable PythonFile (NativeFile) from a a Python file object:
 
-    >>> with open("example.txt", mode="w") as f:
-    ...     f.write("some text")
+    >>> with open('example.txt', mode='w') as f:
+    ...     f.write('some text')
+    ...
     9
-    >>> with pa.input_stream("example.txt") as stream:
+    >>> with pa.input_stream('example.txt') as stream:
     ...     stream.read(6)
+    ...
     b'some t'
     """
 
@@ -1430,9 +1425,11 @@ def output_stream(
     >>> buf = pa.py_buffer(empty_obj)
     >>> with pa.output_stream(buf) as stream:
     ...     stream.write(data)
+    ...
     11
     >>> with pa.input_stream(buf) as stream:
     ...     stream.read(6)
+    ...
     b'buffer'
 
     or from a memoryview object:
@@ -1440,18 +1437,22 @@ def output_stream(
     >>> buf = memoryview(empty_obj)
     >>> with pa.output_stream(buf) as stream:
     ...     stream.write(data)
+    ...
     11
     >>> with pa.input_stream(buf) as stream:
     ...     stream.read()
+    ...
     b'buffer data'
 
     Create a writable NativeFile from a string or file path:
 
-    >>> with pa.output_stream("example_second.txt") as stream:
-    ...     stream.write(b"Write some data")
+    >>> with pa.output_stream('example_second.txt') as stream:
+    ...     stream.write(b'Write some data')
+    ...
     15
-    >>> with pa.input_stream("example_second.txt") as stream:
+    >>> with pa.input_stream('example_second.txt') as stream:
     ...     stream.read()
+    ...
     b'Write some data'
     """
 

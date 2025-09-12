@@ -19,13 +19,13 @@ import datetime as dt
 
 from collections.abc import Sequence
 from decimal import Decimal
-from typing import Any, Collection, Literal, Protocol, TypeAlias, TypeVar
+from typing import Any, Collection, Literal, Protocol, TypeAlias, TypeVar, Iterator
 
 import numpy as np
 
 from numpy.typing import NDArray
 
-from .compute import BooleanArray, IntegerArray
+from pyarrow.lib import BooleanArray, IntegerArray
 
 ArrayLike: TypeAlias = Any
 ScalarLike: TypeAlias = Any
@@ -52,6 +52,8 @@ PyScalar: TypeAlias = (
 )
 
 _T = TypeVar("_T")
+_V = TypeVar("_V", covariant=True)
+
 SingleOrList: TypeAlias = list[_T] | _T
 
 class SupportEq(Protocol):
@@ -78,11 +80,9 @@ FilterTuple: TypeAlias = (
     | tuple[str, Literal["in", "not in"], Collection]
 )
 
-class Buffer(Protocol):
-    def __buffer__(self, flags: int, /) -> memoryview: ...
+class Buffer(Protocol): ...
 
-class SupportPyBuffer(Protocol):
-    def __buffer__(self, flags: int, /) -> memoryview: ...
+class SupportPyBuffer(Protocol): ...
 
 class SupportArrowStream(Protocol):
     def __arrow_c_stream__(self, requested_schema=None) -> Any: ...
@@ -95,3 +95,8 @@ class SupportArrowDeviceArray(Protocol):
 
 class SupportArrowSchema(Protocol):
     def __arrow_c_schema(self) -> Any: ...
+
+class NullableCollection(Protocol[_V]):  # pyright: ignore[reportInvalidTypeVarUse]
+    def __iter__(self) -> Iterator[_V] | Iterator[_V | None]: ...
+    def __len__(self) -> int: ...
+    def __contains__(self, item: Any, /) -> bool: ...

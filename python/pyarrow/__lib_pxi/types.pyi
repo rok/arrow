@@ -26,19 +26,20 @@ if sys.version_info >= (3, 11):
 else:
     from typing_extensions import Self
 
-from typing import Any, Generic, Iterable, Iterator, Literal, overload
+from typing import Any, Generic, Iterable, Iterator, Literal
 
 import numpy as np
 import pandas as pd
 
 from pyarrow._stubs_typing import SupportArrowSchema
+# TODO
 from pyarrow.lib import (
     Array,
-    ChunkedArray,
+    # ChunkedArray,
     ExtensionArray,
     MemoryPool,
     MonthDayNano,
-    Table,
+    # Table,
 )
 from typing_extensions import TypeVar, deprecated
 
@@ -119,7 +120,7 @@ class DataType(_Weakrefable):
         ListType(list<item: string>)
         >>> pa.list_(pa.string()).num_fields
         1
-        >>> struct = pa.struct({"x": pa.int32(), "y": pa.string()})
+        >>> struct = pa.struct({'x': pa.int32(), 'y': pa.string()})
         >>> struct.num_fields
         2
         """
@@ -137,7 +138,10 @@ class DataType(_Weakrefable):
         >>> pa.string().num_buffers
         3
         """
-    def __hash__(self) -> int: ...
+    def __hash__(self) -> int:
+        """
+        Return hash(self).
+        """
     def equals(self, other: DataType | str, *, check_metadata: bool = False) -> bool:
         """
         Return true if type is equivalent to passed value.
@@ -240,12 +244,12 @@ class TimestampType(_BasicDataType[int], Generic[_Unit, _Tz]):
 
     Create an instance of timestamp type:
 
-    >>> pa.timestamp("us")
+    >>> pa.timestamp('us')
     TimestampType(timestamp[us])
 
     Create an instance of timestamp type with timezone:
 
-    >>> pa.timestamp("s", tz="UTC")
+    >>> pa.timestamp('s', tz='UTC')
     TimestampType(timestamp[s, tz=UTC])
     """
     @property
@@ -256,7 +260,7 @@ class TimestampType(_BasicDataType[int], Generic[_Unit, _Tz]):
         Examples
         --------
         >>> import pyarrow as pa
-        >>> t = pa.timestamp("us")
+        >>> t = pa.timestamp('us')
         >>> t.unit
         'us'
         """
@@ -268,7 +272,7 @@ class TimestampType(_BasicDataType[int], Generic[_Unit, _Tz]):
         Examples
         --------
         >>> import pyarrow as pa
-        >>> t = pa.timestamp("s", tz="UTC")
+        >>> t = pa.timestamp('s', tz='UTC')
         >>> t.tz
         'UTC'
         """
@@ -287,7 +291,7 @@ class Time32Type(_BasicDataType[dt.time], Generic[_Time32Unit]):
     Create an instance of time32 type:
 
     >>> import pyarrow as pa
-    >>> pa.time32("ms")
+    >>> pa.time32('ms')
     Time32Type(time32[ms])
     """
     @property
@@ -298,7 +302,7 @@ class Time32Type(_BasicDataType[dt.time], Generic[_Time32Unit]):
         Examples
         --------
         >>> import pyarrow as pa
-        >>> t = pa.time32("ms")
+        >>> t = pa.time32('ms')
         >>> t.unit
         'ms'
         """
@@ -317,7 +321,7 @@ class Time64Type(_BasicDataType[dt.time], Generic[_Time64Unit]):
     Create an instance of time64 type:
 
     >>> import pyarrow as pa
-    >>> pa.time64("us")
+    >>> pa.time64('us')
     Time64Type(time64[us])
     """
     @property
@@ -328,7 +332,7 @@ class Time64Type(_BasicDataType[dt.time], Generic[_Time64Unit]):
         Examples
         --------
         >>> import pyarrow as pa
-        >>> t = pa.time64("us")
+        >>> t = pa.time64('us')
         >>> t.unit
         'us'
         """
@@ -342,7 +346,7 @@ class DurationType(_BasicDataType[dt.timedelta], Generic[_Unit]):
     Create an instance of duration type:
 
     >>> import pyarrow as pa
-    >>> pa.duration("s")
+    >>> pa.duration('s')
     DurationType(duration[s])
     """
     @property
@@ -353,7 +357,7 @@ class DurationType(_BasicDataType[dt.timedelta], Generic[_Unit]):
         Examples
         --------
         >>> import pyarrow as pa
-        >>> t = pa.duration("s")
+        >>> t = pa.duration('s')
         >>> t.unit
         's'
         """
@@ -860,17 +864,17 @@ class StructType(DataType):
 
     Accessing fields using direct indexing:
 
-    >>> struct_type = pa.struct({"x": pa.int32(), "y": pa.string()})
+    >>> struct_type = pa.struct({'x': pa.int32(), 'y': pa.string()})
     >>> struct_type[0]
     pyarrow.Field<x: int32>
-    >>> struct_type["y"]
+    >>> struct_type['y']
     pyarrow.Field<y: string>
 
     Accessing fields using ``field()``:
 
     >>> struct_type.field(1)
     pyarrow.Field<y: string>
-    >>> struct_type.field("x")
+    >>> struct_type.field('x')
     pyarrow.Field<x: int32>
 
     # Creating a schema from the struct type's fields:
@@ -897,16 +901,16 @@ class StructType(DataType):
         Examples
         --------
         >>> import pyarrow as pa
-        >>> struct_type = pa.struct({"x": pa.int32(), "y": pa.string()})
+        >>> struct_type = pa.struct({'x': pa.int32(), 'y': pa.string()})
 
         Index of the field with a name 'y':
 
-        >>> struct_type.get_field_index("y")
+        >>> struct_type.get_field_index('y')
         1
 
         Index of the field that does not exist:
 
-        >>> struct_type.get_field_index("z")
+        >>> struct_type.get_field_index('z')
         -1
         """
     def field(self, i: int | str) -> Field:
@@ -925,7 +929,7 @@ class StructType(DataType):
         --------
 
         >>> import pyarrow as pa
-        >>> struct_type = pa.struct({"x": pa.int32(), "y": pa.string()})
+        >>> struct_type = pa.struct({'x': pa.int32(), 'y': pa.string()})
 
         Select the second field:
 
@@ -934,7 +938,7 @@ class StructType(DataType):
 
         Select the field named 'x':
 
-        >>> struct_type.field("x")
+        >>> struct_type.field('x')
         pyarrow.Field<x: int32>
         """
     def get_all_field_indices(self, name: str) -> list[int]:
@@ -953,12 +957,18 @@ class StructType(DataType):
         Examples
         --------
         >>> import pyarrow as pa
-        >>> struct_type = pa.struct({"x": pa.int32(), "y": pa.string()})
-        >>> struct_type.get_all_field_indices("x")
+        >>> struct_type = pa.struct({'x': pa.int32(), 'y': pa.string()})
+        >>> struct_type.get_all_field_indices('x')
         [0]
         """
-    def __len__(self) -> int: ...
-    def __iter__(self) -> Iterator[Field]: ...
+    def __len__(self) -> int:
+        """
+        Like num_fields().
+        """
+    def __iter__(self) -> Iterator[Field]:
+        """
+        Iterate over struct fields, in order.
+        """
     __getitem__ = field  # pyright: ignore[reportUnknownVariableType]
     @property
     def names(self) -> list[str]:
@@ -968,7 +978,7 @@ class StructType(DataType):
         Examples
         --------
         >>> import pyarrow as pa
-        >>> struct_type = pa.struct([("a", pa.int64()), ("b", pa.float64()), ("c", pa.string())])
+        >>> struct_type = pa.struct([('a', pa.int64()), ('b', pa.float64()), ('c', pa.string())])
         >>> struct_type.names
         ['a', 'b', 'c']
         """
@@ -980,7 +990,7 @@ class StructType(DataType):
         Examples
         --------
         >>> import pyarrow as pa
-        >>> struct_type = pa.struct([("a", pa.int64()), ("b", pa.float64()), ("c", pa.string())])
+        >>> struct_type = pa.struct([('a', pa.int64()), ('b', pa.float64()), ('c', pa.string())])
         >>> struct_type.fields
         [pyarrow.Field<a: int64>, pyarrow.Field<b: double>, pyarrow.Field<c: string>]
         """
@@ -994,32 +1004,24 @@ class UnionType(DataType):
     Create an instance of a dense UnionType using ``pa.union``:
 
     >>> import pyarrow as pa
-    >>> (
-    ...     pa.union(
-    ...         [pa.field("a", pa.binary(10)), pa.field("b", pa.string())],
-    ...         mode=pa.lib.UnionMode_DENSE,
-    ...     ),
-    ... )
+    >>> pa.union([pa.field('a', pa.binary(10)), pa.field('b', pa.string())],
+    ...          mode=pa.lib.UnionMode_DENSE),
     (DenseUnionType(dense_union<a: fixed_size_binary[10]=0, b: string=1>),)
 
     Create an instance of a dense UnionType using ``pa.dense_union``:
 
-    >>> pa.dense_union([pa.field("a", pa.binary(10)), pa.field("b", pa.string())])
+    >>> pa.dense_union([pa.field('a', pa.binary(10)), pa.field('b', pa.string())])
     DenseUnionType(dense_union<a: fixed_size_binary[10]=0, b: string=1>)
 
     Create an instance of a sparse UnionType using ``pa.union``:
 
-    >>> (
-    ...     pa.union(
-    ...         [pa.field("a", pa.binary(10)), pa.field("b", pa.string())],
-    ...         mode=pa.lib.UnionMode_SPARSE,
-    ...     ),
-    ... )
+    >>> pa.union([pa.field('a', pa.binary(10)), pa.field('b', pa.string())],
+    ...          mode=pa.lib.UnionMode_SPARSE),
     (SparseUnionType(sparse_union<a: fixed_size_binary[10]=0, b: string=1>),)
 
     Create an instance of a sparse UnionType using ``pa.sparse_union``:
 
-    >>> pa.sparse_union([pa.field("a", pa.binary(10)), pa.field("b", pa.string())])
+    >>> pa.sparse_union([pa.field('a', pa.binary(10)), pa.field('b', pa.string())])
     SparseUnionType(sparse_union<a: fixed_size_binary[10]=0, b: string=1>)
     """
     @property
@@ -1030,7 +1032,7 @@ class UnionType(DataType):
         Examples
         --------
         >>> import pyarrow as pa
-        >>> union = pa.sparse_union([pa.field("a", pa.binary(10)), pa.field("b", pa.string())])
+        >>> union = pa.sparse_union([pa.field('a', pa.binary(10)), pa.field('b', pa.string())])
         >>> union.mode
         'sparse'
         """
@@ -1042,12 +1044,18 @@ class UnionType(DataType):
         Examples
         --------
         >>> import pyarrow as pa
-        >>> union = pa.sparse_union([pa.field("a", pa.binary(10)), pa.field("b", pa.string())])
+        >>> union = pa.sparse_union([pa.field('a', pa.binary(10)), pa.field('b', pa.string())])
         >>> union.type_codes
         [0, 1]
         """
-    def __len__(self) -> int: ...
-    def __iter__(self) -> Iterator[Field]: ...
+    def __len__(self) -> int:
+        """
+        Like num_fields().
+        """
+    def __iter__(self) -> Iterator[Field]:
+        """
+        Iterate over union members, in order.
+        """
     def field(self, i: int) -> Field:
         """
         Return a child field by its numeric index.
@@ -1063,7 +1071,7 @@ class UnionType(DataType):
         Examples
         --------
         >>> import pyarrow as pa
-        >>> union = pa.sparse_union([pa.field("a", pa.binary(10)), pa.field("b", pa.string())])
+        >>> union = pa.sparse_union([pa.field('a', pa.binary(10)), pa.field('b', pa.string())])
         >>> union[0]
         pyarrow.Field<a: fixed_size_binary[10]>
         """
@@ -1078,21 +1086,27 @@ class SparseUnionType(UnionType):
     Create an instance of a sparse UnionType using ``pa.union``:
 
     >>> import pyarrow as pa
-    >>> (
-    ...     pa.union(
-    ...         [pa.field("a", pa.binary(10)), pa.field("b", pa.string())],
-    ...         mode=pa.lib.UnionMode_SPARSE,
-    ...     ),
-    ... )
+    >>> pa.union([pa.field('a', pa.binary(10)), pa.field('b', pa.string())],
+    ...          mode=pa.lib.UnionMode_SPARSE),
     (SparseUnionType(sparse_union<a: fixed_size_binary[10]=0, b: string=1>),)
 
     Create an instance of a sparse UnionType using ``pa.sparse_union``:
 
-    >>> pa.sparse_union([pa.field("a", pa.binary(10)), pa.field("b", pa.string())])
+    >>> pa.sparse_union([pa.field('a', pa.binary(10)), pa.field('b', pa.string())])
     SparseUnionType(sparse_union<a: fixed_size_binary[10]=0, b: string=1>)
     """
     @property
-    def mode(self) -> Literal["sparse"]: ...
+    def mode(self) -> Literal["sparse"]:
+        """
+        The mode of the union ("dense" or "sparse").
+
+        Examples
+        --------
+        >>> import pyarrow as pa
+        >>> union = pa.sparse_union([pa.field('a', pa.binary(10)), pa.field('b', pa.string())])
+        >>> union.mode
+        'sparse'
+        """
 
 class DenseUnionType(UnionType):
     """
@@ -1103,22 +1117,28 @@ class DenseUnionType(UnionType):
     Create an instance of a dense UnionType using ``pa.union``:
 
     >>> import pyarrow as pa
-    >>> (
-    ...     pa.union(
-    ...         [pa.field("a", pa.binary(10)), pa.field("b", pa.string())],
-    ...         mode=pa.lib.UnionMode_DENSE,
-    ...     ),
-    ... )
+    >>> pa.union([pa.field('a', pa.binary(10)), pa.field('b', pa.string())],
+    ...          mode=pa.lib.UnionMode_DENSE),
     (DenseUnionType(dense_union<a: fixed_size_binary[10]=0, b: string=1>),)
 
     Create an instance of a dense UnionType using ``pa.dense_union``:
 
-    >>> pa.dense_union([pa.field("a", pa.binary(10)), pa.field("b", pa.string())])
+    >>> pa.dense_union([pa.field('a', pa.binary(10)), pa.field('b', pa.string())])
     DenseUnionType(dense_union<a: fixed_size_binary[10]=0, b: string=1>)
     """
 
     @property
-    def mode(self) -> Literal["dense"]: ...
+    def mode(self) -> Literal["dense"]:
+        """
+        The mode of the union ("dense" or "sparse").
+
+        Examples
+        --------
+        >>> import pyarrow as pa
+        >>> union = pa.sparse_union([pa.field('a', pa.binary(10)), pa.field('b', pa.string())])
+        >>> union.mode
+        'sparse'
+        """
 
 _RunEndType = TypeVar("_RunEndType", Int16Type, Int32Type, Int64Type)
 
@@ -1131,7 +1151,9 @@ class RunEndEncodedType(DataType, Generic[_RunEndType, _BasicValueT]):
     @property
     def value_type(self) -> _BasicValueT: ...
 
-_StorageT = TypeVar("_StorageT", bound=Array | ChunkedArray)
+# TODO: replace below with:
+# _StorageT = TypeVar("_StorageT", bound=Array | ChunkedArray)
+_StorageT = TypeVar("_StorageT", bound=Array | Any)
 
 class BaseExtensionType(DataType):
     """
@@ -1155,7 +1177,19 @@ class BaseExtensionType(DataType):
         """
         The underlying storage type.
         """
-    def wrap_array(self, storage: _StorageT) -> _StorageT: ...
+    def wrap_array(self, storage: _StorageT) -> _StorageT:
+        """
+        Wrap the given storage array as an extension array.
+
+        Parameters
+        ----------
+        storage : Array or ChunkedArray
+
+        Returns
+        -------
+        array : Array or ChunkedArray
+            Extension array wrapping the storage array
+        """
 
 class ExtensionType(BaseExtensionType):
     """
@@ -1219,7 +1253,7 @@ class ExtensionType(BaseExtensionType):
     ...         {"numer": 10, "denom": 17},
     ...         {"numer": 20, "denom": 13},
     ...     ],
-    ...     type=rational_type.storage_type,
+    ...     type=rational_type.storage_type
     ... )
     >>> rational_array = rational_type.wrap_array(storage_array)
     >>> rational_array
@@ -1264,7 +1298,13 @@ class ExtensionType(BaseExtensionType):
     ``__arrow_ext_deserialize__``.
     """
 
-    def __init__(self, storage_type: DataType, extension_name: str) -> None: ...
+    def __init__(self, storage_type: DataType, extension_name: str) -> None:
+        """
+        Initialize an extension type instance.
+
+        This should be called at the end of the subclass'
+        ``__init__`` method.
+        """
     def __arrow_ext_serialize__(self) -> bytes:
         """
         Serialized representation of metadata to reconstruct the type object.
@@ -1301,7 +1341,8 @@ class FixedShapeTensorType(BaseExtensionType, Generic[_ValueT]):
     Create an instance of fixed shape tensor extension type with
     permutation:
 
-    >>> tensor_type = pa.fixed_shape_tensor(pa.int8(), (2, 2, 3), permutation=[0, 2, 1])
+    >>> tensor_type = pa.fixed_shape_tensor(pa.int8(), (2, 2, 3),
+    ...                                     permutation=[0, 2, 1])
     >>> tensor_type.permutation
     [0, 2, 1]
     """
@@ -1397,37 +1438,37 @@ class OpaqueType(BaseExtensionType):
         The name of the external system.
         """
 
-@deprecated(
-    "This class is deprecated and its deserialization is disabled by default. "
-    ":class:`ExtensionType` is recommended instead."
-)
-class PyExtensionType(ExtensionType):
-    """
-    Concrete base class for Python-defined extension types based on pickle
-    for (de)serialization.
+# @deprecated(
+#     "This class is deprecated and its deserialization is disabled by default. "
+#     ":class:`ExtensionType` is recommended instead."
+# )
+# class PyExtensionType(ExtensionType):
+#     """
+#     Concrete base class for Python-defined extension types based on pickle
+#     for (de)serialization.
+#
+#     .. warning::
+#        This class is deprecated and its deserialization is disabled by default.
+#        :class:`ExtensionType` is recommended instead.
+#
+#     Parameters
+#     ----------
+#     storage_type : DataType
+#         The storage type for which the extension is built.
+#     """
+#     def __init__(self, storage_type: DataType) -> None: ...
+#     @classmethod
+#     def set_auto_load(cls, value: bool) -> None:
+#         """
+#         Enable or disable auto-loading of serialized PyExtensionType instances.
+#
+#         Parameters
+#         ----------
+#         value : bool
+#             Whether to enable auto-loading.
+#         """
 
-    .. warning::
-       This class is deprecated and its deserialization is disabled by default.
-       :class:`ExtensionType` is recommended instead.
-
-    Parameters
-    ----------
-    storage_type : DataType
-        The storage type for which the extension is built.
-    """
-    def __init__(self, storage_type: DataType) -> None: ...
-    @classmethod
-    def set_auto_load(cls, value: bool) -> None:
-        """
-        Enable or disable auto-loading of serialized PyExtensionType instances.
-
-        Parameters
-        ----------
-        value : bool
-            Whether to enable auto-loading.
-        """
-
-class UnknownExtensionType(PyExtensionType):  # type: ignore
+class UnknownExtensionType(ExtensionType):  # type: ignore
     """
     A concrete class for Python-defined extension types that refer to
     an unknown Python implementation.
@@ -1439,9 +1480,12 @@ class UnknownExtensionType(PyExtensionType):  # type: ignore
     serialized : bytes
         The serialised output.
     """
-    def __init__(self, storage_type: DataType, serialized: bytes) -> None: ...
+    def __init__(self, storage_type: DataType, serialized: bytes) -> None:
+        """
+        Initialize self.  See help(type(self)) for accurate signature.
+        """
 
-def register_extension_type(ext_type: PyExtensionType) -> None:  # type: ignore
+def register_extension_type(ext_type: ExtensionType) -> None:  # type: ignore
     """
     Register a Python extension type.
 
@@ -1549,22 +1593,51 @@ class KeyValueMetadata(_Metadata, Mapping[bytes, bytes]):
     **kwargs : optional
         additional key-value metadata
     """
-    def __init__(self, __arg0__: Mapping[bytes, bytes] | Mapping[str, str] | None = None, **kwargs) -> None: ...
-    def equals(self, other: KeyValueMetadata) -> bool: ...
-    def __len__(self) -> int: ...
-    def __contains__(self, __key: object) -> bool: ...
-    def __getitem__(self, __key: Any) -> Any: ...
-    def __iter__(self) -> Iterator[bytes]: ...
-    def get_all(self, key: str) -> list[bytes]: ...
+    def __init__(self, __arg0__: Mapping[bytes, bytes] | None = None, **kwargs) -> None:
+        """
+        Initialize self.  See help(type(self)) for accurate signature.
+        """
+    def equals(self, other: KeyValueMetadata) -> bool:
+        """
+        Parameters
+        ----------
+        other : pyarrow.KeyValueMetadata
+
+        Returns
+        -------
+        bool
+        """
+    def __len__(self) -> int:
+        """
+        Return len(self).
+        """
+    def __contains__(self, __key: object) -> bool:
+        """
+        Return bool(key in self).
+        """
+    def __getitem__(self, __key: Any) -> Any:
+        """
+        Return self[key].
+        """
+    def __iter__(self) -> Iterator[bytes]:
+        """
+        Implement iter(self).
+        """
+    def get_all(self, key: str) -> list[bytes]:
+        """
+        Parameters
+        ----------
+        key : str
+
+        Returns
+        -------
+        list[byte]
+        """
     def to_dict(self) -> dict[bytes, bytes]:
         """
         Convert KeyValueMetadata to dict. If a key occurs twice, the value for
         the first one is returned
         """
-
-def ensure_metadata(
-    meta: Mapping[bytes | str, bytes | str] | KeyValueMetadata | None, allow_none: bool = False
-) -> KeyValueMetadata | None: ...
 
 class Field(_Weakrefable, Generic[_DataTypeT]):
     """
@@ -1579,11 +1652,12 @@ class Field(_Weakrefable, Generic[_DataTypeT]):
     Create an instance of pyarrow.Field:
 
     >>> import pyarrow as pa
-    >>> pa.field("key", pa.int32())
+    >>> pa.field('key', pa.int32())
     pyarrow.Field<key: int32>
-    >>> pa.field("key", pa.int32(), nullable=False)
+    >>> pa.field('key', pa.int32(), nullable=False)
     pyarrow.Field<key: int32 not null>
-    >>> field = pa.field("key", pa.int32(), metadata={"key": "Something important"})
+    >>> field = pa.field('key', pa.int32(),
+    ...                  metadata={"key": "Something important"})
     >>> field
     pyarrow.Field<key: int32>
     >>> field.metadata
@@ -1612,14 +1686,17 @@ class Field(_Weakrefable, Generic[_DataTypeT]):
         Examples
         --------
         >>> import pyarrow as pa
-        >>> f1 = pa.field("key", pa.int32())
-        >>> f2 = pa.field("key", pa.int32(), nullable=False)
+        >>> f1 = pa.field('key', pa.int32())
+        >>> f2 = pa.field('key', pa.int32(), nullable=False)
         >>> f1.equals(f2)
         False
         >>> f1.equals(f1)
         True
         """
-    def __hash__(self) -> int: ...
+    def __hash__(self) -> int:
+        """
+        Return hash(self).
+        """
     @property
     def nullable(self) -> bool:
         """
@@ -1628,8 +1705,8 @@ class Field(_Weakrefable, Generic[_DataTypeT]):
         Examples
         --------
         >>> import pyarrow as pa
-        >>> f1 = pa.field("key", pa.int32())
-        >>> f2 = pa.field("key", pa.int32(), nullable=False)
+        >>> f1 = pa.field('key', pa.int32())
+        >>> f2 = pa.field('key', pa.int32(), nullable=False)
         >>> f1.nullable
         True
         >>> f2.nullable
@@ -1643,7 +1720,7 @@ class Field(_Weakrefable, Generic[_DataTypeT]):
         Examples
         --------
         >>> import pyarrow as pa
-        >>> field = pa.field("key", pa.int32())
+        >>> field = pa.field('key', pa.int32())
         >>> field.name
         'key'
         """
@@ -1659,7 +1736,8 @@ class Field(_Weakrefable, Generic[_DataTypeT]):
         Examples
         --------
         >>> import pyarrow as pa
-        >>> field = pa.field("key", pa.int32(), metadata={"key": "Something important"})
+        >>> field = pa.field('key', pa.int32(),
+        ...                  metadata={"key": "Something important"})
         >>> field.metadata
         {b'key': b'Something important'}
         """
@@ -1681,7 +1759,7 @@ class Field(_Weakrefable, Generic[_DataTypeT]):
         Examples
         --------
         >>> import pyarrow as pa
-        >>> field = pa.field("key", pa.int32())
+        >>> field = pa.field('key', pa.int32())
 
         Create new field by adding metadata to existing one:
 
@@ -1702,7 +1780,8 @@ class Field(_Weakrefable, Generic[_DataTypeT]):
         Examples
         --------
         >>> import pyarrow as pa
-        >>> field = pa.field("key", pa.int32(), metadata={"key": "Something important"})
+        >>> field = pa.field('key', pa.int32(),
+        ...                  metadata={"key": "Something important"})
         >>> field.metadata
         {b'key': b'Something important'}
 
@@ -1726,7 +1805,7 @@ class Field(_Weakrefable, Generic[_DataTypeT]):
         Examples
         --------
         >>> import pyarrow as pa
-        >>> field = pa.field("key", pa.int32())
+        >>> field = pa.field('key', pa.int32())
         >>> field
         pyarrow.Field<key: int32>
 
@@ -1751,13 +1830,13 @@ class Field(_Weakrefable, Generic[_DataTypeT]):
         Examples
         --------
         >>> import pyarrow as pa
-        >>> field = pa.field("key", pa.int32())
+        >>> field = pa.field('key', pa.int32())
         >>> field
         pyarrow.Field<key: int32>
 
         Create new field by replacing the name of an existing one:
 
-        >>> field_new = field.with_name("lock")
+        >>> field_new = field.with_name('lock')
         >>> field_new
         pyarrow.Field<lock: int32>
         """
@@ -1776,7 +1855,7 @@ class Field(_Weakrefable, Generic[_DataTypeT]):
         Examples
         --------
         >>> import pyarrow as pa
-        >>> field = pa.field("key", pa.int32())
+        >>> field = pa.field('key', pa.int32())
         >>> field
         pyarrow.Field<key: int32>
         >>> field.nullable
@@ -1802,9 +1881,9 @@ class Field(_Weakrefable, Generic[_DataTypeT]):
         Examples
         --------
         >>> import pyarrow as pa
-        >>> f1 = pa.field("bar", pa.float64(), nullable=False)
-        >>> f2 = pa.field("foo", pa.int32()).with_metadata({"key": "Something important"})
-        >>> ff = pa.field("ff", pa.struct([f1, f2]), nullable=False)
+        >>> f1 = pa.field('bar', pa.float64(), nullable=False)
+        >>> f2 = pa.field('foo', pa.int32()).with_metadata({"key": "Something important"})
+        >>> ff = pa.field('ff', pa.struct([f1, f2]), nullable=False)
 
         Flatten a struct field:
 
@@ -1865,27 +1944,42 @@ class Schema(_Weakrefable):
     Create a new Arrow Schema object:
 
     >>> import pyarrow as pa
-    >>> pa.schema([("some_int", pa.int32()), ("some_string", pa.string())])
+    >>> pa.schema([
+    ...     ('some_int', pa.int32()),
+    ...     ('some_string', pa.string())
+    ... ])
     some_int: int32
     some_string: string
 
     Create Arrow Schema with metadata:
 
-    >>> pa.schema(
-    ...     [pa.field("n_legs", pa.int64()), pa.field("animals", pa.string())],
-    ...     metadata={"n_legs": "Number of legs per animal"},
-    ... )
+    >>> pa.schema([
+    ...     pa.field('n_legs', pa.int64()),
+    ...     pa.field('animals', pa.string())],
+    ...     metadata={"n_legs": "Number of legs per animal"})
     n_legs: int64
     animals: string
     -- schema metadata --
     n_legs: 'Number of legs per animal'
     """
 
-    def __len__(self) -> int: ...
-    def __getitem__(self, key: str) -> Field: ...
+    def __len__(self) -> int:
+        """
+        Return len(self).
+        """
+    def __getitem__(self, key: str) -> Field:
+        """
+        Return self[key].
+        """
     _field = __getitem__  # pyright: ignore[reportUnknownVariableType]
-    def __iter__(self) -> Iterator[Field]: ...
-    def __hash__(self) -> int: ...
+    def __iter__(self) -> Iterator[Field]:
+        """
+        Implement iter(self).
+        """
+    def __hash__(self) -> int:
+        """
+        Return hash(self).
+        """
     def __sizeof__(self) -> int: ...
     @property
     def pandas_metadata(self) -> dict:
@@ -1896,12 +1990,8 @@ class Schema(_Weakrefable):
         --------
         >>> import pyarrow as pa
         >>> import pandas as pd
-        >>> df = pd.DataFrame(
-        ...     {
-        ...         "n_legs": [2, 4, 5, 100],
-        ...         "animals": ["Flamingo", "Horse", "Brittle stars", "Centipede"],
-        ...     }
-        ... )
+        >>> df = pd.DataFrame({'n_legs': [2, 4, 5, 100],
+        ...                    'animals': ["Flamingo", "Horse", "Brittle stars", "Centipede"]})
         >>> schema = pa.Table.from_pandas(df).schema
 
         Select pandas metadata field from Arrow Schema:
@@ -1921,7 +2011,9 @@ class Schema(_Weakrefable):
         Examples
         --------
         >>> import pyarrow as pa
-        >>> schema = pa.schema([pa.field("n_legs", pa.int64()), pa.field("animals", pa.string())])
+        >>> schema = pa.schema([
+        ...     pa.field('n_legs', pa.int64()),
+        ...     pa.field('animals', pa.string())])
 
         Get the names of the schema's fields:
 
@@ -1940,7 +2032,9 @@ class Schema(_Weakrefable):
         Examples
         --------
         >>> import pyarrow as pa
-        >>> schema = pa.schema([pa.field("n_legs", pa.int64()), pa.field("animals", pa.string())])
+        >>> schema = pa.schema([
+        ...     pa.field('n_legs', pa.int64()),
+        ...     pa.field('animals', pa.string())])
 
         Get the types of the schema's fields:
 
@@ -1959,17 +2053,19 @@ class Schema(_Weakrefable):
         Examples
         --------
         >>> import pyarrow as pa
-        >>> schema = pa.schema(
-        ...     [pa.field("n_legs", pa.int64()), pa.field("animals", pa.string())],
-        ...     metadata={"n_legs": "Number of legs per animal"},
-        ... )
+        >>> schema = pa.schema([
+        ...     pa.field('n_legs', pa.int64()),
+        ...     pa.field('animals', pa.string())],
+        ...     metadata={"n_legs": "Number of legs per animal"})
 
         Get the metadata of the schema's fields:
 
         >>> schema.metadata
         {b'n_legs': b'Number of legs per animal'}
         """
-    def empty_table(self) -> Table:
+    # TODO: replace below with:
+    # def empty_table(self) -> Table:
+    def empty_table(self) -> Any:
         """
         Provide an empty table according to the schema.
 
@@ -1980,7 +2076,9 @@ class Schema(_Weakrefable):
         Examples
         --------
         >>> import pyarrow as pa
-        >>> schema = pa.schema([pa.field("n_legs", pa.int64()), pa.field("animals", pa.string())])
+        >>> schema = pa.schema([
+        ...     pa.field('n_legs', pa.int64()),
+        ...     pa.field('animals', pa.string())])
 
         Create an empty table with schema's fields:
 
@@ -2009,11 +2107,14 @@ class Schema(_Weakrefable):
         Examples
         --------
         >>> import pyarrow as pa
-        >>> schema1 = pa.schema(
-        ...     [pa.field("n_legs", pa.int64()), pa.field("animals", pa.string())],
-        ...     metadata={"n_legs": "Number of legs per animal"},
-        ... )
-        >>> schema2 = pa.schema([("some_int", pa.int32()), ("some_string", pa.string())])
+        >>> schema1 = pa.schema([
+        ...     pa.field('n_legs', pa.int64()),
+        ...     pa.field('animals', pa.string())],
+        ...     metadata={"n_legs": "Number of legs per animal"})
+        >>> schema2 = pa.schema([
+        ...     ('some_int', pa.int32()),
+        ...     ('some_string', pa.string())
+        ... ])
 
         Test two equal schemas:
 
@@ -2048,7 +2149,10 @@ class Schema(_Weakrefable):
         --------
         >>> import pandas as pd
         >>> import pyarrow as pa
-        >>> df = pd.DataFrame({"int": [1, 2], "str": ["a", "b"]})
+        >>> df = pd.DataFrame({
+        ...     'int': [1, 2],
+        ...     'str': ['a', 'b']
+        ... })
 
         Create an Arrow Schema from the schema of a pandas dataframe:
 
@@ -2073,7 +2177,9 @@ class Schema(_Weakrefable):
         Examples
         --------
         >>> import pyarrow as pa
-        >>> schema = pa.schema([pa.field("n_legs", pa.int64()), pa.field("animals", pa.string())])
+        >>> schema = pa.schema([
+        ...     pa.field('n_legs', pa.int64()),
+        ...     pa.field('animals', pa.string())])
 
         Select the second field:
 
@@ -2082,7 +2188,7 @@ class Schema(_Weakrefable):
 
         Select the field of the column named 'n_legs':
 
-        >>> schema.field("n_legs")
+        >>> schema.field('n_legs')
         pyarrow.Field<n_legs: int64>
         """
     @deprecated("Use 'field' instead")
@@ -2117,7 +2223,9 @@ class Schema(_Weakrefable):
         Examples
         --------
         >>> import pyarrow as pa
-        >>> schema = pa.schema([pa.field("n_legs", pa.int64()), pa.field("animals", pa.string())])
+        >>> schema = pa.schema([
+        ...     pa.field('n_legs', pa.int64()),
+        ...     pa.field('animals', pa.string())])
 
         Get the index of the field named 'animals':
 
@@ -2126,14 +2234,11 @@ class Schema(_Weakrefable):
 
         Index in case of several fields with the given name:
 
-        >>> schema = pa.schema(
-        ...     [
-        ...         pa.field("n_legs", pa.int64()),
-        ...         pa.field("animals", pa.string()),
-        ...         pa.field("animals", pa.bool_()),
-        ...     ],
-        ...     metadata={"n_legs": "Number of legs per animal"},
-        ... )
+        >>> schema = pa.schema([
+        ...     pa.field('n_legs', pa.int64()),
+        ...     pa.field('animals', pa.string()),
+        ...     pa.field('animals', pa.bool_())],
+        ...     metadata={"n_legs": "Number of legs per animal"})
         >>> schema.get_field_index("animals")
         -1
         """
@@ -2153,13 +2258,10 @@ class Schema(_Weakrefable):
         Examples
         --------
         >>> import pyarrow as pa
-        >>> schema = pa.schema(
-        ...     [
-        ...         pa.field("n_legs", pa.int64()),
-        ...         pa.field("animals", pa.string()),
-        ...         pa.field("animals", pa.bool_()),
-        ...     ]
-        ... )
+        >>> schema = pa.schema([
+        ...     pa.field('n_legs', pa.int64()),
+        ...     pa.field('animals', pa.string()),
+        ...     pa.field('animals', pa.bool_())])
 
         Get the indexes of the fields named 'animals':
 
@@ -2185,11 +2287,13 @@ class Schema(_Weakrefable):
         Examples
         --------
         >>> import pyarrow as pa
-        >>> schema = pa.schema([pa.field("n_legs", pa.int64()), pa.field("animals", pa.string())])
+        >>> schema = pa.schema([
+        ...     pa.field('n_legs', pa.int64()),
+        ...     pa.field('animals', pa.string())])
 
         Append a field 'extra' at the end of the schema:
 
-        >>> schema_new = schema.append(pa.field("extra", pa.bool_()))
+        >>> schema_new = schema.append(pa.field('extra', pa.bool_()))
         >>> schema_new
         n_legs: int64
         animals: string
@@ -2217,11 +2321,13 @@ class Schema(_Weakrefable):
         Examples
         --------
         >>> import pyarrow as pa
-        >>> schema = pa.schema([pa.field("n_legs", pa.int64()), pa.field("animals", pa.string())])
+        >>> schema = pa.schema([
+        ...     pa.field('n_legs', pa.int64()),
+        ...     pa.field('animals', pa.string())])
 
         Insert a new field on the second position:
 
-        >>> schema.insert(1, pa.field("extra", pa.bool_()))
+        >>> schema.insert(1, pa.field('extra', pa.bool_()))
         n_legs: int64
         extra: bool
         animals: string
@@ -2241,7 +2347,9 @@ class Schema(_Weakrefable):
         Examples
         --------
         >>> import pyarrow as pa
-        >>> schema = pa.schema([pa.field("n_legs", pa.int64()), pa.field("animals", pa.string())])
+        >>> schema = pa.schema([
+        ...     pa.field('n_legs', pa.int64()),
+        ...     pa.field('animals', pa.string())])
 
         Remove the second field of the schema:
 
@@ -2264,11 +2372,13 @@ class Schema(_Weakrefable):
         Examples
         --------
         >>> import pyarrow as pa
-        >>> schema = pa.schema([pa.field("n_legs", pa.int64()), pa.field("animals", pa.string())])
+        >>> schema = pa.schema([
+        ...     pa.field('n_legs', pa.int64()),
+        ...     pa.field('animals', pa.string())])
 
         Replace the second field of the schema with a new field 'extra':
 
-        >>> schema.set(1, pa.field("replaced", pa.bool_()))
+        >>> schema.set(1, pa.field('replaced', pa.bool_()))
         n_legs: int64
         replaced: bool
         """
@@ -2298,7 +2408,9 @@ class Schema(_Weakrefable):
         Examples
         --------
         >>> import pyarrow as pa
-        >>> schema = pa.schema([pa.field("n_legs", pa.int64()), pa.field("animals", pa.string())])
+        >>> schema = pa.schema([
+        ...     pa.field('n_legs', pa.int64()),
+        ...     pa.field('animals', pa.string())])
 
         Add metadata to existing schema field:
 
@@ -2324,7 +2436,9 @@ class Schema(_Weakrefable):
         Examples
         --------
         >>> import pyarrow as pa
-        >>> schema = pa.schema([pa.field("n_legs", pa.int64()), pa.field("animals", pa.string())])
+        >>> schema = pa.schema([
+        ...     pa.field('n_legs', pa.int64()),
+        ...     pa.field('animals', pa.string())])
 
         Write schema to Buffer:
 
@@ -2342,10 +2456,10 @@ class Schema(_Weakrefable):
         Examples
         --------
         >>> import pyarrow as pa
-        >>> schema = pa.schema(
-        ...     [pa.field("n_legs", pa.int64()), pa.field("animals", pa.string())],
-        ...     metadata={"n_legs": "Number of legs per animal"},
-        ... )
+        >>> schema = pa.schema([
+        ...     pa.field('n_legs', pa.int64()),
+        ...     pa.field('animals', pa.string())],
+        ...     metadata={"n_legs": "Number of legs per animal"})
         >>> schema
         n_legs: int64
         animals: string
@@ -2376,6 +2490,8 @@ class Schema(_Weakrefable):
             Display Field-level KeyValueMetadata
         show_schema_metadata : boolean, default True
             Display Schema-level KeyValueMetadata
+        element_size_limit : int, default 100
+            Maximum number of characters of a single element before it is truncated.
 
         Returns
         -------
@@ -2452,13 +2568,9 @@ def unify_schemas(
         If Fields of the same name are not mergeable.
     """
 
-@overload
-def field(name: SupportArrowSchema) -> Field[Any]: ...
-@overload
 def field(
-    name: str, type: _DataTypeT, nullable: bool = ..., metadata: dict[Any, Any] | None = None
-) -> Field[_DataTypeT]: ...
-def field(*args, **kwargs):
+    name: SupportArrowSchema | str, type: _DataTypeT, nullable: bool = ..., metadata: dict[Any, Any] | None = None
+) -> Field[_DataTypeT] | Field[Any]:
     """
     Create a pyarrow.Field instance.
 
@@ -2485,12 +2597,13 @@ def field(*args, **kwargs):
     Create an instance of pyarrow.Field:
 
     >>> import pyarrow as pa
-    >>> pa.field("key", pa.int32())
+    >>> pa.field('key', pa.int32())
     pyarrow.Field<key: int32>
-    >>> pa.field("key", pa.int32(), nullable=False)
+    >>> pa.field('key', pa.int32(), nullable=False)
     pyarrow.Field<key: int32 not null>
 
-    >>> field = pa.field("key", pa.int32(), metadata={"key": "Something important"})
+    >>> field = pa.field('key', pa.int32(),
+    ...                  metadata={"key": "Something important"})
     >>> field
     pyarrow.Field<key: int32>
     >>> field.metadata
@@ -2503,7 +2616,7 @@ def field(*args, **kwargs):
 
     A str can also be passed for the type parameter:
 
-    >>> pa.field("key", "int32")
+    >>> pa.field('key', 'int32')
     pyarrow.Field<key: int32>
     """
 
@@ -2523,7 +2636,7 @@ def null() -> NullType:
 
     Create a ``Field`` type with a null type and a name:
 
-    >>> pa.field("null_field", pa.null())
+    >>> pa.field('null_field', pa.null())
     pyarrow.Field<null_field: null>
     """
 
@@ -2544,7 +2657,7 @@ def bool_() -> BoolType:
     Create a ``Field`` type with a boolean type
     and a name:
 
-    >>> pa.field("bool_field", pa.bool_())
+    >>> pa.field('bool_field', pa.bool_())
     pyarrow.Field<bool_field: bool>
     """
 
@@ -2748,50 +2861,7 @@ def uint64() -> UInt64Type:
     ]
     """
 
-def tzinfo_to_string(tz: dt.tzinfo) -> str:
-    """
-    Converts a time zone object into a string indicating the name of a time
-    zone, one of:
-    * As used in the Olson time zone database (the "tz database" or
-      "tzdata"), such as "America/New_York"
-    * An absolute time zone offset of the form +XX:XX or -XX:XX, such as +07:30
-
-    Parameters
-    ----------
-      tz : datetime.tzinfo
-        Time zone object
-
-    Returns
-    -------
-      name : str
-        Time zone name
-    """
-
-def string_to_tzinfo(name: str) -> dt.tzinfo:
-    """
-    Convert a time zone name into a time zone object.
-
-    Supported input strings are:
-    * As used in the Olson time zone database (the "tz database" or
-      "tzdata"), such as "America/New_York"
-    * An absolute time zone offset of the form +XX:XX or -XX:XX, such as +07:30
-
-    Parameters
-    ----------
-      name: str
-        Time zone name.
-
-    Returns
-    -------
-      tz : datetime.tzinfo
-        Time zone object
-    """
-
-@overload
-def timestamp(unit: _Unit | str) -> TimestampType[_Unit, _Tz]: ...
-@overload
-def timestamp(unit: _Unit | str, tz: _Tz) -> TimestampType[_Unit, _Tz]: ...
-def timestamp(*args, **kwargs):
+def timestamp(unit: _Unit, tz: _Tz | None = None) -> TimestampType[_Unit, _Tz]:
     """
     Create instance of timestamp type with resolution and optional time zone.
 
@@ -2808,19 +2878,19 @@ def timestamp(*args, **kwargs):
     Create an instance of timestamp type:
 
     >>> import pyarrow as pa
-    >>> pa.timestamp("us")
+    >>> pa.timestamp('us')
     TimestampType(timestamp[us])
-    >>> pa.timestamp("s", tz="America/New_York")
+    >>> pa.timestamp('s', tz='America/New_York')
     TimestampType(timestamp[s, tz=America/New_York])
-    >>> pa.timestamp("s", tz="+07:30")
+    >>> pa.timestamp('s', tz='+07:30')
     TimestampType(timestamp[s, tz=+07:30])
 
     Use timestamp type when creating a scalar object:
 
     >>> from datetime import datetime
-    >>> pa.scalar(datetime(2012, 1, 1), type=pa.timestamp("s", tz="UTC"))
+    >>> pa.scalar(datetime(2012, 1, 1), type=pa.timestamp('s', tz='UTC'))
     <pyarrow.TimestampScalar: '2012-01-01T00:00:00+0000'>
-    >>> pa.scalar(datetime(2012, 1, 1), type=pa.timestamp("us"))
+    >>> pa.scalar(datetime(2012, 1, 1), type=pa.timestamp('us'))
     <pyarrow.TimestampScalar: '2012-01-01T00:00:00.000000'>
 
     Returns
@@ -2844,9 +2914,9 @@ def time32(unit: _Time32Unit) -> Time32Type[_Time32Unit]:
     Examples
     --------
     >>> import pyarrow as pa
-    >>> pa.time32("s")
+    >>> pa.time32('s')
     Time32Type(time32[s])
-    >>> pa.time32("ms")
+    >>> pa.time32('ms')
     Time32Type(time32[ms])
     """
 
@@ -2866,9 +2936,9 @@ def time64(unit: _Time64Unit) -> Time64Type[_Time64Unit]:
     Examples
     --------
     >>> import pyarrow as pa
-    >>> pa.time64("us")
+    >>> pa.time64('us')
     Time64Type(time64[us])
-    >>> pa.time64("ns")
+    >>> pa.time64('ns')
     Time64Type(time64[ns])
     """
 
@@ -2891,14 +2961,14 @@ def duration(unit: _Unit) -> DurationType[_Unit]:
     Create an instance of duration type:
 
     >>> import pyarrow as pa
-    >>> pa.duration("us")
+    >>> pa.duration('us')
     DurationType(duration[us])
-    >>> pa.duration("s")
+    >>> pa.duration('s')
     DurationType(duration[s])
 
     Create an array with duration type:
 
-    >>> pa.array([0, 1, 2], type=pa.duration("s"))
+    >>> pa.array([0, 1, 2], type=pa.duration('s'))
     <pyarrow.lib.DurationArray object at ...>
     [
       0,
@@ -2985,15 +3055,15 @@ def float16() -> Float16Type:
     >>> a
     <pyarrow.lib.HalfFloatArray object at ...>
     [
-      15872,
-      32256
+      1.5,
+      nan
     ]
 
     Note that unlike other float types, if you convert this array
     to a python list, the types of its elements will be ``np.float16``
 
     >>> [type(val) for val in a.to_pylist()]
-    [<class 'numpy.float16'>, <class 'numpy.float16'>]
+    [<class 'float'>, <class 'float'>]
     """
 
 def float32() -> Float32Type:
@@ -3046,11 +3116,7 @@ def float64() -> Float64Type:
     ]
     """
 
-@overload
-def decimal32(precision: _Precision) -> Decimal32Type[_Precision, Literal[0]]: ...
-@overload
-def decimal32(precision: _Precision, scale: _Scale) -> Decimal32Type[_Precision, _Scale]: ...
-def decimal32(*args, **kwargs):
+def decimal32(precision: _Precision, scale: _Scale | None = None) -> Decimal32Type[_Precision, _Scale| Literal[0]]:
     """
     Create decimal type with precision and scale and 32-bit width.
 
@@ -3091,7 +3157,7 @@ def decimal32(*args, **kwargs):
     Create an array with decimal type:
 
     >>> import decimal
-    >>> a = decimal.Decimal("123.45")
+    >>> a = decimal.Decimal('123.45')
     >>> pa.array([a], pa.decimal32(5, 2))
     <pyarrow.lib.Decimal32Array object at ...>
     [
@@ -3099,11 +3165,7 @@ def decimal32(*args, **kwargs):
     ]
     """
 
-@overload
-def decimal64(precision: _Precision) -> Decimal64Type[_Precision, Literal[0]]: ...
-@overload
-def decimal64(precision: _Precision, scale: _Scale) -> Decimal64Type[_Precision, _Scale]: ...
-def decimal64(*args, **kwargs):
+def decimal64(precision: _Precision, scale: _Scale | None = None) -> Decimal64Type[_Precision, _Scale | Literal[0]]:
     """
     Create decimal type with precision and scale and 64-bit width.
 
@@ -3144,7 +3206,7 @@ def decimal64(*args, **kwargs):
     Create an array with decimal type:
 
     >>> import decimal
-    >>> a = decimal.Decimal("123.45")
+    >>> a = decimal.Decimal('123.45')
     >>> pa.array([a], pa.decimal64(5, 2))
     <pyarrow.lib.Decimal64Array object at ...>
     [
@@ -3152,11 +3214,7 @@ def decimal64(*args, **kwargs):
     ]
     """
 
-@overload
-def decimal128(precision: _Precision) -> Decimal128Type[_Precision, Literal[0]]: ...
-@overload
-def decimal128(precision: _Precision, scale: _Scale) -> Decimal128Type[_Precision, _Scale]: ...
-def decimal128(*args, **kwargs):
+def decimal128(precision: _Precision, scale: _Scale | None = None) -> Decimal128Type[_Precision, _Scale | Literal[0]]:
     """
     Create decimal type with precision and scale and 128-bit width.
 
@@ -3197,7 +3255,7 @@ def decimal128(*args, **kwargs):
     Create an array with decimal type:
 
     >>> import decimal
-    >>> a = decimal.Decimal("123.45")
+    >>> a = decimal.Decimal('123.45')
     >>> pa.array([a], pa.decimal128(5, 2))
     <pyarrow.lib.Decimal128Array object at ...>
     [
@@ -3205,11 +3263,7 @@ def decimal128(*args, **kwargs):
     ]
     """
 
-@overload
-def decimal256(precision: _Precision) -> Decimal256Type[_Precision, Literal[0]]: ...
-@overload
-def decimal256(precision: _Precision, scale: _Scale) -> Decimal256Type[_Precision, _Scale]: ...
-def decimal256(*args, **kwargs):
+def decimal256(precision: _Precision, scale: _Scale | None = None) -> Decimal256Type[_Precision, _Scale | Literal[0]]:
     """
     Create decimal type with precision and scale and 256-bit width.
 
@@ -3248,7 +3302,7 @@ def string() -> StringType:
 
     and use the string type to create an array:
 
-    >>> pa.array(["foo", "bar", "baz"], type=pa.string())
+    >>> pa.array(['foo', 'bar', 'baz'], type=pa.string())
     <pyarrow.lib.StringArray object at ...>
     [
       "foo",
@@ -3280,11 +3334,7 @@ and use the string type to create an array:
 ]
 """
 
-@overload
-def binary(length: Literal[-1] = ...) -> BinaryType: ...
-@overload
-def binary(length: int) -> FixedSizeBinaryType: ...
-def binary(length):
+def binary(length: Literal[-1] | int = ...) -> BinaryType | FixedSizeBinaryType:
     """
     Create variable-length or fixed size binary type.
 
@@ -3305,7 +3355,7 @@ def binary(length):
 
     and use the variable-length binary type to create an array:
 
-    >>> pa.array(["foo", "bar", "baz"], type=pa.binary())
+    >>> pa.array(['foo', 'bar', 'baz'], type=pa.binary())
     <pyarrow.lib.BinaryArray object at ...>
     [
       666F6F,
@@ -3320,7 +3370,7 @@ def binary(length):
 
     and use the fixed-length binary type to create an array:
 
-    >>> pa.array(["foo", "bar", "baz"], type=pa.binary(3))
+    >>> pa.array(['foo', 'bar', 'baz'], type=pa.binary(3))
     <pyarrow.lib.FixedSizeBinaryArray object at ...>
     [
       666F6F,
@@ -3346,7 +3396,7 @@ def large_binary() -> LargeBinaryType:
 
     and use the type to create an array:
 
-    >>> pa.array(["foo", "bar", "baz"], type=pa.large_binary())
+    >>> pa.array(['foo', 'bar', 'baz'], type=pa.large_binary())
     <pyarrow.lib.LargeBinaryArray object at ...>
     [
       666F6F,
@@ -3372,7 +3422,7 @@ def large_string() -> LargeStringType:
 
     and use the type to create an array:
 
-    >>> pa.array(["foo", "bar"] * 50, type=pa.large_string())
+    >>> pa.array(['foo', 'bar'] * 50, type=pa.large_string())
     <pyarrow.lib.LargeStringArray object at ...>
     [
       "foo",
@@ -3434,15 +3484,9 @@ def string_view() -> StringViewType:
     DataType(string_view)
     """
 
-@overload
 def list_(
-    value_type: _DataTypeT | Field[_DataTypeT], list_size: Literal[-1] = ...
-) -> ListType[_DataTypeT]: ...
-@overload
-def list_(
-    value_type: _DataTypeT | Field[_DataTypeT], list_size: _Size
-) -> FixedSizeListType[_DataTypeT, _Size]: ...
-def list_(*args, **kwargs):
+    value_type: _DataTypeT | Field[_DataTypeT], list_size: Literal[-1] | _Size | None = None
+) -> ListType[_DataTypeT] | FixedSizeListType[_DataTypeT, _Size]:
     """
     Create ListType instance from child data type or field.
 
@@ -3469,7 +3513,7 @@ def list_(*args, **kwargs):
 
     Use the ListType to create a scalar:
 
-    >>> pa.scalar(["foo", None], type=pa.list_(pa.string(), 2))
+    >>> pa.scalar(['foo', None], type=pa.list_(pa.string(), 2))
     <pyarrow.FixedSizeListScalar: ['foo', None]>
 
     or an array:
@@ -3578,13 +3622,9 @@ def large_list_view(
     LargeListViewType(large_list_view<item: int8>)
     """
 
-@overload
-def map_(key_type: _K, item_type: _ValueT) -> MapType[_K, _ValueT, _Ordered]: ...
-@overload
 def map_(
-    key_type: _K, item_type: _ValueT, key_sorted: _Ordered
-) -> MapType[_K, _ValueT, _Ordered]: ...
-def map_(*args, **kwargs):
+    key_type: _K, item_type: _ValueT, key_sorted: _Ordered | None = None
+) -> MapType[_K, _ValueT, _Ordered]:
     """
     Create MapType instance from key and item data types or fields.
 
@@ -3610,7 +3650,7 @@ def map_(*args, **kwargs):
 
     Use MapType to create an array:
 
-    >>> data = [[{"key": "a", "value": 1}, {"key": "b", "value": 2}], [{"key": "c", "value": 3}]]
+    >>> data = [[{'key': 'a', 'value': 1}, {'key': 'b', 'value': 2}], [{'key': 'c', 'value': 3}]]
     >>> pa.array(data, type=pa.map_(pa.string(), pa.int32(), keys_sorted=True))
     <pyarrow.lib.MapArray object at ...>
     [
@@ -3635,15 +3675,9 @@ def map_(*args, **kwargs):
     ]
     """
 
-@overload
 def dictionary(
-    index_type: _IndexT, value_type: _BasicValueT
-) -> DictionaryType[_IndexT, _BasicValueT, _Ordered]: ...
-@overload
-def dictionary(
-    index_type: _IndexT, value_type: _BasicValueT, ordered: _Ordered
-) -> DictionaryType[_IndexT, _BasicValueT, _Ordered]: ...
-def dictionary(*args, **kwargs):
+    index_type: _IndexT, value_type: _BasicValueT, ordered: _Ordered | None = None
+) -> DictionaryType[_IndexT, _BasicValueT, _Ordered]:
     """
     Dictionary (categorical, or simply encoded) type.
 
@@ -3707,8 +3741,8 @@ def struct(
 
     >>> import pyarrow as pa
     >>> fields = [
-    ...     ("f1", pa.int32()),
-    ...     ("f2", pa.string()),
+    ...     ('f1', pa.int32()),
+    ...     ('f2', pa.string()),
     ... ]
     >>> struct_type = pa.struct(fields)
     >>> struct_type
@@ -3718,14 +3752,14 @@ def struct(
 
     >>> struct_type[0]
     pyarrow.Field<f1: int32>
-    >>> struct_type["f1"]
+    >>> struct_type['f1']
     pyarrow.Field<f1: int32>
 
     Create an instance of StructType from an iterable of Fields:
 
     >>> fields = [
-    ...     pa.field("f1", pa.int32()),
-    ...     pa.field("f2", pa.string(), nullable=False),
+    ...     pa.field('f1', pa.int32()),
+    ...     pa.field('f2', pa.string(), nullable=False),
     ... ]
     >>> pa.struct(fields)
     StructType(struct<f1: int32, f2: string not null>)
@@ -3790,15 +3824,9 @@ def dense_union(
     type : DenseUnionType
     """
 
-@overload
 def union(
-    child_fields: list[Field[Any]], mode: Literal["sparse"], type_codes: list[int] | None = None
-) -> SparseUnionType: ...
-@overload
-def union(
-    child_fields: list[Field[Any]], mode: Literal["dense"], type_codes: list[int] | None = None
-) -> DenseUnionType: ...
-def union(*args, **kwargs):
+    child_fields: list[Field[Any]], mode: Literal["sparse"] | Literal["dense"], type_codes: list[int] | None = None
+) -> SparseUnionType | DenseUnionType:
     """
     Create UnionType from child fields.
 
@@ -3939,14 +3967,16 @@ def fixed_shape_tensor(
     Create an instance of fixed shape tensor extension type with names
     of tensor dimensions:
 
-    >>> tensor_type = pa.fixed_shape_tensor(pa.int8(), (2, 2, 3), dim_names=["C", "H", "W"])
+    >>> tensor_type = pa.fixed_shape_tensor(pa.int8(), (2, 2, 3),
+    ...                                     dim_names=['C', 'H', 'W'])
     >>> tensor_type.dim_names
     ['C', 'H', 'W']
 
     Create an instance of fixed shape tensor extension type with
     permutation:
 
-    >>> tensor_type = pa.fixed_shape_tensor(pa.int8(), (2, 2, 3), permutation=[0, 2, 1])
+    >>> tensor_type = pa.fixed_shape_tensor(pa.int8(), (2, 2, 3),
+    ...                                     permutation=[0, 2, 1])
     >>> tensor_type.permutation
     [0, 2, 1]
 
@@ -4036,77 +4066,7 @@ def opaque(storage_type: DataType, type_name: str, vendor_name: str) -> OpaqueTy
     type : OpaqueType
     """
 
-@overload
-def type_for_alias(name: Literal["null"]) -> NullType: ...
-@overload
-def type_for_alias(name: Literal["bool", "boolean"]) -> BoolType: ...
-@overload
-def type_for_alias(name: Literal["i1", "int8"]) -> Int8Type: ...
-@overload
-def type_for_alias(name: Literal["i2", "int16"]) -> Int16Type: ...
-@overload
-def type_for_alias(name: Literal["i4", "int32"]) -> Int32Type: ...
-@overload
-def type_for_alias(name: Literal["i8", "int64"]) -> Int64Type: ...
-@overload
-def type_for_alias(name: Literal["u1", "uint8"]) -> UInt8Type: ...
-@overload
-def type_for_alias(name: Literal["u2", "uint16"]) -> UInt16Type: ...
-@overload
-def type_for_alias(name: Literal["u4", "uint32"]) -> Uint32Type: ...
-@overload
-def type_for_alias(name: Literal["u8", "uint64"]) -> UInt64Type: ...
-@overload
-def type_for_alias(name: Literal["f2", "halffloat", "float16"]) -> Float16Type: ...
-@overload
-def type_for_alias(name: Literal["f4", "float", "float32"]) -> Float32Type: ...
-@overload
-def type_for_alias(name: Literal["f8", "double", "float64"]) -> Float64Type: ...
-@overload
-def type_for_alias(name: Literal["string", "str", "utf8"]) -> StringType: ...
-@overload
-def type_for_alias(name: Literal["binary"]) -> BinaryType: ...
-@overload
-def type_for_alias(
-    name: Literal["large_string", "large_str", "large_utf8"],
-) -> LargeStringType: ...
-@overload
-def type_for_alias(name: Literal["large_binary"]) -> LargeBinaryType: ...
-@overload
-def type_for_alias(name: Literal["binary_view"]) -> BinaryViewType: ...
-@overload
-def type_for_alias(name: Literal["string_view"]) -> StringViewType: ...
-@overload
-def type_for_alias(name: Literal["date32", "date32[day]"]) -> Date32Type: ...
-@overload
-def type_for_alias(name: Literal["date64", "date64[ms]"]) -> Date64Type: ...
-@overload
-def type_for_alias(name: Literal["time32[s]"]) -> Time32Type[Literal["s"]]: ...
-@overload
-def type_for_alias(name: Literal["time32[ms]"]) -> Time32Type[Literal["ms"]]: ...
-@overload
-def type_for_alias(name: Literal["time64[us]"]) -> Time64Type[Literal["us"]]: ...
-@overload
-def type_for_alias(name: Literal["time64[ns]"]) -> Time64Type[Literal["ns"]]: ...
-@overload
-def type_for_alias(name: Literal["timestamp[s]"]) -> TimestampType[Literal["s"], Any]: ...
-@overload
-def type_for_alias(name: Literal["timestamp[ms]"]) -> TimestampType[Literal["ms"], Any]: ...
-@overload
-def type_for_alias(name: Literal["timestamp[us]"]) -> TimestampType[Literal["us"], Any]: ...
-@overload
-def type_for_alias(name: Literal["timestamp[ns]"]) -> TimestampType[Literal["ns"], Any]: ...
-@overload
-def type_for_alias(name: Literal["duration[s]"]) -> DurationType[Literal["s"]]: ...
-@overload
-def type_for_alias(name: Literal["duration[ms]"]) -> DurationType[Literal["ms"]]: ...
-@overload
-def type_for_alias(name: Literal["duration[us]"]) -> DurationType[Literal["us"]]: ...
-@overload
-def type_for_alias(name: Literal["duration[ns]"]) -> DurationType[Literal["ns"]]: ...
-@overload
-def type_for_alias(name: Literal["month_day_nano_interval"]) -> MonthDayNanoIntervalType: ...
-def type_for_alias(name):
+def type_for_alias(name: Any) -> DataType:
     """
     Return DataType given a string alias if one exists.
 
@@ -4120,80 +4080,6 @@ def type_for_alias(name):
     type : DataType
     """
 
-@overload
-def ensure_type(ty: None, allow_none: Literal[True]) -> None: ...
-@overload
-def ensure_type(ty: _DataTypeT) -> _DataTypeT: ...
-@overload
-def ensure_type(ty: Literal["null"]) -> NullType: ...
-@overload
-def ensure_type(ty: Literal["bool", "boolean"]) -> BoolType: ...
-@overload
-def ensure_type(ty: Literal["i1", "int8"]) -> Int8Type: ...
-@overload
-def ensure_type(ty: Literal["i2", "int16"]) -> Int16Type: ...
-@overload
-def ensure_type(ty: Literal["i4", "int32"]) -> Int32Type: ...
-@overload
-def ensure_type(ty: Literal["i8", "int64"]) -> Int64Type: ...
-@overload
-def ensure_type(ty: Literal["u1", "uint8"]) -> UInt8Type: ...
-@overload
-def ensure_type(ty: Literal["u2", "uint16"]) -> UInt16Type: ...
-@overload
-def ensure_type(ty: Literal["u4", "uint32"]) -> Uint32Type: ...
-@overload
-def ensure_type(ty: Literal["u8", "uint64"]) -> UInt64Type: ...
-@overload
-def ensure_type(ty: Literal["f2", "halffloat", "float16"]) -> Float16Type: ...
-@overload
-def ensure_type(ty: Literal["f4", "float", "float32"]) -> Float32Type: ...
-@overload
-def ensure_type(ty: Literal["f8", "double", "float64"]) -> Float64Type: ...
-@overload
-def ensure_type(ty: Literal["string", "str", "utf8"]) -> StringType: ...
-@overload
-def ensure_type(ty: Literal["binary"]) -> BinaryType: ...
-@overload
-def ensure_type(
-    ty: Literal["large_string", "large_str", "large_utf8"],
-) -> LargeStringType: ...
-@overload
-def ensure_type(ty: Literal["large_binary"]) -> LargeBinaryType: ...
-@overload
-def ensure_type(ty: Literal["binary_view"]) -> BinaryViewType: ...
-@overload
-def ensure_type(ty: Literal["string_view"]) -> StringViewType: ...
-@overload
-def ensure_type(ty: Literal["date32", "date32[day]"]) -> Date32Type: ...
-@overload
-def ensure_type(ty: Literal["date64", "date64[ms]"]) -> Date64Type: ...
-@overload
-def ensure_type(ty: Literal["time32[s]"]) -> Time32Type[Literal["s"]]: ...
-@overload
-def ensure_type(ty: Literal["time32[ms]"]) -> Time32Type[Literal["ms"]]: ...
-@overload
-def ensure_type(ty: Literal["time64[us]"]) -> Time64Type[Literal["us"]]: ...
-@overload
-def ensure_type(ty: Literal["time64[ns]"]) -> Time64Type[Literal["ns"]]: ...
-@overload
-def ensure_type(ty: Literal["timestamp[s]"]) -> TimestampType[Literal["s"], Any]: ...
-@overload
-def ensure_type(ty: Literal["timestamp[ms]"]) -> TimestampType[Literal["ms"], Any]: ...
-@overload
-def ensure_type(ty: Literal["timestamp[us]"]) -> TimestampType[Literal["us"], Any]: ...
-@overload
-def ensure_type(ty: Literal["timestamp[ns]"]) -> TimestampType[Literal["ns"], Any]: ...
-@overload
-def ensure_type(ty: Literal["duration[s]"]) -> DurationType[Literal["s"]]: ...
-@overload
-def ensure_type(ty: Literal["duration[ms]"]) -> DurationType[Literal["ms"]]: ...
-@overload
-def ensure_type(ty: Literal["duration[us]"]) -> DurationType[Literal["us"]]: ...
-@overload
-def ensure_type(ty: Literal["duration[ns]"]) -> DurationType[Literal["ns"]]: ...
-@overload
-def ensure_type(ty: Literal["month_day_nano_interval"]) -> MonthDayNanoIntervalType: ...
 def schema(
     fields: Iterable[Field[Any]] | Iterable[tuple[str, DataType]] | Mapping[str, DataType],
     metadata: dict[bytes | str, bytes | str] | None = None,
@@ -4214,33 +4100,40 @@ def schema(
     Create a Schema from iterable of tuples:
 
     >>> import pyarrow as pa
-    >>> pa.schema(
-    ...     [
-    ...         ("some_int", pa.int32()),
-    ...         ("some_string", pa.string()),
-    ...         pa.field("some_required_string", pa.string(), nullable=False),
-    ...     ]
-    ... )
+    >>> pa.schema([
+    ...     ('some_int', pa.int32()),
+    ...     ('some_string', pa.string()),
+    ...     pa.field('some_required_string', pa.string(), nullable=False)
+    ... ])
     some_int: int32
     some_string: string
     some_required_string: string not null
 
     Create a Schema from iterable of Fields:
 
-    >>> pa.schema([pa.field("some_int", pa.int32()), pa.field("some_string", pa.string())])
+    >>> pa.schema([
+    ...     pa.field('some_int', pa.int32()),
+    ...     pa.field('some_string', pa.string())
+    ... ])
     some_int: int32
     some_string: string
 
     DataTypes can also be passed as strings. The following is equivalent to the
     above example:
 
-    >>> pa.schema([pa.field("some_int", "int32"), pa.field("some_string", "string")])
+    >>> pa.schema([
+    ...     pa.field('some_int', "int32"),
+    ...     pa.field('some_string', "string")
+    ... ])
     some_int: int32
     some_string: string
 
     Or more concisely:
 
-    >>> pa.schema([("some_int", "int32"), ("some_string", "string")])
+    >>> pa.schema([
+    ...     ('some_int', "int32"),
+    ...     ('some_string', "string")
+    ... ])
     some_int: int32
     some_string: string
 
@@ -4264,9 +4157,9 @@ def from_numpy_dtype(dtype: np.dtype[Any]) -> DataType:
 
     >>> import pyarrow as pa
     >>> import numpy as np
-    >>> pa.from_numpy_dtype(np.dtype("float16"))
+    >>> pa.from_numpy_dtype(np.dtype('float16'))
     DataType(halffloat)
-    >>> pa.from_numpy_dtype("U")
+    >>> pa.from_numpy_dtype('U')
     DataType(string)
     >>> pa.from_numpy_dtype(bool)
     DataType(bool)
@@ -4274,42 +4167,10 @@ def from_numpy_dtype(dtype: np.dtype[Any]) -> DataType:
     DataType(string)
     """
 
-def is_boolean_value(obj: Any) -> bool:
-    """
-    Check if the object is a boolean.
-
-    Parameters
-    ----------
-    obj : object
-        The object to check
-    """
-
-def is_integer_value(obj: Any) -> bool:
-    """
-    Check if the object is an integer.
-
-    Parameters
-    ----------
-    obj : object
-        The object to check
-    """
-
-def is_float_value(obj: Any) -> bool:
-    """
-    Check if the object is a float.
-
-    Parameters
-    ----------
-    obj : object
-        The object to check
-    """
-
 __all__ = [
     "_Weakrefable",
     "_Metadata",
-    "_AsPyType",
     "DataType",
-    "_DataTypeT",
     "_BasicDataType",
     "NullType",
     "BoolType",
@@ -4362,12 +4223,10 @@ __all__ = [
     "UuidType",
     "JsonType",
     "OpaqueType",
-    "PyExtensionType",
     "UnknownExtensionType",
     "register_extension_type",
     "unregister_extension_type",
     "KeyValueMetadata",
-    "ensure_metadata",
     "Field",
     "Schema",
     "unify_schemas",
@@ -4382,8 +4241,6 @@ __all__ = [
     "int32",
     "int64",
     "uint64",
-    "tzinfo_to_string",
-    "string_to_tzinfo",
     "timestamp",
     "time32",
     "time64",
@@ -4423,10 +4280,6 @@ __all__ = [
     "bool8",
     "opaque",
     "type_for_alias",
-    "ensure_type",
     "schema",
     "from_numpy_dtype",
-    "is_boolean_value",
-    "is_integer_value",
-    "is_float_value",
 ]

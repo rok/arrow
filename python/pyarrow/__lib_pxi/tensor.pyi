@@ -26,7 +26,7 @@ import numpy as np
 
 from pyarrow.lib import _Weakrefable
 from scipy.sparse import coo_matrix, csr_matrix
-from sparse import COO
+from sparse import COO  # type: ignore
 
 class Tensor(_Weakrefable):
     """
@@ -37,7 +37,7 @@ class Tensor(_Weakrefable):
     >>> import pyarrow as pa
     >>> import numpy as np
     >>> x = np.array([[2, 2, 4], [4, 5, 100]], np.int32)
-    >>> pa.Tensor.from_numpy(x, dim_names=["dim1", "dim2"])
+    >>> pa.Tensor.from_numpy(x, dim_names=["dim1","dim2"])
     <pyarrow.Tensor>
     type: int32
     shape: (2, 3)
@@ -61,7 +61,7 @@ class Tensor(_Weakrefable):
         >>> import pyarrow as pa
         >>> import numpy as np
         >>> x = np.array([[2, 2, 4], [4, 5, 100]], np.int32)
-        >>> pa.Tensor.from_numpy(x, dim_names=["dim1", "dim2"])
+        >>> pa.Tensor.from_numpy(x, dim_names=["dim1","dim2"])
         <pyarrow.Tensor>
         type: int32
         shape: (2, 3)
@@ -76,7 +76,7 @@ class Tensor(_Weakrefable):
         >>> import pyarrow as pa
         >>> import numpy as np
         >>> x = np.array([[2, 2, 4], [4, 5, 100]], np.int32)
-        >>> tensor = pa.Tensor.from_numpy(x, dim_names=["dim1", "dim2"])
+        >>> tensor = pa.Tensor.from_numpy(x, dim_names=["dim1","dim2"])
         >>> tensor.to_numpy()
         array([[  2,   2,   4],
                [  4,   5, 100]], dtype=int32)
@@ -95,9 +95,9 @@ class Tensor(_Weakrefable):
         >>> import pyarrow as pa
         >>> import numpy as np
         >>> x = np.array([[2, 2, 4], [4, 5, 100]], np.int32)
-        >>> tensor = pa.Tensor.from_numpy(x, dim_names=["dim1", "dim2"])
+        >>> tensor = pa.Tensor.from_numpy(x, dim_names=["dim1","dim2"])
         >>> y = np.array([[2, 2, 4], [4, 5, 10]], np.int32)
-        >>> tensor2 = pa.Tensor.from_numpy(y, dim_names=["a", "b"])
+        >>> tensor2 = pa.Tensor.from_numpy(y, dim_names=["a","b"])
         >>> tensor.equals(tensor)
         True
         >>> tensor.equals(tensor2)
@@ -117,7 +117,7 @@ class Tensor(_Weakrefable):
         >>> import pyarrow as pa
         >>> import numpy as np
         >>> x = np.array([[2, 2, 4], [4, 5, 100]], np.int32)
-        >>> tensor = pa.Tensor.from_numpy(x, dim_names=["dim1", "dim2"])
+        >>> tensor = pa.Tensor.from_numpy(x, dim_names=["dim1","dim2"])
         >>> tensor.dim_name(0)
         'dim1'
         >>> tensor.dim_name(1)
@@ -133,7 +133,7 @@ class Tensor(_Weakrefable):
         >>> import pyarrow as pa
         >>> import numpy as np
         >>> x = np.array([[2, 2, 4], [4, 5, 100]], np.int32)
-        >>> tensor = pa.Tensor.from_numpy(x, dim_names=["dim1", "dim2"])
+        >>> tensor = pa.Tensor.from_numpy(x, dim_names=["dim1","dim2"])
         >>> tensor.dim_names
         ['dim1', 'dim2']
         """
@@ -147,7 +147,7 @@ class Tensor(_Weakrefable):
         >>> import pyarrow as pa
         >>> import numpy as np
         >>> x = np.array([[2, 2, 4], [4, 5, 100]], np.int32)
-        >>> tensor = pa.Tensor.from_numpy(x, dim_names=["dim1", "dim2"])
+        >>> tensor = pa.Tensor.from_numpy(x, dim_names=["dim1","dim2"])
         >>> tensor.is_mutable
         True
         """
@@ -161,7 +161,7 @@ class Tensor(_Weakrefable):
         >>> import pyarrow as pa
         >>> import numpy as np
         >>> x = np.array([[2, 2, 4], [4, 5, 100]], np.int32)
-        >>> tensor = pa.Tensor.from_numpy(x, dim_names=["dim1", "dim2"])
+        >>> tensor = pa.Tensor.from_numpy(x, dim_names=["dim1","dim2"])
         >>> tensor.is_contiguous
         True
         """
@@ -175,7 +175,7 @@ class Tensor(_Weakrefable):
         >>> import pyarrow as pa
         >>> import numpy as np
         >>> x = np.array([[2, 2, 4], [4, 5, 100]], np.int32)
-        >>> tensor = pa.Tensor.from_numpy(x, dim_names=["dim1", "dim2"])
+        >>> tensor = pa.Tensor.from_numpy(x, dim_names=["dim1","dim2"])
         >>> tensor.ndim
         2
         """
@@ -189,7 +189,7 @@ class Tensor(_Weakrefable):
         >>> import pyarrow as pa
         >>> import numpy as np
         >>> x = np.array([[2, 2, 4], [4, 5, 100]], np.int32)
-        >>> tensor = pa.Tensor.from_numpy(x, dim_names=["dim1", "dim2"])
+        >>> tensor = pa.Tensor.from_numpy(x, dim_names=["dim1","dim2"])
         >>> tensor.size
         6
         """
@@ -203,7 +203,7 @@ class Tensor(_Weakrefable):
         >>> import pyarrow as pa
         >>> import numpy as np
         >>> x = np.array([[2, 2, 4], [4, 5, 100]], np.int32)
-        >>> tensor = pa.Tensor.from_numpy(x, dim_names=["dim1", "dim2"])
+        >>> tensor = pa.Tensor.from_numpy(x, dim_names=["dim1","dim2"])
         >>> tensor.shape
         (2, 3)
         """
@@ -217,12 +217,15 @@ class Tensor(_Weakrefable):
         >>> import pyarrow as pa
         >>> import numpy as np
         >>> x = np.array([[2, 2, 4], [4, 5, 100]], np.int32)
-        >>> tensor = pa.Tensor.from_numpy(x, dim_names=["dim1", "dim2"])
+        >>> tensor = pa.Tensor.from_numpy(x, dim_names=["dim1","dim2"])
         >>> tensor.strides
         (12, 4)
         """
 
 class SparseCOOTensor(_Weakrefable):
+    """
+    A sparse COO tensor.
+    """
     @classmethod
     def from_dense_numpy(cls, obj: np.ndarray, dim_names: list[str] | None = None) -> Self:
         """
@@ -265,12 +268,12 @@ class SparseCOOTensor(_Weakrefable):
     @classmethod
     def from_scipy(cls, obj: csr_matrix, dim_names: list[str] | None = None) -> Self:
         """
-        Convert scipy.sparse.coo_matrix to arrow::SparseCOOTensor
+        Convert scipy.sparse.coo_array or scipy.sparse.coo_matrix to arrow::SparseCOOTensor
 
         Parameters
         ----------
-        obj : scipy.sparse.csr_matrix
-            The scipy matrix that should be converted.
+        obj : scipy.sparse.coo_array or scipy.sparse.coo_matrix
+            The scipy array or matrix that should be converted.
         dim_names : list, optional
             Names of the dimensions.
         """
@@ -302,7 +305,7 @@ class SparseCOOTensor(_Weakrefable):
         """
     def to_scipy(self) -> coo_matrix:
         """
-        Convert arrow::SparseCOOTensor to scipy.sparse.coo_matrix.
+        Convert arrow::SparseCOOTensor to scipy.sparse.coo_array.
         """
     def to_pydata_sparse(self) -> COO:
         """
@@ -399,11 +402,11 @@ class SparseCSRMatrix(_Weakrefable):
     @classmethod
     def from_scipy(cls, obj: csr_matrix, dim_names: list[str] | None = None) -> Self:
         """
-        Convert scipy.sparse.csr_matrix to arrow::SparseCSRMatrix.
+        Convert scipy.sparse.csr_array or scipy.sparse.csr_matrix to arrow::SparseCSRMatrix.
 
         Parameters
         ----------
-        obj : scipy.sparse.csr_matrix
+        obj : scipy.sparse.csr_array or scipy.sparse.csr_matrix
             The scipy matrix that should be converted.
         dim_names : list, optional
             Names of the dimensions.
@@ -424,7 +427,7 @@ class SparseCSRMatrix(_Weakrefable):
         """
     def to_scipy(self) -> csr_matrix:
         """
-        Convert arrow::SparseCSRMatrix to scipy.sparse.csr_matrix.
+        Convert arrow::SparseCSRMatrix to scipy.sparse.csr_array.
         """
     def to_tensor(self) -> Tensor:
         """
@@ -515,11 +518,11 @@ class SparseCSCMatrix(_Weakrefable):
     @classmethod
     def from_scipy(cls, obj: csr_matrix, dim_names: list[str] | None = None) -> Self:
         """
-        Convert scipy.sparse.csc_matrix to arrow::SparseCSCMatrix
+        Convert scipy.sparse.csc_array or scipy.sparse.csc_matrix to arrow::SparseCSCMatrix
 
         Parameters
         ----------
-        obj : scipy.sparse.csc_matrix
+        obj : scipy.sparse.csc_array or scipy.sparse.csc_matrix
             The scipy matrix that should be converted.
         dim_names : list, optional
             Names of the dimensions.
@@ -540,7 +543,7 @@ class SparseCSCMatrix(_Weakrefable):
         """
     def to_scipy(self) -> csr_matrix:
         """
-        Convert arrow::SparseCSCMatrix to scipy.sparse.csc_matrix
+        Convert arrow::SparseCSCMatrix to scipy.sparse.csc_array
         """
     def to_tensor(self) -> Tensor:
         """
