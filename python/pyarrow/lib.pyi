@@ -16,7 +16,10 @@
 # under the License.
 
 # ruff: noqa: F403
-from typing import NamedTuple
+from collections.abc import Mapping
+import datetime as dt
+from typing import NamedTuple, Literal
+from typing_extensions import TypeVar
 
 from .__lib_pxi.array import *
 # TODO
@@ -34,6 +37,8 @@ from .__lib_pxi.scalar import *
 # from .__lib_pxi.table import *
 from .__lib_pxi.tensor import *
 from .__lib_pxi.types import *
+
+_DataTypeT = TypeVar("_DataTypeT", bound=DataType)
 
 class MonthDayNano(NamedTuple):
     days: int
@@ -79,6 +84,51 @@ def is_threading_enabled() -> bool:
     threads either, because we're probably on a system where
     threading doesn't work (e.g. Emscripten).
     """
+
+def ensure_metadata(
+    meta: Mapping[bytes | str, bytes | str] | KeyValueMetadata | None, allow_none: bool = False
+) -> KeyValueMetadata | None: ...
+
+def tzinfo_to_string(tz: dt.tzinfo) -> str:
+    """
+    Converts a time zone object into a string indicating the name of a time
+    zone, one of:
+    * As used in the Olson time zone database (the "tz database" or
+      "tzdata"), such as "America/New_York"
+    * An absolute time zone offset of the form +XX:XX or -XX:XX, such as +07:30
+
+    Parameters
+    ----------
+      tz : datetime.tzinfo
+        Time zone object
+
+    Returns
+    -------
+      name : str
+        Time zone name
+    """
+
+def string_to_tzinfo(name: str) -> dt.tzinfo:
+    """
+    Convert a time zone name into a time zone object.
+
+    Supported input strings are:
+    * As used in the Olson time zone database (the "tz database" or
+      "tzdata"), such as "America/New_York"
+    * An absolute time zone offset of the form +XX:XX or -XX:XX, such as +07:30
+
+    Parameters
+    ----------
+      name: str
+        Time zone name.
+
+    Returns
+    -------
+      tz : datetime.tzinfo
+        Time zone object
+    """
+
+def ensure_type(ty: _DataTypeT | None, allow_none: Literal[True] | Literal[False] | None = None) -> _DataTypeT | None: ...
 
 Type_NA: int
 Type_BOOL: int

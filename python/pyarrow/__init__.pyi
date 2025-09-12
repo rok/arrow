@@ -40,8 +40,14 @@ from pyarrow.lib import (
     set_io_thread_count,
 )
 
-def show_versions() -> None: ...
-def show_info() -> None: ...
+def show_versions() -> None:
+    """
+    Print various version information, to help with error reporting.
+    """
+def show_info() -> None:
+    """
+    Print detailed version and platform information, for error reporting
+    """
 def _module_is_available(module: str) -> bool: ...
 def _filesystem_is_available(fs: str) -> bool: ...
 
@@ -126,7 +132,6 @@ from pyarrow.lib import (
     UuidType,
     JsonType,
     OpaqueType,
-    PyExtensionType,
     UnknownExtensionType,
     register_extension_type,
     unregister_extension_type,
@@ -358,13 +363,39 @@ import types as types
 # ----------------------------------------------------------------------
 # Returning absolute path to the pyarrow include directory (if bundled, e.g. in
 # wheels)
-def get_include() -> str: ...
+def get_include() -> str:
+    """
+    Return absolute path to directory containing Arrow C++ include
+    headers. Similar to numpy.get_include
+    """
 def _get_pkg_config_executable() -> str: ...
 def _has_pkg_config(pkgname: str) -> bool: ...
 def _read_pkg_config_variable(pkgname: str, cli_args: list[str]) -> str: ...
-def get_libraries() -> list[str]: ...
-def create_library_symlinks() -> None: ...
-def get_library_dirs() -> list[str]: ...
+def get_libraries() -> list[str]:
+    """
+    Return list of library names to include in the `libraries` argument for C
+    or Cython extensions using pyarrow
+    """
+def create_library_symlinks() -> None:
+    """
+    With Linux and macOS wheels, the bundled shared libraries have an embedded
+    ABI version like libarrow.so.17 or libarrow.17.dylib and so linking to them
+    with -larrow won't work unless we create symlinks at locations like
+    site-packages/pyarrow/libarrow.so. This unfortunate workaround addresses
+    prior problems we had with shipping two copies of the shared libraries to
+    permit third party projects like turbodbc to build their C++ extensions
+    against the pyarrow wheels.
+
+    This function must only be invoked once and only when the shared libraries
+    are bundled with the Python package, which should only apply to wheel-based
+    installs. It requires write access to the site-packages/pyarrow directory
+    and so depending on your system may need to be run with root.
+    """
+def get_library_dirs() -> list[str]:
+    """
+    Return lists of directories likely to contain Arrow C++ libraries for
+    linking C or Cython extensions using pyarrow
+    """
 
 __all__ = [
     "__version__",
@@ -467,7 +498,6 @@ __all__ = [
     "UuidType",
     "JsonType",
     "OpaqueType",
-    "PyExtensionType",
     "UnknownExtensionType",
     "register_extension_type",
     "unregister_extension_type",

@@ -27,13 +27,13 @@ if sys.version_info >= (3, 10):
     from typing import TypeAlias
 else:
     from typing_extensions import TypeAlias
-from typing import Any, Generic, Iterator, Literal, overload
+from typing import Any, Generic, Iterator, Literal
 
 import numpy as np
 
 from pyarrow._compute import CastOptions  # type: ignore[import-not-found]
 from pyarrow.lib import Array, Buffer, MemoryPool, MonthDayNano, Tensor, _Weakrefable
-from typing_extensions import Protocol, TypeVar
+from typing_extensions import  TypeVar
 
 from . import types
 from .types import (
@@ -106,8 +106,20 @@ class Scalar(_Weakrefable, Generic[_DataType_co]):
         ------
         ArrowInvalid
         """
-    def equals(self, other: Scalar) -> bool: ...
-    def __hash__(self) -> int: ...
+    def equals(self, other: Scalar) -> bool:
+        """
+        Parameters
+        ----------
+        other : pyarrow.Scalar
+
+        Returns
+        -------
+        bool
+        """
+    def __hash__(self) -> int:
+        """
+        Return hash(self).
+        """
     def as_py(self: Scalar[Any], *, maps_as_pydicts: Literal["lossy", "strict"] | None = None) -> Any:
         """
         Return this value as a Python representation.
@@ -130,152 +142,413 @@ class Scalar(_Weakrefable, Generic[_DataType_co]):
 _NULL: TypeAlias = None
 NA = _NULL
 
-class NullScalar(Scalar[types.NullType]): ...
-class BooleanScalar(Scalar[types.BoolType]): ...
-class UInt8Scalar(Scalar[types.UInt8Type]): ...
-class Int8Scalar(Scalar[types.Int8Type]): ...
-class UInt16Scalar(Scalar[types.UInt16Type]): ...
-class Int16Scalar(Scalar[types.Int16Type]): ...
-class UInt32Scalar(Scalar[types.Uint32Type]): ...
-class Int32Scalar(Scalar[types.Int32Type]): ...
-class UInt64Scalar(Scalar[types.UInt64Type]): ...
-class Int64Scalar(Scalar[types.Int64Type]): ...
-class HalfFloatScalar(Scalar[types.Float16Type]): ...
-class FloatScalar(Scalar[types.Float32Type]): ...
-class DoubleScalar(Scalar[types.Float64Type]): ...
-class Decimal32Scalar(Scalar[types.Decimal32Type[types._Precision, types._Scale]]): ...
-class Decimal64Scalar(Scalar[types.Decimal64Type[types._Precision, types._Scale]]): ...
-class Decimal128Scalar(Scalar[types.Decimal128Type[types._Precision, types._Scale]]): ...
-class Decimal256Scalar(Scalar[types.Decimal256Type[types._Precision, types._Scale]]): ...
-class Date32Scalar(Scalar[types.Date32Type]): ...
+class NullScalar(Scalar[types.NullType]):
+    """
+    Concrete class for null scalars.
+    """
+class BooleanScalar(Scalar[types.BoolType]):
+    """
+    Concrete class for boolean scalars.
+    """
+class UInt8Scalar(Scalar[types.UInt8Type]):
+    """
+    Concrete class for uint8 scalars.
+    """
+class Int8Scalar(Scalar[types.Int8Type]):
+    """
+    Concrete class for int8 scalars.
+    """
+class UInt16Scalar(Scalar[types.UInt16Type]):
+    """
+    Concrete class for uint16 scalars.
+    """
+class Int16Scalar(Scalar[types.Int16Type]):
+    """
+    Concrete class for int16 scalars.
+    """
+class UInt32Scalar(Scalar[types.Uint32Type]):
+    """
+    Concrete class for uint32 scalars.
+    """
+class Int32Scalar(Scalar[types.Int32Type]):
+    """
+    Concrete class for int32 scalars.
+    """
+class UInt64Scalar(Scalar[types.UInt64Type]):
+    """
+    Concrete class for uint64 scalars.
+    """
+class Int64Scalar(Scalar[types.Int64Type]):
+    """
+    Concrete class for int64 scalars.
+    """
+class HalfFloatScalar(Scalar[types.Float16Type]):
+    """
+    Concrete class for float scalars.
+    """
+class FloatScalar(Scalar[types.Float32Type]):
+    """
+    Concrete class for float scalars.
+    """
+class DoubleScalar(Scalar[types.Float64Type]):
+    """
+    Concrete class for double scalars.
+    """
+class Decimal32Scalar(Scalar[types.Decimal32Type[types._Precision, types._Scale]]):
+    """
+    Concrete class for decimal32 scalars.
+    """
+class Decimal64Scalar(Scalar[types.Decimal64Type[types._Precision, types._Scale]]):
+    """
+    Concrete class for decimal64 scalars.
+    """
+class Decimal128Scalar(Scalar[types.Decimal128Type[types._Precision, types._Scale]]):
+    """
+    Concrete class for decimal128 scalars.
+    """
+class Decimal256Scalar(Scalar[types.Decimal256Type[types._Precision, types._Scale]]):
+    """
+    Concrete class for decimal256 scalars.
+    """
+class Date32Scalar(Scalar[types.Date32Type]):
+    """
+    Concrete class for date32 scalars.
+    """
 
 class Date64Scalar(Scalar[types.Date64Type]):
+    """
+    Concrete class for date64 scalars.
+    """
     @property
     def value(self) -> dt.date | None: ...
 
 class Time32Scalar(Scalar[types.Time32Type[_Time32Unit]]):
+    """
+    Concrete class for time32 scalars.
+    """
     @property
     def value(self) -> dt.time | None: ...
 
 class Time64Scalar(Scalar[types.Time64Type[_Time64Unit]]):
+    """
+    Concrete class for time64 scalars.
+    """
     @property
     def value(self) -> dt.time | None: ...
 
 class TimestampScalar(Scalar[types.TimestampType[_Unit, _Tz]]):
+    """
+    Concrete class for timestamp scalars.
+    """
     @property
     def value(self) -> int | None: ...
 
 class DurationScalar(Scalar[types.DurationType[_Unit]]):
+    """
+    Concrete class for duration scalars.
+    """
     @property
     def value(self) -> dt.timedelta | None: ...
 
 class MonthDayNanoIntervalScalar(Scalar[types.MonthDayNanoIntervalType]):
+    """
+    Concrete class for month, day, nanosecond interval scalars.
+    """
     @property
-    def value(self) -> MonthDayNano | None: ...
+    def value(self) -> MonthDayNano | None:
+        """
+        Same as self.as_py()
+        """
 
 class BinaryScalar(Scalar[types.BinaryType]):
-    def as_buffer(self) -> Buffer: ...
+    """
+    Concrete class for binary-like scalars.
+    """
+    def as_buffer(self) -> Buffer:
+        """
+        Return a view over this value as a Buffer object.
+        """
 
 class LargeBinaryScalar(Scalar[types.LargeBinaryType]):
-    def as_buffer(self) -> Buffer: ...
+    """
+    """
+    def as_buffer(self) -> Buffer:
+        """
+        BinaryScalar.as_buffer(self)
+
+        Return a view over this value as a Buffer object.
+        """
 
 class FixedSizeBinaryScalar(Scalar[types.FixedSizeBinaryType]):
-    def as_buffer(self) -> Buffer: ...
+    """
+    """
+    def as_buffer(self) -> Buffer:
+        """
+        BinaryScalar.as_buffer(self)
+
+        Return a view over this value as a Buffer object.
+        """
 
 class StringScalar(Scalar[types.StringType]):
-    def as_buffer(self) -> Buffer: ...
+    """
+    Concrete class for string-like (utf8) scalars.
+    """
+    def as_buffer(self) -> Buffer:
+        """
+        BinaryScalar.as_buffer(self)
+
+        Return a view over this value as a Buffer object.
+        """
 
 class LargeStringScalar(Scalar[types.LargeStringType]):
-    def as_buffer(self) -> Buffer: ...
+    """
+    """
+    def as_buffer(self) -> Buffer:
+        """
+        BinaryScalar.as_buffer(self)
+
+        Return a view over this value as a Buffer object.
+        """
 
 class BinaryViewScalar(Scalar[types.BinaryViewType]):
-    def as_buffer(self) -> Buffer: ...
+    """
+    """
+    def as_buffer(self) -> Buffer:
+        """
+        BinaryScalar.as_buffer(self)
+
+        Return a view over this value as a Buffer object.
+        """
 
 class StringViewScalar(Scalar[types.StringViewType]):
-    def as_buffer(self) -> Buffer: ...
+    """
+    """
+    def as_buffer(self) -> Buffer:
+        """
+        BinaryScalar.as_buffer(self)
+
+        Return a view over this value as a Buffer object.
+        """
 
 class ListScalar(Scalar[types.ListType[_DataTypeT]]):
+    """
+    Concrete class for list-like scalars.
+    """
     @property
     def values(self) -> Array | None: ...
-    def __len__(self) -> int: ...
-    def __getitem__(self, i: int) -> Scalar[_DataTypeT]: ...
-    def __iter__(self) -> Iterator[Array]: ...
+    def __len__(self) -> int:
+        """
+        Return the number of values.
+        """
+    def __getitem__(self, i: int) -> Scalar[_DataTypeT]:
+        """
+        Return the value at the given index.
+        """
+    def __iter__(self) -> Iterator[Array]:
+        """
+        Iterate over this element's values.
+        """
 
 class FixedSizeListScalar(Scalar[types.FixedSizeListType[_DataTypeT, types._Size]]):
+    """
+    """
     @property
     def values(self) -> Array | None: ...
-    def __len__(self) -> int: ...
-    def __getitem__(self, i: int) -> Scalar[_DataTypeT]: ...
-    def __iter__(self) -> Iterator[Array]: ...
+    def __len__(self) -> int:
+        """
+        ListScalar.__len__(self)
+
+        Return the number of values.
+        """
+    def __getitem__(self, i: int) -> Scalar[_DataTypeT]:
+        """
+        ListScalar.__getitem__(self, i)
+
+        Return the value at the given index.
+        """
+    def __iter__(self) -> Iterator[Array]:
+        """
+        ListScalar.__iter__(self)
+
+        Iterate over this element's values.
+        """
 
 class LargeListScalar(Scalar[types.LargeListType[_DataTypeT]]):
+    """
+    """
     @property
     def values(self) -> Array | None: ...
-    def __len__(self) -> int: ...
-    def __getitem__(self, i: int) -> Scalar[_DataTypeT]: ...
-    def __iter__(self) -> Iterator[Array]: ...
+    def __len__(self) -> int:
+        """
+        ListScalar.__len__(self)
+
+        Return the number of values.
+        """
+    def __getitem__(self, i: int) -> Scalar[_DataTypeT]:
+        """
+        ListScalar.__getitem__(self, i)
+
+        Return the value at the given index.
+        """
+    def __iter__(self) -> Iterator[Array]:
+        """
+        ListScalar.__iter__(self)
+
+        Iterate over this element's values.
+        """
 
 class ListViewScalar(Scalar[types.ListViewType[_DataTypeT]]):
+    """
+    """
     @property
     def values(self) -> Array | None: ...
-    def __len__(self) -> int: ...
-    def __getitem__(self, i: int) -> Scalar[_DataTypeT]: ...
-    def __iter__(self) -> Iterator[Array]: ...
+    def __len__(self) -> int:
+        """
+        ListScalar.__len__(self)
+
+        Return the number of values.
+        """
+    def __getitem__(self, i: int) -> Scalar[_DataTypeT]:
+        """
+        ListScalar.__getitem__(self, i)
+
+        Return the value at the given index.
+        """
+    def __iter__(self) -> Iterator[Array]:
+        """
+        ListScalar.__iter__(self)
+
+        Iterate over this element's values.
+        """
 
 class LargeListViewScalar(Scalar[types.LargeListViewType[_DataTypeT]]):
+    """
+    """
     @property
     def values(self) -> Array | None: ...
-    def __len__(self) -> int: ...
-    def __getitem__(self, i: int) -> Scalar[_DataTypeT]: ...
-    def __iter__(self) -> Iterator[Array]: ...
+    def __len__(self) -> int:
+        """
+        ListScalar.__len__(self)
+
+        Return the number of values.
+        """
+    def __getitem__(self, i: int) -> Scalar[_DataTypeT]:
+        """
+        ListScalar.__getitem__(self, i)
+
+        Return the value at the given index.
+        """
+    def __iter__(self) -> Iterator[Array]:
+        """
+        ListScalar.__iter__(self)
+
+        Iterate over this element's values.
+        """
 
 class StructScalar(Scalar[types.StructType], collections.abc.Mapping[str, Scalar]):
-    def __len__(self) -> int: ...
-    def __iter__(self) -> Iterator[str]: ...
-    def __getitem__(self, __key: str) -> Scalar[Any]: ...  # type: ignore[override]
+    """
+    Concrete class for struct scalars.
+    """
+    def __len__(self) -> int:
+        """
+        Return len(self).
+        """
+    def __iter__(self) -> Iterator[str]:
+        """
+        Implement iter(self).
+        """
+    def __getitem__(self, key: int | str) -> Scalar[Any]:
+        """
+        Return the child value for the given field.
+
+        Parameters
+        ----------
+        key : Union[int, str]
+            Index / position or name of the field.
+
+        Returns
+        -------
+        result : Scalar
+        """
     def _as_py_tuple(self) -> list[tuple[str, Any]]: ...
 
 class MapScalar(Scalar[types.MapType[types._K, types._ValueT]]):
+    """
+    Concrete class for map scalars.
+    """
     @property
     def values(self) -> Array | None: ...
-    def __len__(self) -> int: ...
-    def __getitem__(self, i: int) -> tuple[Scalar[types._K], types._ValueT, Any]: ...
-    @overload
+    def __len__(self) -> int:
+        """
+        ListScalar.__len__(self)
+
+        Return the number of values.
+        """
+    def __getitem__(self, i: int) -> tuple[Scalar[types._K], types._ValueT, Any]:
+        """
+        Return the value at the given index or key.
+        """
     def __iter__(
         self: Scalar[
-            types.MapType[types._BasicDataType[_AsPyTypeK], types._BasicDataType[_AsPyTypeV]]
-        ],
-    ) -> Iterator[tuple[_AsPyTypeK, _AsPyTypeV]]: ...
-    @overload
-    def __iter__(
-        self: Scalar[types.MapType[Any, types._BasicDataType[_AsPyTypeV]],],
-    ) -> Iterator[tuple[Any, _AsPyTypeV]]: ...
-    @overload
-    def __iter__(
-        self: Scalar[types.MapType[types._BasicDataType[_AsPyTypeK], Any],],
-    ) -> Iterator[tuple[_AsPyTypeK, Any]]: ...
+            types.MapType[types._BasicDataType[_AsPyTypeK], types._BasicDataType[_AsPyTypeV]],]
+            | Scalar[types.MapType[Any, types._BasicDataType[_AsPyTypeV]]]
+            | Scalar[types.MapType[types._BasicDataType[_AsPyTypeK], Any]]
+    ) -> Iterator[tuple[_AsPyTypeK, _AsPyTypeV]] | Iterator[tuple[Any, _AsPyTypeV]] | Iterator[tuple[_AsPyTypeK, Any]]:
+        """
+        Iterate over this element's values.
+        """
 
 class DictionaryScalar(Scalar[types.DictionaryType[types._IndexT, types._BasicValueT]]):
+    """
+    Concrete class for dictionary-encoded scalars.
+    """
     @property
-    def index(self) -> Scalar[types._IndexT]: ...
+    def index(self) -> Scalar[types._IndexT]:
+        """
+        Return this value's underlying index as a scalar.
+        """
     @property
-    def value(self) -> Scalar[types._BasicValueT]: ...
+    def value(self) -> Scalar[types._BasicValueT]:
+        """
+        Return the encoded value as a scalar.
+        """
     @property
     def dictionary(self) -> Array: ...
 
 class RunEndEncodedScalar(Scalar[types.RunEndEncodedType[types._RunEndType, types._BasicValueT]]):
+    """
+    Concrete class for RunEndEncoded scalars.
+    """
     @property
-    def value(self) -> tuple[int, types._BasicValueT] | None: ...
+    def value(self) -> tuple[int, types._BasicValueT] | None:
+        """
+        Return underlying value as a scalar.
+        """
 
 class UnionScalar(Scalar[types.UnionType]):
+    """
+    Concrete class for Union scalars.
+    """
     @property
-    def value(self) -> Any | None: ...
+    def value(self) -> Any | None:
+        """
+        Return underlying value as a scalar.
+        """
     @property
-    def type_code(self) -> str: ...
+    def type_code(self) -> str:
+        """
+        Return the union type code for this scalar.
+        """
 
 class ExtensionScalar(Scalar[types.ExtensionType]):
+    """
+    Concrete class for Extension scalars.
+    """
     @property
-    def value(self) -> Any | None: ...
+    def value(self) -> Any | None:
+        """
+        Return storage value as a scalar.
+        """
     @staticmethod
     def from_storage(typ: types.BaseExtensionType, value) -> ExtensionScalar:
         """
@@ -293,12 +566,27 @@ class ExtensionScalar(Scalar[types.ExtensionType]):
         ext_scalar : ExtensionScalar
         """
 
-class Bool8Scalar(Scalar[types.Bool8Type]): ...
-class UuidScalar(Scalar[types.UuidType]): ...
-class JsonScalar(Scalar[types.JsonType]): ...
-class OpaqueScalar(Scalar[types.OpaqueType]): ...
+class Bool8Scalar(Scalar[types.Bool8Type]):
+    """
+    Concrete class for bool8 extension scalar.
+    """
+class UuidScalar(Scalar[types.UuidType]):
+    """
+    Concrete class for Uuid extension scalar.
+    """
+class JsonScalar(Scalar[types.JsonType]):
+    """
+    Concrete class for JSON extension scalar.
+    """
+class OpaqueScalar(Scalar[types.OpaqueType]):
+    """
+    Concrete class for opaque extension scalar.
+    """
 
 class FixedShapeTensorScalar(ExtensionScalar):
+    """
+    Concrete class for fixed shape tensor extension scalar.
+    """
     def to_numpy(self) -> np.ndarray:
         """
         Convert fixed shape tensor scalar to a numpy.ndarray.
@@ -323,13 +611,6 @@ class FixedShapeTensorScalar(ExtensionScalar):
         pyarrow.Tensor
             Tensor represented stored in FixedShapeTensorScalar.
         """
-
-_V = TypeVar("_V", covariant=True)
-
-class NullableCollection(Protocol[_V]):  # pyright: ignore[reportInvalidTypeVarUse]
-    def __iter__(self) -> Iterator[_V] | Iterator[_V | None]: ...
-    def __len__(self) -> int: ...
-    def __contains__(self, item: Any, /) -> bool: ...
 
 def scalar(
     value: Any,
