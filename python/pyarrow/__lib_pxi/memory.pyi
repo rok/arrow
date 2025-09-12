@@ -73,7 +73,12 @@ class MemoryPool(_Weakrefable):
         """
 
 class LoggingMemoryPool(MemoryPool): ...
-class ProxyMemoryPool(MemoryPool): ...
+class ProxyMemoryPool(MemoryPool):
+    """
+    Memory pool implementation that tracks the number of bytes and
+    maximum memory allocated through its direct calls, while redirecting
+    to another memory pool.
+    """
 
 def default_memory_pool() -> MemoryPool:
     """
