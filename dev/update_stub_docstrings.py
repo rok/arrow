@@ -21,13 +21,14 @@
 # Usage
 # =====
 #
-# python ../dev/update_stub_docstrings.py -s ./pyarrow/compute.pyi
+# python ../dev/update_stub_docstrings.py -f ./pyarrow/
 
 
 from pathlib import Path
 from textwrap import indent
 
 import click
+# TODO: perhaps replace griffe with importlib
 import griffe
 import libcst
 
@@ -43,26 +44,23 @@ class DocUpdater(libcst.CSTTransformer):
         # print("extract_docstrings", name)
         try:
             obj = self.package.get_member(name)
-        except KeyError as _:
+        except KeyError:
             # Some cython __init__ symbols can't be found
             # e.g. pyarrow.lib.OSFile.__init__
             parent_name = ".".join(self.stack[:-1])
 
             try:
                 obj = self.package.get_member(parent_name).all_members[self.stack[-1]]
-            except KeyError as _:
-                if self.stack[-1] == "__init__" and \
-                    hasattr(self.package.get_member(parent_name), "analysis") and self.package.get_member(parent_name).analysis == "dynamic":
-                    print(f"{name} expected to not be found in {self.package.name}")
-                else:
-                    print(f"{name} not found in {self.package.name}")
+            except KeyError:
+                # print(f"{name} not found in {self.package.name}, it's probably ok.")
                 return None
 
         if obj.has_docstring:
             docstring = obj.docstring.value
             # remove signature if present in docstring
-            if docstring.startswith(obj.name) or \
-                    (hasattr(obj.parent, "name") and docstring.startswith(f"{obj.parent.name}.{obj.name}")):
+            if docstring.startswith(obj.name) or (
+                (hasattr(obj.parent, "name") and
+                    docstring.startswith(f"{obj.parent.name}.{obj.name}"))):
                 return "\n".join(docstring.splitlines()[2:])
             else:
                 return docstring
@@ -72,11 +70,16 @@ class DocUpdater(libcst.CSTTransformer):
         # TODO: class docstrings?
         self.stack.append(node.name.value)
         self.indentation += 1
+        node_name = ".".join(self.stack)
+        docstring = self._get_docstring(node_name)
 
-    def leave_ClassDef(self, original_node, updated_node):
-        self.stack.pop()
-        self.indentation -= 1
-        return updated_node
+        if docstring:
+            if not node.get_docstring(clean=False):
+                print("Missing docstring (in annotations) for:", node_name)
+                return False
+            self._docstring = f'"""{node.get_docstring(clean=False)}"""'
+            return True
+        return False
 
     def visit_FunctionDef(self, node):
         self.stack.append(node.name.value)
@@ -92,6 +95,11 @@ class DocUpdater(libcst.CSTTransformer):
             return True
         return False
 
+    def leave_ClassDef(self, original_node, updated_node):
+        self.stack.pop()
+        self.indentation -= 1
+        return updated_node
+
     def leave_FunctionDef(self, original_node, updated_node):
         self.stack.pop()
         self.indentation -= 1
@@ -102,87 +110,22 @@ class DocUpdater(libcst.CSTTransformer):
 
         if original_node.value == self._docstring:
             indentation = self.indentation * "    "
-            docstring = f'"""\n{indent(self._get_docstring(node_name), indentation)}\n{indentation}"""'
+            indented_docstring = indent(self._get_docstring(node_name), indentation)
+            docstring = f'"""\n{indented_docstring}\n{indentation}"""'
             return updated_node.with_changes(value=docstring)
 
         return updated_node
 
 
-# def _is_docstring_node(node):
-#     """Checks if a node is a docstring."""
-#     return (
-#         isinstance(node, cst.SimpleStatementLine) and
-#         isinstance(node.body[0], cst.Expr) and
-#         isinstance(node.body[0].value, cst.SimpleString)
-#     )
-
-
-# class ClonedSignatureDocstringTransformer(cst.CSTTransformer):
-#     def __init__(self, docstrings_map, module_name):
-#         self.docstrings_map = docstrings_map
-#         self.module_name = module_name
-#         self.name_of_function = None
-
-#     def leave_Assign(self, original_node, updated_node):
-#         target = original_node.targets[0].target
-#         value = original_node.value
-
-#         if isinstance(target, cst.Name) and isinstance(value, cst.Call) and \
-#                 value.func.value == "_clone_signature":
-#             self.name_of_function = f"{self.module_name}.{target.value}"
-#         return updated_node
-
-#     def leave_SimpleStatementLine(self, original_node, updated_node):
-#         if self.name_of_function:
-#             if len(updated_node.body) > 0 and _is_docstring_node(updated_node):
-#                 comment_content = self.docstrings_map[self.name_of_function].strip()
-#                 self.name_of_function = None
-
-#                 new_string_node = cst.SimpleString(value=f'"""\n{comment_content}\n"""')
-#                 new_expr_node = updated_node.body[0].with_changes(value=new_string_node)
-#                 new_body = [new_expr_node] + list(updated_node.body[1:])
-#                 updated_node = updated_node.with_changes(body=new_body)
-
-#         return updated_node
-
-
-# class FunctionDocstringTransformer(cst.CSTTransformer):
-#     def __init__(self, docstrings_map, module_name):
-#         self.docstrings_map = docstrings_map
-#         self.module_name = module_name
-
-#     def leave_FunctionDef(self, original_node, updated_node):
-#         full_name = f"{self.module_name}.{original_node.name.value}"
-
-#         # Check if we have a docstring for this function
-#         if full_name in self.docstrings_map:
-#             # Check if the function already has a docstring
-#             body_list = list(updated_node.body.body)
-#             has_docstring = len(body_list) > 0 and _is_docstring_node(body_list[0])
-
-#             if has_docstring:
-#                 # Replace existing docstring
-#                 docstring = indent(self.docstrings_map[full_name], "    ").strip()
-#                 docstring_value = f'"""\n    {docstring}\n    """'
-#                 new_docstring_node = cst.SimpleStatementLine(
-#                     body=[cst.Expr(value=cst.SimpleString(value=docstring_value))]
-#                 )
-#                 new_body = [new_docstring_node] + body_list[1:]
-#                 return updated_node.with_changes(
-#                     body=updated_node.body.with_changes(body=new_body)
-#                 )
-
-#         return updated_node
-
-
 @click.command()
-@click.option('--pyarrow_folder', '-s', type=click.Path(resolve_path=True))
+@click.option('--pyarrow_folder', '-f', type=click.Path(resolve_path=True))
 def update_stub_files(pyarrow_folder):
     print("Updating docstrings of stub files in:", pyarrow_folder)
-    package = griffe.load("pyarrow", try_relative_path=True, force_inspection=True, resolve_aliases=True)
+    package = griffe.load("pyarrow", try_relative_path=True,
+                          force_inspection=True, resolve_aliases=True)
 
     for stub_file in Path(pyarrow_folder).rglob('*.pyi'):
-        if stub_file.name ==  "_stubs_typing.pyi":
+        if stub_file.name == "_stubs_typing.pyi":
             continue
 
         print(f"[{stub_file}]")
@@ -190,7 +133,7 @@ def update_stub_files(pyarrow_folder):
         with open(stub_file, 'r') as f:
             tree = libcst.parse_module(f.read())
 
-        if stub_file.name !=  "__init__.pyi":
+        if stub_file.name != "__init__.pyi":
             modified_tree = tree.visit(DocUpdater(package, "lib"))
         else:
             modified_tree = tree.visit(DocUpdater(package, None))
