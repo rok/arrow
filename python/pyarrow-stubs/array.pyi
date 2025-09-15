@@ -54,6 +54,7 @@ from pyarrow.lib import ( # type: ignore[attr-defined]
     _Weakrefable,
 )
 from typing_extensions import deprecated
+import builtins
 
 from .scalar import *
 from .device import DeviceAllocationType  # type: ignore[import-not-found]
@@ -891,7 +892,7 @@ class Array(_PandasConvertible[pd.Series], Generic[_Scalar_co]):
         result : Array
             A new array with nulls replaced by the given value.
         """
-    def __getitem__(self, key: int | slice) -> _Scalar_co | Self:
+    def __getitem__(self, key: int | builtins.slice) -> _Scalar_co | Self:
         """
         Slice or return value at given index
 
@@ -2488,7 +2489,7 @@ class UnionArray(Array[UnionScalar]):
         """
     @staticmethod
     def from_dense(
-        type: Int8Array,
+        types: Int8Array,
         value_offsets: Int32Array,
         children: NullableCollection[Array],
         field_names: list[str] | None = None,

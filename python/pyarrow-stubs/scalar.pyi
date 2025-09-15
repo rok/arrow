@@ -36,7 +36,6 @@ from pyarrow.lib import Array, Buffer, MemoryPool, MonthDayNano, Tensor, _Weakre
 from typing_extensions import  TypeVar
 
 from ._types import (
-    # _AsPyType,
     _DataTypeT,
     _Time32Unit,
     _Time64Unit,
@@ -49,7 +48,17 @@ from ._types import (
     LargeListViewType,
     FixedSizeListType,
 )
-from . import types
+from ._types import (
+    Decimal256Type, _Precision, _Scale, NullType, BoolType, UInt8Type, Int8Type,
+    UInt16Type, Int16Type, Uint32Type, Int32Type, UInt64Type, Int64Type,
+    Float16Type, Float32Type, Float64Type, Decimal32Type, Decimal64Type,
+    Decimal128Type, Date32Type, Date64Type, Time32Type, Time64Type, TimestampType,
+    _Size, DurationType, MonthDayNanoIntervalType, BinaryType, LargeBinaryType,
+    FixedSizeBinaryType, StringType, LargeStringType, BinaryViewType, StringViewType,
+    StructType, _K, _ValueT, _IndexT, _BasicValueT, RunEndEncodedType, _RunEndType,
+    UnionType, ExtensionType, BaseExtensionType, Bool8Type, UuidType, JsonType,
+    OpaqueType, DictionaryType, MapType, _BasicDataType,
+)
 
 _AsPyTypeK = TypeVar("_AsPyTypeK")
 _AsPyTypeV = TypeVar("_AsPyTypeV")
@@ -148,115 +157,115 @@ class Scalar(_Weakrefable, Generic[_DataType_co]):
 _NULL: TypeAlias = None
 NA = _NULL
 
-class NullScalar(Scalar[types.NullType]):
+class NullScalar(Scalar[NullType]):
     """
     Concrete class for null scalars.
     """
-class BooleanScalar(Scalar[types.BoolType]):
+class BooleanScalar(Scalar[BoolType]):
     """
     Concrete class for boolean scalars.
     """
-class UInt8Scalar(Scalar[types.UInt8Type]):
+class UInt8Scalar(Scalar[UInt8Type]):
     """
     Concrete class for uint8 scalars.
     """
-class Int8Scalar(Scalar[types.Int8Type]):
+class Int8Scalar(Scalar[Int8Type]):
     """
     Concrete class for int8 scalars.
     """
-class UInt16Scalar(Scalar[types.UInt16Type]):
+class UInt16Scalar(Scalar[UInt16Type]):
     """
     Concrete class for uint16 scalars.
     """
-class Int16Scalar(Scalar[types.Int16Type]):
+class Int16Scalar(Scalar[Int16Type]):
     """
     Concrete class for int16 scalars.
     """
-class UInt32Scalar(Scalar[types.Uint32Type]):
+class UInt32Scalar(Scalar[Uint32Type]):
     """
     Concrete class for uint32 scalars.
     """
-class Int32Scalar(Scalar[types.Int32Type]):
+class Int32Scalar(Scalar[Int32Type]):
     """
     Concrete class for int32 scalars.
     """
-class UInt64Scalar(Scalar[types.UInt64Type]):
+class UInt64Scalar(Scalar[UInt64Type]):
     """
     Concrete class for uint64 scalars.
     """
-class Int64Scalar(Scalar[types.Int64Type]):
+class Int64Scalar(Scalar[Int64Type]):
     """
     Concrete class for int64 scalars.
     """
-class HalfFloatScalar(Scalar[types.Float16Type]):
+class HalfFloatScalar(Scalar[Float16Type]):
     """
     Concrete class for float scalars.
     """
-class FloatScalar(Scalar[types.Float32Type]):
+class FloatScalar(Scalar[Float32Type]):
     """
     Concrete class for float scalars.
     """
-class DoubleScalar(Scalar[types.Float64Type]):
+class DoubleScalar(Scalar[Float64Type]):
     """
     Concrete class for double scalars.
     """
-class Decimal32Scalar(Scalar[types.Decimal32Type[types._Precision, types._Scale]]):
+class Decimal32Scalar(Scalar[Decimal32Type[_Precision, _Scale]]):
     """
     Concrete class for decimal32 scalars.
     """
-class Decimal64Scalar(Scalar[types.Decimal64Type[types._Precision, types._Scale]]):
+class Decimal64Scalar(Scalar[Decimal64Type[_Precision, _Scale]]):
     """
     Concrete class for decimal64 scalars.
     """
-class Decimal128Scalar(Scalar[types.Decimal128Type[types._Precision, types._Scale]]):
+class Decimal128Scalar(Scalar[Decimal128Type[_Precision, _Scale]]):
     """
     Concrete class for decimal128 scalars.
     """
-class Decimal256Scalar(Scalar[types.Decimal256Type[types._Precision, types._Scale]]):
+class Decimal256Scalar(Scalar[Decimal256Type[_Precision, _Scale]]):
     """
     Concrete class for decimal256 scalars.
     """
-class Date32Scalar(Scalar[types.Date32Type]):
+class Date32Scalar(Scalar[Date32Type]):
     """
     Concrete class for date32 scalars.
     """
 
-class Date64Scalar(Scalar[types.Date64Type]):
+class Date64Scalar(Scalar[Date64Type]):
     """
     Concrete class for date64 scalars.
     """
     @property
     def value(self) -> dt.date | None: ...
 
-class Time32Scalar(Scalar[types.Time32Type[_Time32Unit]]):
+class Time32Scalar(Scalar[Time32Type[_Time32Unit]]):
     """
     Concrete class for time32 scalars.
     """
     @property
     def value(self) -> dt.time | None: ...
 
-class Time64Scalar(Scalar[types.Time64Type[_Time64Unit]]):
+class Time64Scalar(Scalar[Time64Type[_Time64Unit]]):
     """
     Concrete class for time64 scalars.
     """
     @property
     def value(self) -> dt.time | None: ...
 
-class TimestampScalar(Scalar[types.TimestampType[_Unit, _Tz]]):
+class TimestampScalar(Scalar[TimestampType[_Unit, _Tz]]):
     """
     Concrete class for timestamp scalars.
     """
     @property
     def value(self) -> int | None: ...
 
-class DurationScalar(Scalar[types.DurationType[_Unit]]):
+class DurationScalar(Scalar[DurationType[_Unit]]):
     """
     Concrete class for duration scalars.
     """
     @property
     def value(self) -> dt.timedelta | None: ...
 
-class MonthDayNanoIntervalScalar(Scalar[types.MonthDayNanoIntervalType]):
+class MonthDayNanoIntervalScalar(Scalar[MonthDayNanoIntervalType]):
     """
     Concrete class for month, day, nanosecond interval scalars.
     """
@@ -266,7 +275,7 @@ class MonthDayNanoIntervalScalar(Scalar[types.MonthDayNanoIntervalType]):
         Same as self.as_py()
         """
 
-class BinaryScalar(Scalar[types.BinaryType]):
+class BinaryScalar(Scalar[BinaryType]):
     """
     Concrete class for binary-like scalars.
     """
@@ -275,7 +284,7 @@ class BinaryScalar(Scalar[types.BinaryType]):
         Return a view over this value as a Buffer object.
         """
 
-class LargeBinaryScalar(Scalar[types.LargeBinaryType]):
+class LargeBinaryScalar(Scalar[LargeBinaryType]):
     """
     """
     def as_buffer(self) -> Buffer:
@@ -285,7 +294,7 @@ class LargeBinaryScalar(Scalar[types.LargeBinaryType]):
         Return a view over this value as a Buffer object.
         """
 
-class FixedSizeBinaryScalar(Scalar[types.FixedSizeBinaryType]):
+class FixedSizeBinaryScalar(Scalar[FixedSizeBinaryType]):
     """
     """
     def as_buffer(self) -> Buffer:
@@ -295,7 +304,7 @@ class FixedSizeBinaryScalar(Scalar[types.FixedSizeBinaryType]):
         Return a view over this value as a Buffer object.
         """
 
-class StringScalar(Scalar[types.StringType]):
+class StringScalar(Scalar[StringType]):
     """
     Concrete class for string-like (utf8) scalars.
     """
@@ -306,7 +315,7 @@ class StringScalar(Scalar[types.StringType]):
         Return a view over this value as a Buffer object.
         """
 
-class LargeStringScalar(Scalar[types.LargeStringType]):
+class LargeStringScalar(Scalar[LargeStringType]):
     """
     """
     def as_buffer(self) -> Buffer:
@@ -316,7 +325,7 @@ class LargeStringScalar(Scalar[types.LargeStringType]):
         Return a view over this value as a Buffer object.
         """
 
-class BinaryViewScalar(Scalar[types.BinaryViewType]):
+class BinaryViewScalar(Scalar[BinaryViewType]):
     """
     """
     def as_buffer(self) -> Buffer:
@@ -326,7 +335,7 @@ class BinaryViewScalar(Scalar[types.BinaryViewType]):
         Return a view over this value as a Buffer object.
         """
 
-class StringViewScalar(Scalar[types.StringViewType]):
+class StringViewScalar(Scalar[StringViewType]):
     """
     """
     def as_buffer(self) -> Buffer:
@@ -355,7 +364,7 @@ class ListScalar(Scalar[ListType[_DataTypeT]]):
         Iterate over this element's values.
         """
 
-class FixedSizeListScalar(Scalar[FixedSizeListType[_DataTypeT, types._Size]]):
+class FixedSizeListScalar(Scalar[FixedSizeListType[_DataTypeT, _Size]]):
     """
     """
     @property
@@ -451,7 +460,7 @@ class LargeListViewScalar(Scalar[LargeListViewType[_DataTypeT]]):
         Iterate over this element's values.
         """
 
-class StructScalar(Scalar[types.StructType], collections.abc.Mapping[str, Scalar]):
+class StructScalar(Scalar[StructType], collections.abc.Mapping[str, Scalar]):
     """
     Concrete class for struct scalars.
     """
@@ -478,7 +487,7 @@ class StructScalar(Scalar[types.StructType], collections.abc.Mapping[str, Scalar
         """
     def _as_py_tuple(self) -> list[tuple[str, Any]]: ...
 
-class MapScalar(Scalar[types.MapType[types._K, types._ValueT]]):
+class MapScalar(Scalar[MapType[_K, _ValueT]]):
     """
     Concrete class for map scalars.
     """
@@ -490,48 +499,48 @@ class MapScalar(Scalar[types.MapType[types._K, types._ValueT]]):
 
         Return the number of values.
         """
-    def __getitem__(self, i: int) -> tuple[Scalar[types._K], types._ValueT, Any]:
+    def __getitem__(self, i: int) -> tuple[Scalar[_K], _ValueT, Any]:
         """
         Return the value at the given index or key.
         """
     def __iter__(
         self: Scalar[
-            types.MapType[types._BasicDataType[_AsPyTypeK], types._BasicDataType[_AsPyTypeV]],]
-            | Scalar[types.MapType[Any, types._BasicDataType[_AsPyTypeV]]]
-            | Scalar[types.MapType[types._BasicDataType[_AsPyTypeK], Any]]
+            MapType[_BasicDataType[_AsPyTypeK], _BasicDataType[_AsPyTypeV]],]
+            | Scalar[MapType[Any, _BasicDataType[_AsPyTypeV]]]
+            | Scalar[MapType[_BasicDataType[_AsPyTypeK], Any]]
     ) -> Iterator[tuple[_AsPyTypeK, _AsPyTypeV]] | Iterator[tuple[Any, _AsPyTypeV]] | Iterator[tuple[_AsPyTypeK, Any]]:
         """
         Iterate over this element's values.
         """
 
-class DictionaryScalar(Scalar[types.DictionaryType[types._IndexT, types._BasicValueT]]):
+class DictionaryScalar(Scalar[DictionaryType[_IndexT, _BasicValueT]]):
     """
     Concrete class for dictionary-encoded scalars.
     """
     @property
-    def index(self) -> Scalar[types._IndexT]:
+    def index(self) -> Scalar[_IndexT]:
         """
         Return this value's underlying index as a scalar.
         """
     @property
-    def value(self) -> Scalar[types._BasicValueT]:
+    def value(self) -> Scalar[_BasicValueT]:
         """
         Return the encoded value as a scalar.
         """
     @property
     def dictionary(self) -> Array: ...
 
-class RunEndEncodedScalar(Scalar[types.RunEndEncodedType[types._RunEndType, types._BasicValueT]]):
+class RunEndEncodedScalar(Scalar[RunEndEncodedType[_RunEndType, _BasicValueT]]):
     """
     Concrete class for RunEndEncoded scalars.
     """
     @property
-    def value(self) -> tuple[int, types._BasicValueT] | None:
+    def value(self) -> tuple[int, _BasicValueT] | None:
         """
         Return underlying value as a scalar.
         """
 
-class UnionScalar(Scalar[types.UnionType]):
+class UnionScalar(Scalar[UnionType]):
     """
     Concrete class for Union scalars.
     """
@@ -546,7 +555,7 @@ class UnionScalar(Scalar[types.UnionType]):
         Return the union type code for this scalar.
         """
 
-class ExtensionScalar(Scalar[types.ExtensionType]):
+class ExtensionScalar(Scalar[ExtensionType]):
     """
     Concrete class for Extension scalars.
     """
@@ -556,7 +565,7 @@ class ExtensionScalar(Scalar[types.ExtensionType]):
         Return storage value as a scalar.
         """
     @staticmethod
-    def from_storage(typ: types.BaseExtensionType, value) -> ExtensionScalar:
+    def from_storage(typ: BaseExtensionType, value) -> ExtensionScalar:
         """
         Construct ExtensionScalar from type and storage value.
 
@@ -572,19 +581,19 @@ class ExtensionScalar(Scalar[types.ExtensionType]):
         ext_scalar : ExtensionScalar
         """
 
-class Bool8Scalar(Scalar[types.Bool8Type]):
+class Bool8Scalar(Scalar[Bool8Type]):
     """
     Concrete class for bool8 extension scalar.
     """
-class UuidScalar(Scalar[types.UuidType]):
+class UuidScalar(Scalar[UuidType]):
     """
     Concrete class for Uuid extension scalar.
     """
-class JsonScalar(Scalar[types.JsonType]):
+class JsonScalar(Scalar[JsonType]):
     """
     Concrete class for JSON extension scalar.
     """
-class OpaqueScalar(Scalar[types.OpaqueType]):
+class OpaqueScalar(Scalar[OpaqueType]):
     """
     Concrete class for opaque extension scalar.
     """

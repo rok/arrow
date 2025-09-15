@@ -38,7 +38,6 @@ from .scalar import *
 from .tensor import *
 from ._types import *
 
-_DataTypeT = TypeVar("_DataTypeT", bound=DataType)
 
 class MonthDayNano(NamedTuple):
     days: int

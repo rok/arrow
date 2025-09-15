@@ -619,6 +619,7 @@ class SparseCSFTensor(_Weakrefable):
         indptr: np.ndarray,
         indices: np.ndarray,
         shape: tuple[int, ...],
+        axis_order: list[int] | None = None,
         dim_names: list[str] | None = None,
     ) -> Self:
         """
