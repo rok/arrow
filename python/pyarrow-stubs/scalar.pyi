@@ -35,19 +35,25 @@ from pyarrow._compute import CastOptions  # type: ignore[import-not-found]
 from pyarrow.lib import Array, Buffer, MemoryPool, MonthDayNano, Tensor, _Weakrefable
 from typing_extensions import  TypeVar
 
-from . import types
-from .types import (
+from ._types import (
     # _AsPyType,
     _DataTypeT,
     _Time32Unit,
     _Time64Unit,
     _Tz,
     _Unit,
+    DataType,
+    ListType,
+    LargeListType,
+    ListViewType,
+    LargeListViewType,
+    FixedSizeListType,
 )
+from . import types
 
 _AsPyTypeK = TypeVar("_AsPyTypeK")
 _AsPyTypeV = TypeVar("_AsPyTypeV")
-_DataType_co = TypeVar("_DataType_co", bound=types.DataType, covariant=True)
+_DataType_co = TypeVar("_DataType_co", bound=DataType, covariant=True)
 
 class Scalar(_Weakrefable, Generic[_DataType_co]):
     """
@@ -330,7 +336,7 @@ class StringViewScalar(Scalar[types.StringViewType]):
         Return a view over this value as a Buffer object.
         """
 
-class ListScalar(Scalar[types.ListType[_DataTypeT]]):
+class ListScalar(Scalar[ListType[_DataTypeT]]):
     """
     Concrete class for list-like scalars.
     """
@@ -349,7 +355,7 @@ class ListScalar(Scalar[types.ListType[_DataTypeT]]):
         Iterate over this element's values.
         """
 
-class FixedSizeListScalar(Scalar[types.FixedSizeListType[_DataTypeT, types._Size]]):
+class FixedSizeListScalar(Scalar[FixedSizeListType[_DataTypeT, types._Size]]):
     """
     """
     @property
@@ -373,7 +379,7 @@ class FixedSizeListScalar(Scalar[types.FixedSizeListType[_DataTypeT, types._Size
         Iterate over this element's values.
         """
 
-class LargeListScalar(Scalar[types.LargeListType[_DataTypeT]]):
+class LargeListScalar(Scalar[LargeListType[_DataTypeT]]):
     """
     """
     @property
@@ -397,7 +403,7 @@ class LargeListScalar(Scalar[types.LargeListType[_DataTypeT]]):
         Iterate over this element's values.
         """
 
-class ListViewScalar(Scalar[types.ListViewType[_DataTypeT]]):
+class ListViewScalar(Scalar[ListViewType[_DataTypeT]]):
     """
     """
     @property
@@ -421,7 +427,7 @@ class ListViewScalar(Scalar[types.ListViewType[_DataTypeT]]):
         Iterate over this element's values.
         """
 
-class LargeListViewScalar(Scalar[types.LargeListViewType[_DataTypeT]]):
+class LargeListViewScalar(Scalar[LargeListViewType[_DataTypeT]]):
     """
     """
     @property
