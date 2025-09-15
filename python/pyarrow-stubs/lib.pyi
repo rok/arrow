@@ -21,22 +21,22 @@ import datetime as dt
 from typing import NamedTuple, Literal
 from typing_extensions import TypeVar
 
-from .__lib_pxi.array import *
+from .array import *
 # TODO
-# from .__lib_pxi.benchmark import *
-# from .__lib_pxi.builder import *
-# from .__lib_pxi.compat import *
-# from .__lib_pxi.config import *
-# from .__lib_pxi.device import *
-# from .__lib_pxi.error import *
-from .__lib_pxi.io import *
+# from .benchmark import *
+# from .builder import *
+# from .compat import *
+# from .config import *
+# from .device import *
+# from .error import *
+from .io import *
 # from .__lib_pxi.ipc import *
-from .__lib_pxi.memory import *
-# from .__lib_pxi.pandas_shim import *
-from .__lib_pxi.scalar import *
-# from .__lib_pxi.table import *
-from .__lib_pxi.tensor import *
-from .__lib_pxi.types import *
+from .memory import *
+# from .pandas_shim import *
+from .scalar import *
+# from .table import *
+from .tensor import *
+from ._types import *
 
 _DataTypeT = TypeVar("_DataTypeT", bound=DataType)
 

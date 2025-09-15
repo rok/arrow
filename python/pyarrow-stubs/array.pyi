@@ -55,13 +55,20 @@ from pyarrow.lib import ( # type: ignore[attr-defined]
 )
 from typing_extensions import deprecated
 
-from . import scalar, types
+from .scalar import *
 from .device import DeviceAllocationType  # type: ignore[import-not-found]
-from .scalar import Scalar
-from .types import (
+from ._types import (
+    BaseExtensionType,
+    BinaryType,
     DataType,
     Field,
+    Float64Type,
+    Int16Type,
+    Int32Type,
+    Int64Type,
     MapType,
+    StringType,
+    StructType,
     _AsPyType,
     _BasicDataType,
     _BasicValueT,
@@ -69,8 +76,12 @@ from .types import (
     _IndexT,
     _RunEndType,
     _Size,
+    _Time32Unit,
+    _Time64Unit,
+    _Tz,
+    _Unit,
 )
-from .._stubs_typing import NullableCollection
+from ._stubs_typing import NullableCollection
 
 def array(
     values: NullableCollection[Any] | Iterable[Any] | SupportArrowArray | SupportArrowDeviceArray,
@@ -963,7 +974,7 @@ class Array(_PandasConvertible[pd.Series], Generic[_Scalar_co]):
         end: int | None = None,
         *,
         memory_pool: MemoryPool | None = None,
-    ) -> scalar.Int64Scalar | scalar.Int64Scalar:
+    ) -> Int64Scalar:
         """
         Find the first index of a value.
 
@@ -1270,12 +1281,12 @@ class Array(_PandasConvertible[pd.Series], Generic[_Scalar_co]):
         Statistics of the array.
         """
 
-class NullArray(Array[scalar.NullScalar]):
+class NullArray(Array[NullScalar]):
     """
     Concrete class for Arrow arrays of null data type.
     """
 
-class BooleanArray(Array[scalar.BooleanScalar]):
+class BooleanArray(Array[BooleanScalar]):
     """
     Concrete class for Arrow arrays of boolean data type.
     """
@@ -1296,79 +1307,79 @@ class FloatingPointArray(NumericArray[_ScalarT]):
     """
     A base class for Arrow floating-point arrays.
     """
-class Int8Array(IntegerArray[scalar.Int8Scalar]):
+class Int8Array(IntegerArray[Int8Scalar]):
     """
     Concrete class for Arrow arrays of int8 data type.
     """
-class UInt8Array(IntegerArray[scalar.UInt8Scalar]):
+class UInt8Array(IntegerArray[UInt8Scalar]):
     """
     Concrete class for Arrow arrays of uint8 data type.
     """
-class Int16Array(IntegerArray[scalar.Int16Scalar]):
+class Int16Array(IntegerArray[Int16Scalar]):
     """
     Concrete class for Arrow arrays of int16 data type.
     """
-class UInt16Array(IntegerArray[scalar.UInt16Scalar]):
+class UInt16Array(IntegerArray[UInt16Scalar]):
     """
     Concrete class for Arrow arrays of uint16 data type.
     """
-class Int32Array(IntegerArray[scalar.Int32Scalar]):
+class Int32Array(IntegerArray[Int32Scalar]):
     """
     Concrete class for Arrow arrays of int32 data type.
     """
-class UInt32Array(IntegerArray[scalar.UInt32Scalar]):
+class UInt32Array(IntegerArray[UInt32Scalar]):
     """
     Concrete class for Arrow arrays of uint32 data type.
     """
-class Int64Array(IntegerArray[scalar.Int64Scalar]):
+class Int64Array(IntegerArray[Int64Scalar]):
     """
     Concrete class for Arrow arrays of int64 data type.
     """
-class UInt64Array(IntegerArray[scalar.UInt64Scalar]):
+class UInt64Array(IntegerArray[UInt64Scalar]):
     """
     Concrete class for Arrow arrays of uint64 data type.
     """
-class Date32Array(NumericArray[scalar.Date32Scalar]):
+class Date32Array(NumericArray[Date32Scalar]):
     """
     Concrete class for Arrow arrays of date32 data type.
     """
-class Date64Array(NumericArray[scalar.Date64Scalar]):
+class Date64Array(NumericArray[Date64Scalar]):
     """
     Concrete class for Arrow arrays of date64 data type.
     """
-class TimestampArray(NumericArray[scalar.TimestampScalar[types._Unit, types._Tz]]):
+class TimestampArray(NumericArray[TimestampScalar[_Unit, _Tz]]):
     """
     Concrete class for Arrow arrays of timestamp data type.
     """
-class Time32Array(NumericArray[scalar.Time32Scalar[types._Time32Unit]]):
+class Time32Array(NumericArray[Time32Scalar[_Time32Unit]]):
     """
     Concrete class for Arrow arrays of time32 data type.
     """
-class Time64Array(NumericArray[scalar.Time64Scalar[types._Time64Unit]]):
+class Time64Array(NumericArray[Time64Scalar[_Time64Unit]]):
     """
     Concrete class for Arrow arrays of time64 data type.
     """
-class DurationArray(NumericArray[scalar.DurationScalar[types._Unit]]):
+class DurationArray(NumericArray[DurationScalar[_Unit]]):
     """
     Concrete class for Arrow arrays of duration data type.
     """
-class MonthDayNanoIntervalArray(Array[scalar.MonthDayNanoIntervalScalar]):
+class MonthDayNanoIntervalArray(Array[MonthDayNanoIntervalScalar]):
     """
     Concrete class for Arrow arrays of interval[MonthDayNano] type.
     """
-class HalfFloatArray(FloatingPointArray[scalar.HalfFloatScalar]):
+class HalfFloatArray(FloatingPointArray[HalfFloatScalar]):
     """
     Concrete class for Arrow arrays of float16 data type.
     """
-class FloatArray(FloatingPointArray[scalar.FloatScalar]):
+class FloatArray(FloatingPointArray[FloatScalar]):
     """
     Concrete class for Arrow arrays of float32 data type.
     """
-class DoubleArray(FloatingPointArray[scalar.DoubleScalar]):
+class DoubleArray(FloatingPointArray[DoubleScalar]):
     """
     Concrete class for Arrow arrays of float64 data type.
     """
-class FixedSizeBinaryArray(Array[scalar.FixedSizeBinaryScalar]):
+class FixedSizeBinaryArray(Array[FixedSizeBinaryScalar]):
     """
     Concrete class for Arrow arrays of a fixed-size binary data type.
     """
@@ -1533,7 +1544,7 @@ class ListArray(BaseListArray[_ScalarT]):
         type: _DataTypeT | None = None,
         pool: MemoryPool | None = None,
         mask: Mask | None = None,
-    ) -> ListArray[scalar.ListScalar[_DataTypeT | types.Int64Type | types.Float64Type | types.StringType | types.BinaryType]] | ListArray:
+    ) -> ListArray[ListScalar[_DataTypeT | Int64Type | Float64Type | StringType | BinaryType]] | ListArray:
         """
         Construct ListArray from arrays of int32 offsets and values.
 
@@ -1679,7 +1690,7 @@ class ListArray(BaseListArray[_ScalarT]):
         ]
         """
 
-class LargeListArray(BaseListArray[scalar.LargeListScalar[_DataTypeT]]):
+class LargeListArray(BaseListArray[LargeListScalar[_DataTypeT]]):
     """
     Concrete class for Arrow arrays of a large list data type.
 
@@ -1797,7 +1808,7 @@ class LargeListArray(BaseListArray[scalar.LargeListScalar[_DataTypeT]]):
         offsets : Int64Array
         """
 
-class ListViewArray(BaseListArray[scalar.ListViewScalar[_DataTypeT]]):
+class ListViewArray(BaseListArray[ListViewScalar[_DataTypeT]]):
     """
     Concrete class for Arrow arrays of a list view data type.
     """
@@ -1992,7 +2003,7 @@ class ListViewArray(BaseListArray[scalar.ListViewScalar[_DataTypeT]]):
         ]
         """
 
-class LargeListViewArray(BaseListArray[scalar.LargeListScalar[_DataTypeT]]):
+class LargeListViewArray(BaseListArray[LargeListScalar[_DataTypeT]]):
     """
     Concrete class for Arrow arrays of a large list view data type.
 
@@ -2196,7 +2207,7 @@ class LargeListViewArray(BaseListArray[scalar.LargeListScalar[_DataTypeT]]):
         ]
         """
 
-class FixedSizeListArray(BaseListArray[scalar.FixedSizeListScalar[_DataTypeT, _Size]]):
+class FixedSizeListArray(BaseListArray[FixedSizeListScalar[_DataTypeT, _Size]]):
     """
     Concrete class for Arrow arrays of a fixed size list data type.
     """
@@ -2267,7 +2278,7 @@ class FixedSizeListArray(BaseListArray[scalar.FixedSizeListScalar[_DataTypeT, _S
         ]
         """
     @property
-    def values(self) -> BaseListArray[scalar.ListScalar[_DataTypeT]]:
+    def values(self) -> BaseListArray[ListScalar[_DataTypeT]]:
         """
         Return the underlying array of values which backs the
         FixedSizeListArray ignoring the array's offset.
@@ -2307,7 +2318,7 @@ class FixedSizeListArray(BaseListArray[scalar.FixedSizeListScalar[_DataTypeT, _S
 _MapKeyT = TypeVar("_MapKeyT", bound=_BasicDataType)
 _MapItemT = TypeVar("_MapItemT", bound=_BasicDataType)
 
-class MapArray(BaseListArray[scalar.MapScalar[_MapKeyT, _MapItemT]]):
+class MapArray(BaseListArray[MapScalar[_MapKeyT, _MapItemT]]):
     """
     Concrete class for Arrow arrays of a map data type.
     """
@@ -2425,7 +2436,7 @@ class MapArray(BaseListArray[scalar.MapScalar[_MapKeyT, _MapItemT]]):
         Flattened array of items across all maps in array
         """
 
-class UnionArray(Array[scalar.UnionScalar]):
+class UnionArray(Array[UnionScalar]):
     """
     Concrete class for Arrow arrays of a Union data type.
     """
@@ -2522,7 +2533,7 @@ class UnionArray(Array[scalar.UnionScalar]):
         union_array : UnionArray
         """
 
-class StringArray(Array[scalar.StringScalar]):
+class StringArray(Array[StringScalar]):
     """
     Concrete class for Arrow arrays of string (or utf8) data type.
     """
@@ -2554,7 +2565,7 @@ class StringArray(Array[scalar.StringScalar]):
         string_array : StringArray
         """
 
-class LargeStringArray(Array[scalar.LargeStringScalar]):
+class LargeStringArray(Array[LargeStringScalar]):
     """
     Concrete class for Arrow arrays of large string (or utf8) data type.
     """
@@ -2586,12 +2597,12 @@ class LargeStringArray(Array[scalar.LargeStringScalar]):
         string_array : StringArray
         """
 
-class StringViewArray(Array[scalar.StringViewScalar]):
+class StringViewArray(Array[StringViewScalar]):
     """
     Concrete class for Arrow arrays of string (or utf8) view data type.
     """
 
-class BinaryArray(Array[scalar.BinaryScalar]):
+class BinaryArray(Array[BinaryScalar]):
     """
     Concrete class for Arrow arrays of variable-sized binary data type.
     """
@@ -2602,7 +2613,7 @@ class BinaryArray(Array[scalar.BinaryScalar]):
         by the offsets of this BinaryArray.
         """
 
-class LargeBinaryArray(Array[scalar.LargeBinaryScalar]):
+class LargeBinaryArray(Array[LargeBinaryScalar]):
     """
     Concrete class for Arrow arrays of large variable-sized binary data type.
     """
@@ -2613,12 +2624,12 @@ class LargeBinaryArray(Array[scalar.LargeBinaryScalar]):
         by the offsets of this LargeBinaryArray.
         """
 
-class BinaryViewArray(Array[scalar.BinaryViewScalar]):
+class BinaryViewArray(Array[BinaryViewScalar]):
     """
     Concrete class for Arrow arrays of variable-sized binary view data type.
     """
 
-class DictionaryArray(Array[scalar.DictionaryScalar[_IndexT, _BasicValueT]]):
+class DictionaryArray(Array[DictionaryScalar[_IndexT, _BasicValueT]]):
     """
     Concrete class for dictionary-encoded Arrow arrays.
     """
@@ -2700,7 +2711,7 @@ class DictionaryArray(Array[scalar.DictionaryScalar[_IndexT, _BasicValueT]]):
         dict_array : DictionaryArray
         """
 
-class StructArray(Array[scalar.StructScalar]):
+class StructArray(Array[StructScalar]):
     """
     Concrete class for Arrow arrays of a struct data type.
     """
@@ -2737,7 +2748,7 @@ class StructArray(Array[scalar.StructScalar]):
         fields: list[Field] | None = None,
         mask=None,
         memory_pool: MemoryPool | None = None,
-        type: types.StructType | None = None,
+        type: StructType | None = None,
     ) -> StructArray:
         """
         Construct StructArray from collection of arrays representing
@@ -2784,7 +2795,7 @@ class StructArray(Array[scalar.StructScalar]):
         result : StructArray
         """
 
-class RunEndEncodedArray(Array[scalar.RunEndEncodedScalar[_RunEndType, _BasicValueT]]):
+class RunEndEncodedArray(Array[RunEndEncodedScalar[_RunEndType, _BasicValueT]]):
     """
     Concrete class for Arrow run-end encoded arrays.
     """
@@ -2793,7 +2804,7 @@ class RunEndEncodedArray(Array[scalar.RunEndEncodedScalar[_RunEndType, _BasicVal
         run_ends: Int16Array | Int32Array | Int64Array,
         values: Array,
         type: DataType | None = None,
-    ) -> RunEndEncodedArray[types.Int16Type | types.Int32Type | types.Int64Type, _BasicValueT]:  # type: ignore[type-var]
+    ) -> RunEndEncodedArray[Int16Type | Int32Type | Int64Type, _BasicValueT]:  # type: ignore[type-var]
         """
         Construct RunEndEncodedArray from run_ends and values arrays.
 
@@ -2849,14 +2860,14 @@ class RunEndEncodedArray(Array[scalar.RunEndEncodedScalar[_RunEndType, _BasicVal
         RunEndEncodedArray
         """
     @property
-    def run_ends(self) -> Array[scalar.Scalar[_RunEndType]]:
+    def run_ends(self) -> Array[Scalar[_RunEndType]]:
         """
         An array holding the logical indexes of each run-end.
 
         The physical offset to the array is applied.
         """
     @property
-    def values(self) -> Array[scalar.Scalar[_BasicValueT]]:
+    def values(self) -> Array[Scalar[_BasicValueT]]:
         """
         An array holding the values of each run.
 
@@ -2884,14 +2895,14 @@ class RunEndEncodedArray(Array[scalar.RunEndEncodedScalar[_RunEndType, _BasicVal
 
 _ArrayT = TypeVar("_ArrayT", bound=Array)
 
-class ExtensionArray(Array[scalar.ExtensionScalar], Generic[_ArrayT]):
+class ExtensionArray(Array[ExtensionScalar], Generic[_ArrayT]):
     """
     Concrete class for Arrow extension arrays.
     """
     @property
     def storage(self) -> Any: ...
     @staticmethod
-    def from_storage(typ: types.BaseExtensionType, storage: _ArrayT) -> ExtensionArray[_ArrayT]:
+    def from_storage(typ: BaseExtensionType, storage: _ArrayT) -> ExtensionArray[_ArrayT]:
         """
         Construct ExtensionArray from type and storage array.
 
@@ -3232,7 +3243,7 @@ def concat_arrays(arrays: Iterable[_ArrayT], memory_pool: MemoryPool | None = No
     ]
     """
 
-def _empty_array(type: _DataTypeT) -> Array[scalar.Scalar[_DataTypeT]]:
+def _empty_array(type: _DataTypeT) -> Array[Scalar[_DataTypeT]]:
     """
     Create empty array of the given type.
     """

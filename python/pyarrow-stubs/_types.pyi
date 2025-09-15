@@ -4282,4 +4282,9 @@ __all__ = [
     "type_for_alias",
     "schema",
     "from_numpy_dtype",
+    "_Unit",
+    "_Tz",
+    "_Time32Unit",
+    "_Time64Unit",
+
 ]
