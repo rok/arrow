@@ -32,12 +32,13 @@ else:
     from typing_extensions import TypeAlias
 
 from typing import Any, Literal, SupportsIndex
+import builtins
 
 from pyarrow._stubs_typing import Compression, SupportPyBuffer
 from pyarrow.lib import MemoryPool, _Weakrefable
 
 # from .device import Device, DeviceAllocationType, MemoryManager
-from .types import KeyValueMetadata
+from ._types import KeyValueMetadata
 
 def have_libhdfs() -> bool:
     """
@@ -205,7 +206,7 @@ class NativeFile(_Weakrefable):
         -------
         stream : NativeFile
         """
-    def read_at(self) -> bytes:
+    def read_at(self, nbytes: int, offset: int) -> bytes:
         """
         Read indicated number of bytes at offset from the file
 
@@ -218,7 +219,7 @@ class NativeFile(_Weakrefable):
         -------
         data : bytes
         """
-    def read1(self) -> bytes:
+    def read1(self, nbytes: int | None = None) -> bytes:
         """
         Read and return up to n bytes.
 
@@ -323,6 +324,8 @@ class NativeFile(_Weakrefable):
         buffer_size : int, optional
             The buffer size to use for data transfers.
         """
+
+    def writable(self): ...
 
 # ----------------------------------------------------------------------
 # Python file-like objects
@@ -632,7 +635,7 @@ class Buffer(_Weakrefable):
     #     """
     @property
     def parent(self) -> Buffer | None: ...
-    def __getitem__(self, key: slice | int) -> Self | int:
+    def __getitem__(self, key: builtins.slice | int) -> Self | int:
         """
         Return self[key].
         """
