@@ -22,20 +22,19 @@ import pyarrow.lib as _lib
 
 _gc_enabled: bool
 
-# TODO
 from pyarrow.lib import (
-    # BuildInfo,
-    # RuntimeInfo,
-    # set_timezone_db_path,
+    BuildInfo,
+    RuntimeInfo,
+    set_timezone_db_path,
     MonthDayNano,
-    # VersionInfo,
-    # cpp_build_info,
-    # cpp_version,
-    # cpp_version_info,
-    # runtime_info,
+    VersionInfo,
+    cpp_build_info,
+    cpp_version,
+    cpp_version_info,
+    runtime_info,
     cpu_count,
     set_cpu_count,
-    # enable_signal_handlers,
+    enable_signal_handlers,
     io_thread_count,
     set_io_thread_count,
 )
@@ -51,7 +50,6 @@ def show_info() -> None:
 def _module_is_available(module: str) -> bool: ...
 def _filesystem_is_available(fs: str) -> bool: ...
 
-# TODO
 from pyarrow.lib import (
     null,
     bool_,
@@ -144,8 +142,8 @@ from pyarrow.lib import (
     Array,
     Tensor,
     array,
-    # chunked_array,
-    # record_batch,
+    chunked_array,
+    record_batch,
     nulls,
     repeat,
     SparseCOOTensor,
@@ -257,7 +255,7 @@ from pyarrow.lib import (
 )
 
 # Buffers, allocation
-# from pyarrow.lib import DeviceAllocationType, Device, MemoryManager, default_cpu_memory_manager
+from pyarrow.lib import DeviceAllocationType, Device, MemoryManager, default_cpu_memory_manager
 
 from pyarrow.lib import (
     Buffer,
@@ -311,54 +309,52 @@ from pyarrow.lib import (
     have_libhdfs,
 )
 
-# TODO
 from pyarrow.lib import (
-    # ChunkedArray,
-    # RecordBatch,
-    # Table,
-    # table,
+    ChunkedArray,
+    RecordBatch,
+    Table,
+    table,
     concat_arrays,
-    # concat_tables,
-    # TableGroupBy,
-    # RecordBatchReader,
+    concat_tables,
+    TableGroupBy,
+    RecordBatchReader,
 )
 
 # Exceptions
-# from pyarrow.lib import (
-#     ArrowCancelled,
-#     ArrowCapacityError,
-#     ArrowException,
-#     ArrowKeyError,
-#     ArrowIndexError,
-#     ArrowInvalid,
-#     ArrowIOError,
-#     ArrowMemoryError,
-#     ArrowNotImplementedError,
-#     ArrowTypeError,
-#     ArrowSerializationError,
-# )
+from pyarrow.lib import (
+    ArrowCancelled,
+    ArrowCapacityError,
+    ArrowException,
+    ArrowKeyError,
+    ArrowIndexError,
+    ArrowInvalid,
+    ArrowIOError,
+    ArrowMemoryError,
+    ArrowNotImplementedError,
+    ArrowTypeError,
+    ArrowSerializationError,
+)
 
-# TODO
-# from ipc import serialize_pandas, deserialize_pandas
-# import ipc as ipc
+from .ipc import serialize_pandas, deserialize_pandas
+# TODO?
+# import _ipc as ipc
 
 import types as types
 
 # ----------------------------------------------------------------------
 # Deprecations
 
-# from util import _deprecate_api, _deprecate_class
+from .util import _deprecate_api, _deprecate_class
 
-# TODO
-# from pyarrow.ipc import (
-#     Message,
-#     MessageReader,
-#     MetadataVersion,
-#     RecordBatchFileReader,
-#     RecordBatchFileWriter,
-#     RecordBatchStreamReader,
-#     RecordBatchStreamWriter,
-# )
+from pyarrow.ipc import (
+    Message,
+    MessageReader,
+    MetadataVersion,
+    RecordBatchFileReader,
+    RecordBatchFileWriter,
+    RecordBatchStreamReader,
+    RecordBatchStreamWriter,
+)
 
 # ----------------------------------------------------------------------
 # Returning absolute path to the pyarrow include directory (if bundled, e.g. in
@@ -401,18 +397,18 @@ __all__ = [
     "__version__",
     "_lib",
     "_gc_enabled",
-    # "BuildInfo",
-    # "RuntimeInfo",
-    # "set_timezone_db_path",
+    "BuildInfo",
+    "RuntimeInfo",
+    "set_timezone_db_path",
     "MonthDayNano",
-    # "VersionInfo",
-    # "cpp_build_info",
-    # "cpp_version",
-    # "cpp_version_info",
-    # "runtime_info",
+    "VersionInfo",
+    "cpp_build_info",
+    "cpp_version",
+    "cpp_version_info",
+    "runtime_info",
     "cpu_count",
     "set_cpu_count",
-    # "enable_signal_handlers",
+    "enable_signal_handlers",
     "io_thread_count",
     "set_io_thread_count",
     "show_versions",
@@ -510,8 +506,8 @@ __all__ = [
     "Array",
     "Tensor",
     "array",
-    # "chunked_array",
-    # "record_batch",
+    "chunked_array",
+    "record_batch",
     "nulls",
     "repeat",
     "SparseCOOTensor",
@@ -620,10 +616,10 @@ __all__ = [
     "UuidScalar",
     "JsonScalar",
     "OpaqueScalar",
-    # "DeviceAllocationType",
-    # "Device",
-    # "MemoryManager",
-    # "default_cpu_memory_manager",
+    "DeviceAllocationType",
+    "Device",
+    "MemoryManager",
+    "default_cpu_memory_manager",
     "Buffer",
     "ResizableBuffer",
     "foreign_buffer",
@@ -666,38 +662,37 @@ __all__ = [
     "input_stream",
     "output_stream",
     "have_libhdfs",
-    # "ChunkedArray",
-    # "RecordBatch",
-    # "Table",
-    # "table",
+    "ChunkedArray",
+    "RecordBatch",
+    "Table",
+    "table",
     "concat_arrays",
-    # "concat_tables",
-    # "TableGroupBy",
-    # "RecordBatchReader",
-    # "ArrowCancelled",
-    # "ArrowCapacityError",
-    # "ArrowException",
-    # "ArrowKeyError",
-    # "ArrowIndexError",
-    # "ArrowInvalid",
-    # "ArrowIOError",
-    # "ArrowMemoryError",
-    # "ArrowNotImplementedError",
-    # "ArrowTypeError",
-    # "ArrowSerializationError",
-    # "serialize_pandas",
-    # "deserialize_pandas",
-    # "ipc",
+    "concat_tables",
+    "TableGroupBy",
+    "RecordBatchReader",
+    "ArrowCancelled",
+    "ArrowCapacityError",
+    "ArrowException",
+    "ArrowKeyError",
+    "ArrowIndexError",
+    "ArrowInvalid",
+    "ArrowIOError",
+    "ArrowMemoryError",
+    "ArrowNotImplementedError",
+    "ArrowTypeError",
+    "ArrowSerializationError",
+    "serialize_pandas",
+    "deserialize_pandas",
     "types",
-    # "_deprecate_api",
-    # "_deprecate_class",
-    # "Message",
-    # "MessageReader",
-    # "MetadataVersion",
-    # "RecordBatchFileReader",
-    # "RecordBatchFileWriter",
-    # "RecordBatchStreamReader",
-    # "RecordBatchStreamWriter",
+    "_deprecate_api",
+    "_deprecate_class",
+    "Message",
+    "MessageReader",
+    "MetadataVersion",
+    "RecordBatchFileReader",
+    "RecordBatchFileWriter",
+    "RecordBatchStreamReader",
+    "RecordBatchStreamWriter",
     "get_include",
     "_get_pkg_config_executable",
     "_has_pkg_config",

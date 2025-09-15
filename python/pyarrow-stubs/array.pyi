@@ -3310,4 +3310,5 @@ __all__ = [
     "FixedShapeTensorArray",
     "concat_arrays",
     "_empty_array",
+    "_CastAs",
 ]
