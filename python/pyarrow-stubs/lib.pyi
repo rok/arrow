@@ -26,15 +26,15 @@ from .array import *
 # from .benchmark import *
 # from .builder import *
 # from .compat import *
-# from .config import *
-# from .device import *
-# from .error import *
+from .config import *
+from .device import *
+from .error import *
 from .io import *
-# from .__lib_pxi.ipc import *
+from ._ipc import *
 from .memory import *
 # from .pandas_shim import *
 from .scalar import *
-# from .table import *
+from .table import *
 from .tensor import *
 from ._types import *
 

@@ -37,7 +37,7 @@ import builtins
 from pyarrow._stubs_typing import Compression, SupportPyBuffer
 from pyarrow.lib import MemoryPool, _Weakrefable
 
-# from .device import Device, DeviceAllocationType, MemoryManager
+from .device import Device, DeviceAllocationType, MemoryManager
 from ._types import KeyValueMetadata
 
 def have_libhdfs() -> bool:
@@ -605,34 +605,33 @@ class Buffer(_Weakrefable):
         """
         Whether the buffer is CPU-accessible.
         """
-    # TODO
-    # @property
-    # def device(self) -> Device:
-    #     """
-    #     The device where the buffer resides.
-    #
-    #     Returns
-    #     -------
-    #     Device
-    #     """
-    # @property
-    # def memory_manager(self) -> MemoryManager:
-    #     """
-    #     The memory manager associated with the buffer.
-    #
-    #     Returns
-    #     -------
-    #     MemoryManager
-    #     """
-    # @property
-    # def device_type(self) -> DeviceAllocationType:
-    #     """
-    #     The device type where the buffer resides.
-    #
-    #     Returns
-    #     -------
-    #     DeviceAllocationType
-    #     """
+    @property
+    def device(self) -> Device:
+        """
+        The device where the buffer resides.
+
+        Returns
+        -------
+        Device
+        """
+    @property
+    def memory_manager(self) -> MemoryManager:
+        """
+        The memory manager associated with the buffer.
+
+        Returns
+        -------
+        MemoryManager
+        """
+    @property
+    def device_type(self) -> DeviceAllocationType:
+        """
+        The device type where the buffer resides.
+
+        Returns
+        -------
+        DeviceAllocationType
+        """
     @property
     def parent(self) -> Buffer | None: ...
     def __getitem__(self, key: builtins.slice | int) -> Self | int:

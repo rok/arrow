@@ -32,14 +32,13 @@ import numpy as np
 import pandas as pd
 
 from pyarrow._stubs_typing import SupportArrowSchema
-# TODO
 from pyarrow.lib import (
     Array,
-    # ChunkedArray,
+    ChunkedArray,
     ExtensionArray,
     MemoryPool,
     MonthDayNano,
-    # Table,
+    Table,
 )
 from typing_extensions import TypeVar, deprecated
 
@@ -1151,9 +1150,7 @@ class RunEndEncodedType(DataType, Generic[_RunEndType, _BasicValueT]):
     @property
     def value_type(self) -> _BasicValueT: ...
 
-# TODO: replace below with:
-# _StorageT = TypeVar("_StorageT", bound=Array | ChunkedArray)
-_StorageT = TypeVar("_StorageT", bound=Array | Any)
+_StorageT = TypeVar("_StorageT", bound=Array | ChunkedArray)
 
 class BaseExtensionType(DataType):
     """
@@ -1438,6 +1435,7 @@ class OpaqueType(BaseExtensionType):
         The name of the external system.
         """
 
+# TODO
 # @deprecated(
 #     "This class is deprecated and its deserialization is disabled by default. "
 #     ":class:`ExtensionType` is recommended instead."
@@ -2063,9 +2061,7 @@ class Schema(_Weakrefable):
         >>> schema.metadata
         {b'n_legs': b'Number of legs per animal'}
         """
-    # TODO: replace below with:
-    # def empty_table(self) -> Table:
-    def empty_table(self) -> Any:
+    def empty_table(self) -> Table:
         """
         Provide an empty table according to the schema.
 
