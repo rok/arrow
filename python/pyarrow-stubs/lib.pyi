@@ -22,17 +22,16 @@ from typing import NamedTuple, Literal
 from typing_extensions import TypeVar
 
 from .array import *
-# TODO
-# from .benchmark import *
-# from .builder import *
-# from .compat import *
+from ._benchmark import *
+from .builder import *
+from .compat import *
 from .config import *
 from .device import *
 from .error import *
 from .io import *
 from ._ipc import *
 from .memory import *
-# from .pandas_shim import *
+from .pandas_shim import *
 from .scalar import *
 from .table import *
 from .tensor import *

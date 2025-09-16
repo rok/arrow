@@ -336,8 +336,6 @@ from pyarrow.lib import (
 )
 
 from .ipc import serialize_pandas, deserialize_pandas
-# TODO?
-# import _ipc as ipc
 
 import types as types
 
