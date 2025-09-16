@@ -142,11 +142,11 @@ jobs:
         run: |-
             python -m pip install mypy pyright scipy-stubs pandas-stubs types-python-dateutil types-requests griffe libcst
             pushd python;
-            pip install -e .
-            python -m mypy pyarrow/*.pyi pyarrow/__lib_pxi/*.pyi pyarrow/tests/test_array.py pyarrow/tests/test_io.py
-            python -m pyright pyarrow/*.pyi pyarrow/__lib_pxi/*.pyi
-            python ../dev/update_stub_docstrings.py -f ./pyarrow
-            git status --porcelain=1
+            # pip install -e .
+            python -m mypy pyarrow-stubs/ pyarrow/tests/test_array.py pyarrow/tests/test_io.py
+            python -m pyright pyarrow-stubs/
+            # python ../dev/update_stub_docstrings.py -f ./pyarrow
+            # git status --porcelain=1
 
   macos:
     name: ${{ matrix.architecture }} macOS ${{ matrix.macos-version }} Python 3
