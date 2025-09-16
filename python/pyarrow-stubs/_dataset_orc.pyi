@@ -17,6 +17,7 @@
 
 from ._dataset import FileFormat
 
+
 class OrcFileFormat(FileFormat):
     def equals(self, other: OrcFileFormat) -> bool: ...
     @property

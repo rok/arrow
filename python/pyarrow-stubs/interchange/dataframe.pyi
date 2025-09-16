@@ -26,10 +26,12 @@ from typing import Any, Iterable, Sequence
 from pyarrow.interchange.column import _PyArrowColumn
 from pyarrow.lib import RecordBatch, Table
 
+
 class _PyArrowDataFrame:
     def __init__(
         self, df: Table | RecordBatch, nan_as_null: bool = False, allow_copy: bool = True
     ) -> None: ...
+
     def __dataframe__(
         self, nan_as_null: bool = False, allow_copy: bool = True
     ) -> _PyArrowDataFrame: ...

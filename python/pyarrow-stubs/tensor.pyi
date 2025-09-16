@@ -29,219 +29,44 @@ from scipy.sparse import coo_matrix, csr_matrix
 from sparse import COO  # type: ignore
 
 class Tensor(_Weakrefable):
-    """
-    A n-dimensional array a.k.a Tensor.
 
-    Examples
-    --------
-    >>> import pyarrow as pa
-    >>> import numpy as np
-    >>> x = np.array([[2, 2, 4], [4, 5, 100]], np.int32)
-    >>> pa.Tensor.from_numpy(x, dim_names=["dim1","dim2"])
-    <pyarrow.Tensor>
-    type: int32
-    shape: (2, 3)
-    strides: (12, 4)
-    """
 
     @classmethod
-    def from_numpy(cls, obj: np.ndarray, dim_names: list[str] | None = None) -> Self:
-        """
-        Create a Tensor from a numpy array.
+    def from_numpy(cls, obj: np.ndarray, dim_names: list[str] | None = None) -> Self: ...
 
-        Parameters
-        ----------
-        obj : numpy.ndarray
-            The source numpy array
-        dim_names : list, optional
-            Names of each dimension of the Tensor.
+    def to_numpy(self) -> np.ndarray: ...
 
-        Examples
-        --------
-        >>> import pyarrow as pa
-        >>> import numpy as np
-        >>> x = np.array([[2, 2, 4], [4, 5, 100]], np.int32)
-        >>> pa.Tensor.from_numpy(x, dim_names=["dim1","dim2"])
-        <pyarrow.Tensor>
-        type: int32
-        shape: (2, 3)
-        strides: (12, 4)
-        """
-    def to_numpy(self) -> np.ndarray:
-        """
-        Convert arrow::Tensor to numpy.ndarray with zero copy
+    def equals(self, other: Tensor) -> bool: ...
 
-        Examples
-        --------
-        >>> import pyarrow as pa
-        >>> import numpy as np
-        >>> x = np.array([[2, 2, 4], [4, 5, 100]], np.int32)
-        >>> tensor = pa.Tensor.from_numpy(x, dim_names=["dim1","dim2"])
-        >>> tensor.to_numpy()
-        array([[  2,   2,   4],
-               [  4,   5, 100]], dtype=int32)
-        """
-    def equals(self, other: Tensor) -> bool:
-        """
-        Return true if the tensors contains exactly equal data.
+    def dim_name(self, i: int) -> str: ...
 
-        Parameters
-        ----------
-        other : Tensor
-            The other tensor to compare for equality.
-
-        Examples
-        --------
-        >>> import pyarrow as pa
-        >>> import numpy as np
-        >>> x = np.array([[2, 2, 4], [4, 5, 100]], np.int32)
-        >>> tensor = pa.Tensor.from_numpy(x, dim_names=["dim1","dim2"])
-        >>> y = np.array([[2, 2, 4], [4, 5, 10]], np.int32)
-        >>> tensor2 = pa.Tensor.from_numpy(y, dim_names=["a","b"])
-        >>> tensor.equals(tensor)
-        True
-        >>> tensor.equals(tensor2)
-        False
-        """
-    def dim_name(self, i: int) -> str:
-        """
-        Returns the name of the i-th tensor dimension.
-
-        Parameters
-        ----------
-        i : int
-            The physical index of the tensor dimension.
-
-        Examples
-        --------
-        >>> import pyarrow as pa
-        >>> import numpy as np
-        >>> x = np.array([[2, 2, 4], [4, 5, 100]], np.int32)
-        >>> tensor = pa.Tensor.from_numpy(x, dim_names=["dim1","dim2"])
-        >>> tensor.dim_name(0)
-        'dim1'
-        >>> tensor.dim_name(1)
-        'dim2'
-        """
     @property
-    def dim_names(self) -> list[str]:
-        """
-        Names of this tensor dimensions.
+    def dim_names(self) -> list[str]: ...
 
-        Examples
-        --------
-        >>> import pyarrow as pa
-        >>> import numpy as np
-        >>> x = np.array([[2, 2, 4], [4, 5, 100]], np.int32)
-        >>> tensor = pa.Tensor.from_numpy(x, dim_names=["dim1","dim2"])
-        >>> tensor.dim_names
-        ['dim1', 'dim2']
-        """
     @property
-    def is_mutable(self) -> bool:
-        """
-        Is this tensor mutable or immutable.
+    def is_mutable(self) -> bool: ...
 
-        Examples
-        --------
-        >>> import pyarrow as pa
-        >>> import numpy as np
-        >>> x = np.array([[2, 2, 4], [4, 5, 100]], np.int32)
-        >>> tensor = pa.Tensor.from_numpy(x, dim_names=["dim1","dim2"])
-        >>> tensor.is_mutable
-        True
-        """
     @property
-    def is_contiguous(self) -> bool:
-        """
-        Is this tensor contiguous in memory.
+    def is_contiguous(self) -> bool: ...
 
-        Examples
-        --------
-        >>> import pyarrow as pa
-        >>> import numpy as np
-        >>> x = np.array([[2, 2, 4], [4, 5, 100]], np.int32)
-        >>> tensor = pa.Tensor.from_numpy(x, dim_names=["dim1","dim2"])
-        >>> tensor.is_contiguous
-        True
-        """
     @property
-    def ndim(self) -> int:
-        """
-        The dimension (n) of this tensor.
+    def ndim(self) -> int: ...
 
-        Examples
-        --------
-        >>> import pyarrow as pa
-        >>> import numpy as np
-        >>> x = np.array([[2, 2, 4], [4, 5, 100]], np.int32)
-        >>> tensor = pa.Tensor.from_numpy(x, dim_names=["dim1","dim2"])
-        >>> tensor.ndim
-        2
-        """
     @property
-    def size(self) -> str:
-        """
-        The size of this tensor.
+    def size(self) -> str: ...
 
-        Examples
-        --------
-        >>> import pyarrow as pa
-        >>> import numpy as np
-        >>> x = np.array([[2, 2, 4], [4, 5, 100]], np.int32)
-        >>> tensor = pa.Tensor.from_numpy(x, dim_names=["dim1","dim2"])
-        >>> tensor.size
-        6
-        """
     @property
-    def shape(self) -> tuple[int, ...]:
-        """
-        The shape of this tensor.
+    def shape(self) -> tuple[int, ...]: ...
 
-        Examples
-        --------
-        >>> import pyarrow as pa
-        >>> import numpy as np
-        >>> x = np.array([[2, 2, 4], [4, 5, 100]], np.int32)
-        >>> tensor = pa.Tensor.from_numpy(x, dim_names=["dim1","dim2"])
-        >>> tensor.shape
-        (2, 3)
-        """
     @property
-    def strides(self) -> tuple[int, ...]:
-        """
-        Strides of this tensor.
+    def strides(self) -> tuple[int, ...]: ...
 
-        Examples
-        --------
-        >>> import pyarrow as pa
-        >>> import numpy as np
-        >>> x = np.array([[2, 2, 4], [4, 5, 100]], np.int32)
-        >>> tensor = pa.Tensor.from_numpy(x, dim_names=["dim1","dim2"])
-        >>> tensor.strides
-        (12, 4)
-        """
 
 class SparseCOOTensor(_Weakrefable):
-    """
-    A sparse COO tensor.
-    """
+
     @classmethod
-    def from_dense_numpy(cls, obj: np.ndarray, dim_names: list[str] | None = None) -> Self:
-        """
-        Convert numpy.ndarray to arrow::SparseCOOTensor
+    def from_dense_numpy(cls, obj: np.ndarray, dim_names: list[str] | None = None) -> Self: ...
 
-        Parameters
-        ----------
-        obj : numpy.ndarray
-            Data used to populate the rows.
-        dim_names : list[str], optional
-            Names of the dimensions.
-
-        Returns
-        -------
-        pyarrow.SparseCOOTensor
-        """
 
     @classmethod
     def from_numpy(
@@ -250,80 +75,27 @@ class SparseCOOTensor(_Weakrefable):
         coords: np.ndarray,
         shape: tuple[int, ...],
         dim_names: list[str] | None = None,
-    ) -> Self:
-        """
-        Create arrow::SparseCOOTensor from numpy.ndarrays
+    ) -> Self: ...
 
-        Parameters
-        ----------
-        data : numpy.ndarray
-            Data used to populate the rows.
-        coords : numpy.ndarray
-            Coordinates of the data.
-        shape : tuple
-            Shape of the tensor.
-        dim_names : list, optional
-            Names of the dimensions.
-        """
     @classmethod
-    def from_scipy(cls, obj: csr_matrix, dim_names: list[str] | None = None) -> Self:
-        """
-        Convert scipy.sparse.coo_array or scipy.sparse.coo_matrix to arrow::SparseCOOTensor
+    def from_scipy(cls, obj: csr_matrix, dim_names: list[str] | None = None) -> Self: ...
 
-        Parameters
-        ----------
-        obj : scipy.sparse.coo_array or scipy.sparse.coo_matrix
-            The scipy array or matrix that should be converted.
-        dim_names : list, optional
-            Names of the dimensions.
-        """
     @classmethod
-    def from_pydata_sparse(cls, obj: COO, dim_names: list[str] | None = None) -> Self:
-        """
-        Convert pydata/sparse.COO to arrow::SparseCOOTensor.
+    def from_pydata_sparse(cls, obj: COO, dim_names: list[str] | None = None) -> Self: ...
 
-        Parameters
-        ----------
-        obj : pydata.sparse.COO
-            The sparse multidimensional array that should be converted.
-        dim_names : list, optional
-            Names of the dimensions.
-        """
     @classmethod
-    def from_tensor(cls, obj: Tensor) -> Self:
-        """
-        Convert arrow::Tensor to arrow::SparseCOOTensor.
+    def from_tensor(cls, obj: Tensor) -> Self: ...
 
-        Parameters
-        ----------
-        obj : Tensor
-            The tensor that should be converted.
-        """
-    def to_numpy(self) -> tuple[np.ndarray, np.ndarray]:
-        """
-        Convert arrow::SparseCOOTensor to numpy.ndarrays with zero copy.
-        """
-    def to_scipy(self) -> coo_matrix:
-        """
-        Convert arrow::SparseCOOTensor to scipy.sparse.coo_array.
-        """
-    def to_pydata_sparse(self) -> COO:
-        """
-        Convert arrow::SparseCOOTensor to pydata/sparse.COO.
-        """
-    def to_tensor(self) -> Tensor:
-        """
-        Convert arrow::SparseCOOTensor to arrow::Tensor.
-        """
-    def equals(self, other: Self) -> bool:
-        """
-        Return true if sparse tensors contains exactly equal data.
+    def to_numpy(self) -> tuple[np.ndarray, np.ndarray]: ...
 
-        Parameters
-        ----------
-        other : SparseCOOTensor
-            The other tensor to compare for equality.
-        """
+    def to_scipy(self) -> coo_matrix: ...
+
+    def to_pydata_sparse(self) -> COO: ...
+
+    def to_tensor(self) -> Tensor: ...
+
+    def equals(self, other: Self) -> bool: ...
+
     @property
     def is_mutable(self) -> bool: ...
     @property
@@ -332,19 +104,8 @@ class SparseCOOTensor(_Weakrefable):
     def size(self) -> str: ...
     @property
     def shape(self) -> tuple[int, ...]: ...
-    def dim_name(self, i: int) -> str:
-        """
-        Returns the name of the i-th tensor dimension.
+    def dim_name(self, i: int) -> str: ...
 
-        Parameters
-        ----------
-        i : int
-            The physical index of the tensor dimension.
-
-        Returns
-        -------
-        str
-        """
     @property
     def dim_names(self) -> list[str]: ...
     @property
@@ -353,26 +114,11 @@ class SparseCOOTensor(_Weakrefable):
     def has_canonical_format(self) -> bool: ...
 
 class SparseCSRMatrix(_Weakrefable):
-    """
-    A sparse CSR matrix.
-    """
+
 
     @classmethod
-    def from_dense_numpy(cls, obj: np.ndarray, dim_names: list[str] | None = None) -> Self:
-        """
-        Convert numpy.ndarray to arrow::SparseCSRMatrix
+    def from_dense_numpy(cls, obj: np.ndarray, dim_names: list[str] | None = None) -> Self: ...
 
-        Parameters
-        ----------
-        obj : numpy.ndarray
-            The dense numpy array that should be converted.
-        dim_names : list, optional
-            The names of the dimensions.
-
-        Returns
-        -------
-        pyarrow.SparseCSRMatrix
-        """
     @classmethod
     def from_numpy(
         cls,
@@ -381,67 +127,22 @@ class SparseCSRMatrix(_Weakrefable):
         indices: np.ndarray,
         shape: tuple[int, ...],
         dim_names: list[str] | None = None,
-    ) -> Self:
-        """
-        Create arrow::SparseCSRMatrix from numpy.ndarrays.
+    ) -> Self: ...
 
-        Parameters
-        ----------
-        data : numpy.ndarray
-            Data used to populate the sparse matrix.
-        indptr : numpy.ndarray
-            Range of the rows,
-            The i-th row spans from `indptr[i]` to `indptr[i+1]` in the data.
-        indices : numpy.ndarray
-            Column indices of the corresponding non-zero values.
-        shape : tuple
-            Shape of the matrix.
-        dim_names : list, optional
-            Names of the dimensions.
-        """
     @classmethod
-    def from_scipy(cls, obj: csr_matrix, dim_names: list[str] | None = None) -> Self:
-        """
-        Convert scipy.sparse.csr_array or scipy.sparse.csr_matrix to arrow::SparseCSRMatrix.
+    def from_scipy(cls, obj: csr_matrix, dim_names: list[str] | None = None) -> Self: ...
 
-        Parameters
-        ----------
-        obj : scipy.sparse.csr_array or scipy.sparse.csr_matrix
-            The scipy matrix that should be converted.
-        dim_names : list, optional
-            Names of the dimensions.
-        """
     @classmethod
-    def from_tensor(cls, obj: Tensor) -> Self:
-        """
-        Convert arrow::Tensor to arrow::SparseCSRMatrix.
+    def from_tensor(cls, obj: Tensor) -> Self: ...
 
-        Parameters
-        ----------
-        obj : Tensor
-            The dense tensor that should be converted.
-        """
-    def to_numpy(self) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-        """
-        Convert arrow::SparseCSRMatrix to numpy.ndarrays with zero copy.
-        """
-    def to_scipy(self) -> csr_matrix:
-        """
-        Convert arrow::SparseCSRMatrix to scipy.sparse.csr_array.
-        """
-    def to_tensor(self) -> Tensor:
-        """
-        Convert arrow::SparseCSRMatrix to arrow::Tensor.
-        """
-    def equals(self, other: Self) -> bool:
-        """
-        Return true if sparse tensors contains exactly equal data.
+    def to_numpy(self) -> tuple[np.ndarray, np.ndarray, np.ndarray]: ...
 
-        Parameters
-        ----------
-        other : SparseCSRMatrix
-            The other tensor to compare for equality.
-        """
+    def to_scipy(self) -> csr_matrix: ...
+
+    def to_tensor(self) -> Tensor: ...
+
+    def equals(self, other: Self) -> bool: ...
+
     @property
     def is_mutable(self) -> bool: ...
     @property
@@ -450,45 +151,19 @@ class SparseCSRMatrix(_Weakrefable):
     def size(self) -> str: ...
     @property
     def shape(self) -> tuple[int, ...]: ...
-    def dim_name(self, i: int) -> str:
-        """
-        Returns the name of the i-th tensor dimension.
+    def dim_name(self, i: int) -> str: ...
 
-        Parameters
-        ----------
-        i : int
-            The physical index of the tensor dimension.
-
-        Returns
-        -------
-        str
-        """
     @property
     def dim_names(self) -> list[str]: ...
     @property
     def non_zero_length(self) -> int: ...
 
 class SparseCSCMatrix(_Weakrefable):
-    """
-    A sparse CSC matrix.
-    """
+
 
     @classmethod
-    def from_dense_numpy(cls, obj: np.ndarray, dim_names: list[str] | None = None) -> Self:
-        """
-        Convert numpy.ndarray to arrow::SparseCSCMatrix
+    def from_dense_numpy(cls, obj: np.ndarray, dim_names: list[str] | None = None) -> Self: ...
 
-        Parameters
-        ----------
-        obj : numpy.ndarray
-            Data used to populate the rows.
-        dim_names : list[str], optional
-            Names of the dimensions.
-
-        Returns
-        -------
-        pyarrow.SparseCSCMatrix
-        """
     @classmethod
     def from_numpy(
         cls,
@@ -497,67 +172,22 @@ class SparseCSCMatrix(_Weakrefable):
         indices: np.ndarray,
         shape: tuple[int, ...],
         dim_names: list[str] | None = None,
-    ) -> Self:
-        """
-        Create arrow::SparseCSCMatrix from numpy.ndarrays
+    ) -> Self: ...
 
-        Parameters
-        ----------
-        data : numpy.ndarray
-            Data used to populate the sparse matrix.
-        indptr : numpy.ndarray
-            Range of the rows,
-            The i-th row spans from `indptr[i]` to `indptr[i+1]` in the data.
-        indices : numpy.ndarray
-            Column indices of the corresponding non-zero values.
-        shape : tuple
-            Shape of the matrix.
-        dim_names : list, optional
-            Names of the dimensions.
-        """
     @classmethod
-    def from_scipy(cls, obj: csr_matrix, dim_names: list[str] | None = None) -> Self:
-        """
-        Convert scipy.sparse.csc_array or scipy.sparse.csc_matrix to arrow::SparseCSCMatrix
+    def from_scipy(cls, obj: csr_matrix, dim_names: list[str] | None = None) -> Self: ...
 
-        Parameters
-        ----------
-        obj : scipy.sparse.csc_array or scipy.sparse.csc_matrix
-            The scipy matrix that should be converted.
-        dim_names : list, optional
-            Names of the dimensions.
-        """
     @classmethod
-    def from_tensor(cls, obj: Tensor) -> Self:
-        """
-        Convert arrow::Tensor to arrow::SparseCSCMatrix
+    def from_tensor(cls, obj: Tensor) -> Self: ...
 
-        Parameters
-        ----------
-        obj : Tensor
-            The dense tensor that should be converted.
-        """
-    def to_numpy(self) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-        """
-        Convert arrow::SparseCSCMatrix to numpy.ndarrays with zero copy
-        """
-    def to_scipy(self) -> csr_matrix:
-        """
-        Convert arrow::SparseCSCMatrix to scipy.sparse.csc_array
-        """
-    def to_tensor(self) -> Tensor:
-        """
-        Convert arrow::SparseCSCMatrix to arrow::Tensor
-        """
-    def equals(self, other: Self) -> bool:
-        """
-        Return true if sparse tensors contains exactly equal data
+    def to_numpy(self) -> tuple[np.ndarray, np.ndarray, np.ndarray]: ...
 
-        Parameters
-        ----------
-        other : SparseCSCMatrix
-            The other tensor to compare for equality.
-        """
+    def to_scipy(self) -> csr_matrix: ...
+
+    def to_tensor(self) -> Tensor: ...
+
+    def equals(self, other: Self) -> bool: ...
+
     @property
     def is_mutable(self) -> bool: ...
     @property
@@ -566,52 +196,19 @@ class SparseCSCMatrix(_Weakrefable):
     def size(self) -> str: ...
     @property
     def shape(self) -> tuple[int, ...]: ...
-    def dim_name(self, i: int) -> str:
-        """
-        Returns the name of the i-th tensor dimension.
+    def dim_name(self, i: int) -> str: ...
 
-        Parameters
-        ----------
-        i : int
-            The physical index of the tensor dimension.
-
-        Returns
-        -------
-        str
-        """
     @property
     def dim_names(self) -> list[str]: ...
     @property
     def non_zero_length(self) -> int: ...
 
 class SparseCSFTensor(_Weakrefable):
-    """
-    A sparse CSF tensor.
 
-    CSF is a generalization of compressed sparse row (CSR) index.
-
-    CSF index recursively compresses each dimension of a tensor into a set
-    of prefix trees. Each path from a root to leaf forms one tensor
-    non-zero index. CSF is implemented with two arrays of buffers and one
-    arrays of integers.
-    """
 
     @classmethod
-    def from_dense_numpy(cls, obj: np.ndarray, dim_names: list[str] | None = None) -> Self:
-        """
-        Convert numpy.ndarray to arrow::SparseCSFTensor
+    def from_dense_numpy(cls, obj: np.ndarray, dim_names: list[str] | None = None) -> Self: ...
 
-        Parameters
-        ----------
-        obj : numpy.ndarray
-            Data used to populate the rows.
-        dim_names : list[str], optional
-            Names of the dimensions.
-
-        Returns
-        -------
-        pyarrow.SparseCSFTensor
-        """
     @classmethod
     def from_numpy(
         cls,
@@ -621,59 +218,17 @@ class SparseCSFTensor(_Weakrefable):
         shape: tuple[int, ...],
         axis_order: list[int] | None = None,
         dim_names: list[str] | None = None,
-    ) -> Self:
-        """
-        Create arrow::SparseCSFTensor from numpy.ndarrays
+    ) -> Self: ...
 
-        Parameters
-        ----------
-        data : numpy.ndarray
-            Data used to populate the sparse tensor.
-        indptr : numpy.ndarray
-            The sparsity structure.
-            Each two consecutive dimensions in a tensor correspond to
-            a buffer in indices.
-            A pair of consecutive values at `indptr[dim][i]`
-            `indptr[dim][i + 1]` signify a range of nodes in
-            `indices[dim + 1]` who are children of `indices[dim][i]` node.
-        indices : numpy.ndarray
-            Stores values of nodes.
-            Each tensor dimension corresponds to a buffer in indptr.
-        shape : tuple
-            Shape of the matrix.
-        axis_order : list, optional
-            the sequence in which dimensions were traversed to
-            produce the prefix tree.
-        dim_names : list, optional
-            Names of the dimensions.
-        """
     @classmethod
-    def from_tensor(cls, obj: Tensor) -> Self:
-        """
-        Convert arrow::Tensor to arrow::SparseCSFTensor
+    def from_tensor(cls, obj: Tensor) -> Self: ...
 
-        Parameters
-        ----------
-        obj : Tensor
-            The dense tensor that should be converted.
-        """
-    def to_numpy(self) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-        """
-        Convert arrow::SparseCSFTensor to numpy.ndarrays with zero copy
-        """
-    def to_tensor(self) -> Tensor:
-        """
-        Convert arrow::SparseCSFTensor to arrow::Tensor
-        """
-    def equals(self, other: Self) -> bool:
-        """
-        Return true if sparse tensors contains exactly equal data
+    def to_numpy(self) -> tuple[np.ndarray, np.ndarray, np.ndarray]: ...
 
-        Parameters
-        ----------
-        other : SparseCSFTensor
-            The other tensor to compare for equality.
-        """
+    def to_tensor(self) -> Tensor: ...
+
+    def equals(self, other: Self) -> bool: ...
+
     @property
     def is_mutable(self) -> bool: ...
     @property
@@ -682,19 +237,8 @@ class SparseCSFTensor(_Weakrefable):
     def size(self) -> str: ...
     @property
     def shape(self) -> tuple[int, ...]: ...
-    def dim_name(self, i: int) -> str:
-        """
-        Returns the name of the i-th tensor dimension.
+    def dim_name(self, i: int) -> str: ...
 
-        Parameters
-        ----------
-        i : int
-            The physical index of the tensor dimension.
-
-        Returns
-        -------
-        str
-        """
     @property
     def dim_names(self) -> list[str]: ...
     @property

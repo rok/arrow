@@ -23,6 +23,7 @@ from pyarrow.lib import Array, ChunkedArray
 
 from .buffer import _PyArrowBuffer
 
+
 class DtypeKind(enum.IntEnum):
     INT = 0
     UINT = 1
@@ -32,7 +33,9 @@ class DtypeKind(enum.IntEnum):
     DATETIME = 22
     CATEGORICAL = 23
 
+
 Dtype: TypeAlias = tuple[DtypeKind, int, str, str]
+
 
 class ColumnNullType(enum.IntEnum):
     NON_NULLABLE = 0
@@ -41,15 +44,18 @@ class ColumnNullType(enum.IntEnum):
     USE_BITMASK = 3
     USE_BYTEMASK = 4
 
+
 class ColumnBuffers(TypedDict):
     data: tuple[_PyArrowBuffer, Dtype]
     validity: tuple[_PyArrowBuffer, Dtype] | None
     offsets: tuple[_PyArrowBuffer, Dtype] | None
 
+
 class CategoricalDescription(TypedDict):
     is_ordered: bool
     is_dictionary: bool
     categories: _PyArrowColumn | None
+
 
 class Endianness(enum.Enum):
     LITTLE = "<"
@@ -57,10 +63,15 @@ class Endianness(enum.Enum):
     NATIVE = "="
     NA = "|"
 
-class NoBufferPresent(Exception): ...
+
+class NoBufferPresent(Exception):
+    ...
+
 
 class _PyArrowColumn:
-    def __init__(self, column: Array | ChunkedArray, allow_copy: bool = True) -> None: ...
+    def __init__(self, column: Array | ChunkedArray,
+                 allow_copy: bool = True) -> None: ...
+
     def size(self) -> int: ...
     @property
     def offset(self) -> int: ...

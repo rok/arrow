@@ -39,6 +39,7 @@ from pyarrow.lib import (
     write_tensor,
 )
 
+
 class RecordBatchStreamReader(lib._RecordBatchStreamReader):
     def __init__(
         self,
@@ -47,6 +48,7 @@ class RecordBatchStreamReader(lib._RecordBatchStreamReader):
         options: IpcReadOptions | None = None,
         memory_pool: lib.MemoryPool | None = None,
     ) -> None: ...
+
 
 class RecordBatchStreamWriter(lib._RecordBatchStreamWriter):
     def __init__(
@@ -58,6 +60,7 @@ class RecordBatchStreamWriter(lib._RecordBatchStreamWriter):
         options: IpcWriteOptions | None = None,
     ) -> None: ...
 
+
 class RecordBatchFileReader(lib._RecordBatchFileReader):
     def __init__(
         self,
@@ -67,6 +70,7 @@ class RecordBatchFileReader(lib._RecordBatchFileReader):
         options: IpcReadOptions | None,
         memory_pool: lib.MemoryPool | None = None,
     ) -> None: ...
+
 
 class RecordBatchFileWriter(lib._RecordBatchFileWriter):
     def __init__(
@@ -78,6 +82,7 @@ class RecordBatchFileWriter(lib._RecordBatchFileWriter):
         options: IpcWriteOptions | None = None,
     ) -> None: ...
 
+
 def new_stream(
     sink: str | lib.NativeFile | IOBase,
     schema: lib.Schema,
@@ -85,12 +90,16 @@ def new_stream(
     use_legacy_format: bool | None = None,
     options: IpcWriteOptions | None = None,
 ) -> RecordBatchStreamWriter: ...
+
+
 def open_stream(
     source: bytes | lib.Buffer | lib.NativeFile | IOBase,
     *,
     options: IpcReadOptions | None = None,
     memory_pool: lib.MemoryPool | None = None,
 ) -> RecordBatchStreamReader: ...
+
+
 def new_file(
     sink: str | lib.NativeFile | IOBase,
     schema: lib.Schema,
@@ -98,6 +107,8 @@ def new_file(
     use_legacy_format: bool | None = None,
     options: IpcWriteOptions | None = None,
 ) -> RecordBatchFileWriter: ...
+
+
 def open_file(
     source: bytes | lib.Buffer | lib.NativeFile | IOBase,
     footer_offset: int | None = None,
@@ -105,10 +116,16 @@ def open_file(
     options: IpcReadOptions | None = None,
     memory_pool: lib.MemoryPool | None = None,
 ) -> RecordBatchFileReader: ...
+
+
 def serialize_pandas(
     df: pd.DataFrame, *, nthreads: int | None = None, preserve_index: bool | None = None
 ) -> lib.Buffer: ...
-def deserialize_pandas(buf: lib.Buffer, *, use_threads: bool = True) -> pd.DataFrame: ...
+
+
+def deserialize_pandas(
+    buf: lib.Buffer, *, use_threads: bool = True) -> pd.DataFrame: ...
+
 
 __all__ = [
     "IpcReadOptions",

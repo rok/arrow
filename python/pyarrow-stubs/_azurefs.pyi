@@ -19,6 +19,7 @@ from typing import Literal
 
 from ._fs import FileSystem
 
+
 class AzureFileSystem(FileSystem):
     def __init__(
         self,

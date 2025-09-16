@@ -56,20 +56,26 @@ _V = TypeVar("_V", covariant=True)
 
 SingleOrList: TypeAlias = list[_T] | _T
 
+
 class SupportEq(Protocol):
     def __eq__(self, other) -> bool: ...
+
 
 class SupportLt(Protocol):
     def __lt__(self, other) -> bool: ...
 
+
 class SupportGt(Protocol):
     def __gt__(self, other) -> bool: ...
+
 
 class SupportLe(Protocol):
     def __le__(self, other) -> bool: ...
 
+
 class SupportGe(Protocol):
     def __ge__(self, other) -> bool: ...
+
 
 FilterTuple: TypeAlias = (
     tuple[str, Literal["=", "==", "!="], SupportEq]
@@ -80,21 +86,30 @@ FilterTuple: TypeAlias = (
     | tuple[str, Literal["in", "not in"], Collection]
 )
 
-class Buffer(Protocol): ...
 
-class SupportPyBuffer(Protocol): ...
+class Buffer(Protocol):
+    ...
+
+
+class SupportPyBuffer(Protocol):
+    ...
+
 
 class SupportArrowStream(Protocol):
     def __arrow_c_stream__(self, requested_schema=None) -> Any: ...
 
+
 class SupportArrowArray(Protocol):
     def __arrow_c_array__(self, requested_schema=None) -> Any: ...
+
 
 class SupportArrowDeviceArray(Protocol):
     def __arrow_c_device_array__(self, requested_schema=None, **kwargs) -> Any: ...
 
+
 class SupportArrowSchema(Protocol):
     def __arrow_c_schema(self) -> Any: ...
+
 
 class NullableCollection(Protocol[_V]):  # pyright: ignore[reportInvalidTypeVarUse]
     def __iter__(self) -> Iterator[_V] | Iterator[_V | None]: ...

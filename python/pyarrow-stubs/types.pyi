@@ -87,7 +87,8 @@ _Decimal: TypeAlias = (
 _Date: TypeAlias = Date32Type | Date64Type
 _Time: TypeAlias = Time32Type[Any] | Time64Type[Any]
 _Interval: TypeAlias = MonthDayNanoIntervalType
-_Temporal: TypeAlias = TimestampType[Any, Any] | DurationType[Any] | _Time | _Date | _Interval
+_Temporal: TypeAlias = TimestampType[Any,
+                                     Any] | DurationType[Any] | _Time | _Date | _Interval
 _Union: TypeAlias = SparseUnionType | DenseUnionType
 _Nested: TypeAlias = (
     ListType[Any]
@@ -99,6 +100,7 @@ _Nested: TypeAlias = (
     | MapType[Any, Any, Any]
     | _Union
 )
+
 
 def is_null(t: DataType) -> TypeIs[NullType]: ...
 def is_boolean(t: DataType) -> TypeIs[BoolType]: ...
@@ -156,6 +158,7 @@ def is_primitive(t: DataType) -> bool: ...
 def is_boolean_value(obj: Any) -> bool: ...
 def is_integer_value(obj: Any) -> bool: ...
 def is_float_value(obj: Any) -> bool: ...
+
 
 __all__ = [
     "is_binary",

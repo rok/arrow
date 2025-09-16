@@ -77,12 +77,19 @@ __all__ = (
     "filters_to_expression",
 )
 
-def filters_to_expression(filters: list[FilterTuple | list[FilterTuple]]) -> Expression: ...
+
+def filters_to_expression(
+    filters: list[FilterTuple | list[FilterTuple]]) -> Expression: ...
+
 
 @deprecated("use filters_to_expression")
-def _filters_to_expression(filters: list[FilterTuple | list[FilterTuple]]) -> Expression: ...
+def _filters_to_expression(
+    filters: list[FilterTuple | list[FilterTuple]]) -> Expression: ...
 
-_Compression: TypeAlias = Literal["gzip", "bz2", "brotli", "lz4", "zstd", "snappy", "none"]
+
+_Compression: TypeAlias = Literal["gzip", "bz2",
+                                  "brotli", "lz4", "zstd", "snappy", "none"]
+
 
 class ParquetFile:
     reader: ParquetReader
@@ -118,6 +125,7 @@ class ParquetFile:
     def close(self, force: bool = False) -> None: ...
     @property
     def closed(self) -> bool: ...
+
     def read_row_group(
         self,
         i: int,
@@ -125,6 +133,7 @@ class ParquetFile:
         use_threads: bool = True,
         use_pandas_metadata: bool = False,
     ) -> Table: ...
+
     def read_row_groups(
         self,
         row_groups: list,
@@ -132,6 +141,7 @@ class ParquetFile:
         use_threads: bool = True,
         use_pandas_metadata: bool = False,
     ) -> Table: ...
+
     def iter_batches(
         self,
         batch_size: int = 65536,
@@ -140,13 +150,16 @@ class ParquetFile:
         use_threads: bool = True,
         use_pandas_metadata: bool = False,
     ) -> Iterator[RecordBatch]: ...
+
     def read(
         self,
         columns: list | None = None,
         use_threads: bool = True,
         use_pandas_metadata: bool = False,
     ) -> Table: ...
-    def scan_contents(self, columns: list | None = None, batch_size: int = 65536) -> int: ...
+    def scan_contents(self, columns: list | None = None,
+                      batch_size: int = 65536) -> int: ...
+
 
 class ParquetWriter:
     flavor: str
@@ -186,13 +199,17 @@ class ParquetWriter:
     ) -> None: ...
     def __enter__(self) -> Self: ...
     def __exit__(self, *args, **kwargs) -> Literal[False]: ...
+
     def write(
         self, table_or_batch: RecordBatch | Table, row_group_size: int | None = None
     ) -> None: ...
-    def write_batch(self, batch: RecordBatch, row_group_size: int | None = None) -> None: ...
+    def write_batch(self, batch: RecordBatch,
+                    row_group_size: int | None = None) -> None: ...
+
     def write_table(self, table: Table, row_group_size: int | None = None) -> None: ...
     def close(self) -> None: ...
     def add_key_value_metadata(self, key_value_metadata: dict[str, str]) -> None: ...
+
 
 class ParquetDataset:
     def __init__(
@@ -220,6 +237,7 @@ class ParquetDataset:
     def equals(self, other: ParquetDataset) -> bool: ...
     @property
     def schema(self) -> Schema: ...
+
     def read(
         self,
         columns: list[str] | None = None,
@@ -235,6 +253,7 @@ class ParquetDataset:
     def filesystem(self) -> FileSystem: ...
     @property
     def partitioning(self) -> Partitioning: ...
+
 
 def read_table(
     source: SingleOrList[str] | SingleOrList[Path] | SingleOrList[NativeFile] | SingleOrList[IO],
@@ -258,9 +277,11 @@ def read_table(
     page_checksum_verification: bool = False,
 ) -> Table: ...
 
+
 def read_pandas(
     source: str | Path | NativeFile | IO, columns: list | None = None, **kwargs
 ) -> Table: ...
+
 
 def write_table(
     table: Table,
@@ -292,6 +313,7 @@ def write_table(
     **kwargs,
 ) -> None: ...
 
+
 def write_to_dataset(
     table: Table,
     root_path: str | Path,
@@ -307,6 +329,7 @@ def write_to_dataset(
     **kwargs,
 ) -> None: ...
 
+
 def write_metadata(
     schema: Schema,
     where: str | NativeFile,
@@ -315,12 +338,14 @@ def write_metadata(
     **kwargs,
 ) -> None: ...
 
+
 def read_metadata(
     where: str | Path | IO | NativeFile,
     memory_map: bool = False,
     decryption_properties: FileDecryptionProperties | None = None,
     filesystem: SupportedFileSystem | None = None,
 ) -> FileMetaData: ...
+
 
 def read_schema(
     where: str | Path | IO | NativeFile,

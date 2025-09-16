@@ -22,8 +22,10 @@ from typing import Any, Protocol, Sequence, TypeVar
 _F = TypeVar("_F", bound=Callable)
 _N = TypeVar("_N")
 
+
 class _DocStringComponents(Protocol):
     _docstring_components: list[str]
+
 
 def doc(
     *docstrings: str | _DocStringComponents | Callable | None, **params: Any
@@ -32,6 +34,8 @@ def _is_iterable(obj) -> bool: ...
 def _is_path_like(path) -> bool: ...
 def _stringify_path(path: str | PathLike) -> str: ...
 def product(seq: Sequence[_N]) -> _N: ...
+
+
 def get_contiguous_span(
     shape: tuple[int, ...], strides: tuple[int, ...], itemsize: int
 ) -> tuple[int, int]: ...

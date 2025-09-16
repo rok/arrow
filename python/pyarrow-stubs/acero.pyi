@@ -32,6 +32,7 @@ from .compute import Expression, FunctionOptions
 
 _StrOrExpr: TypeAlias = str | Expression
 
+
 class Declaration(lib._Weakrefable):
     def __init__(
         self,
@@ -44,16 +45,23 @@ class Declaration(lib._Weakrefable):
     def to_reader(self, use_threads: bool = True) -> lib.RecordBatchReader: ...
     def to_table(self, use_threads: bool = True) -> lib.Table: ...
 
-class ExecNodeOptions(lib._Weakrefable): ...
+
+class ExecNodeOptions(lib._Weakrefable):
+    ...
+
 
 class TableSourceNodeOptions(ExecNodeOptions):
     def __init__(self, table: lib.Table) -> None: ...
 
+
 class FilterNodeOptions(ExecNodeOptions):
     def __init__(self, filter_expression: Expression) -> None: ...
 
+
 class ProjectNodeOptions(ExecNodeOptions):
-    def __init__(self, expressions: list[Expression], names: list[str] | None = None) -> None: ...
+    def __init__(self, expressions: list[Expression],
+                 names: list[str] | None = None) -> None: ...
+
 
 class AggregateNodeOptions(ExecNodeOptions):
     def __init__(
@@ -62,6 +70,7 @@ class AggregateNodeOptions(ExecNodeOptions):
         keys: list[_StrOrExpr] | None = None,
     ) -> None: ...
 
+
 class OrderByNodeOptions(ExecNodeOptions):
     def __init__(
         self,
@@ -69,6 +78,7 @@ class OrderByNodeOptions(ExecNodeOptions):
         *,
         null_placement: Literal["at_start", "at_end"] = "at_end",
     ) -> None: ...
+
 
 class HashJoinNodeOptions(ExecNodeOptions):
     def __init__(
@@ -90,6 +100,7 @@ class HashJoinNodeOptions(ExecNodeOptions):
         output_suffix_for_left: str = "",
         output_suffix_for_right: str = "",
     ) -> None: ...
+
 
 class AsofJoinNodeOptions(ExecNodeOptions):
     def __init__(

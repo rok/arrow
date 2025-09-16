@@ -128,10 +128,13 @@ __all__ = [
 
 _DatasetFormat: TypeAlias = Literal["parquet", "ipc", "arrow", "feather", "csv"]
 
+
 @overload
 def partitioning(
     schema: Schema,
 ) -> Partitioning: ...
+
+
 @overload
 def partitioning(
     schema: Schema,
@@ -139,6 +142,8 @@ def partitioning(
     flavor: Literal["filename"],
     dictionaries: dict[str, Array] | None = None,
 ) -> Partitioning: ...
+
+
 @overload
 def partitioning(
     schema: Schema,
@@ -146,12 +151,16 @@ def partitioning(
     flavor: Literal["filename"],
     dictionaries: Literal["infer"],
 ) -> PartitioningFactory: ...
+
+
 @overload
 def partitioning(
     field_names: list[str],
     *,
     flavor: Literal["filename"],
 ) -> PartitioningFactory: ...
+
+
 @overload
 def partitioning(
     schema: Schema,
@@ -159,11 +168,15 @@ def partitioning(
     flavor: Literal["hive"],
     dictionaries: Literal["infer"],
 ) -> PartitioningFactory: ...
+
+
 @overload
 def partitioning(
     *,
     flavor: Literal["hive"],
 ) -> PartitioningFactory: ...
+
+
 @overload
 def partitioning(
     schema: Schema,
@@ -171,6 +184,8 @@ def partitioning(
     flavor: Literal["hive"],
     dictionaries: dict[str, Array] | None = None,
 ) -> Partitioning: ...
+
+
 def parquet_dataset(
     metadata_path: StrPath,
     schema: Schema | None = None,
@@ -179,6 +194,8 @@ def parquet_dataset(
     partitioning: Partitioning | PartitioningFactory | None = None,
     partition_base_dir: str | None = None,
 ) -> FileSystemDataset: ...
+
+
 @overload
 def dataset(
     source: StrPath | Sequence[StrPath],
@@ -190,6 +207,8 @@ def dataset(
     exclude_invalid_files: bool | None = None,
     ignore_prefixes: list[str] | None = None,
 ) -> FileSystemDataset: ...
+
+
 @overload
 def dataset(
     source: list[Dataset],
@@ -201,6 +220,8 @@ def dataset(
     exclude_invalid_files: bool | None = None,
     ignore_prefixes: list[str] | None = None,
 ) -> UnionDataset: ...
+
+
 @overload
 def dataset(
     source: Iterable[RecordBatch] | Iterable[Table] | RecordBatchReader,
@@ -212,6 +233,8 @@ def dataset(
     exclude_invalid_files: bool | None = None,
     ignore_prefixes: list[str] | None = None,
 ) -> InMemoryDataset: ...
+
+
 @overload
 def dataset(
     source: RecordBatch | Table,
@@ -223,6 +246,8 @@ def dataset(
     exclude_invalid_files: bool | None = None,
     ignore_prefixes: list[str] | None = None,
 ) -> InMemoryDataset: ...
+
+
 def write_dataset(
     data: Dataset | Table | RecordBatch | RecordBatchReader | list[Table] | Iterable[RecordBatch],
     base_dir: StrPath,
@@ -241,6 +266,7 @@ def write_dataset(
     min_rows_per_group: int = 0,
     max_rows_per_group: int = 1024 * 1024,
     file_visitor: Callable[[str], None] | None = None,
-    existing_data_behavior: Literal["error", "overwrite_or_ignore", "delete_matching"] = "error",
+    existing_data_behavior: Literal["error",
+                                    "overwrite_or_ignore", "delete_matching"] = "error",
     create_dir: bool = True,
 ): ...
