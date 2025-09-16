@@ -110,6 +110,7 @@ _Compression: TypeAlias = Literal[
     "UNKNOWN",
 ]
 
+
 class _Statistics(TypedDict):
     has_min_max: bool
     min: Any | None
@@ -118,6 +119,7 @@ class _Statistics(TypedDict):
     distinct_count: int | None
     num_values: int
     physical_type: _PhysicalType
+
 
 class Statistics(_Weakrefable):
     def to_dict(self) -> _Statistics: ...
@@ -149,10 +151,12 @@ class Statistics(_Weakrefable):
     @property
     def converted_type(self) -> _ConvertedType | None: ...
 
+
 class ParquetLogicalType(_Weakrefable):
     def to_json(self) -> str: ...
     @property
     def type(self) -> _LogicTypeName: ...
+
 
 class _ColumnChunkMetaData(TypedDict):
     file_offset: int
@@ -169,6 +173,7 @@ class _ColumnChunkMetaData(TypedDict):
     data_page_offset: int
     total_compressed_size: int
     total_uncompressed_size: int
+
 
 class ColumnChunkMetaData(_Weakrefable):
     def to_dict(self) -> _ColumnChunkMetaData: ...
@@ -212,15 +217,18 @@ class ColumnChunkMetaData(_Weakrefable):
     @property
     def metadata(self) -> dict[bytes, bytes] | None: ...
 
+
 class _SortingColumn(TypedDict):
     column_index: int
     descending: bool
     nulls_first: bool
 
+
 class SortingColumn:
     def __init__(
         self, column_index: int, descending: bool = False, nulls_first: bool = False
     ) -> None: ...
+
     @classmethod
     def from_ordering(
         cls,
@@ -228,6 +236,7 @@ class SortingColumn:
         sort_keys: Sequence[tuple[str, Order]],
         null_placement: Literal["at_start", "at_end"] = "at_end",
     ) -> tuple[SortingColumn, ...]: ...
+
     @staticmethod
     def to_ordering(
         schema: Schema, sorting_columns: tuple[SortingColumn, ...]
@@ -241,12 +250,14 @@ class SortingColumn:
     def nulls_first(self) -> bool: ...
     def to_dict(self) -> _SortingColumn: ...
 
+
 class _RowGroupMetaData(TypedDict):
     num_columns: int
     num_rows: int
     total_byte_size: int
     columns: list[ColumnChunkMetaData]
     sorting_columns: list[SortingColumn]
+
 
 class RowGroupMetaData(_Weakrefable):
     def __init__(self, parent: FileMetaData, index: int) -> None: ...
@@ -262,6 +273,7 @@ class RowGroupMetaData(_Weakrefable):
     @property
     def sorting_columns(self) -> list[SortingColumn]: ...
 
+
 class _FileMetaData(TypedDict):
     created_by: str
     num_columns: int
@@ -269,6 +281,7 @@ class _FileMetaData(TypedDict):
     num_row_groups: int
     format_version: str
     serialized_size: int
+
 
 class FileMetaData(_Weakrefable):
     def __hash__(self) -> int: ...
@@ -293,7 +306,9 @@ class FileMetaData(_Weakrefable):
     def row_group(self, i: int) -> RowGroupMetaData: ...
     def set_file_path(self, path: str) -> None: ...
     def append_row_groups(self, other: FileMetaData) -> None: ...
-    def write_metadata_file(self, where: StrPath | Buffer | NativeFile | IO) -> None: ...
+    def write_metadata_file(self, where: StrPath | Buffer |
+                            NativeFile | IO) -> None: ...
+
 
 class ParquetSchema(_Weakrefable):
     def __init__(self, container: FileMetaData) -> None: ...
@@ -305,6 +320,7 @@ class ParquetSchema(_Weakrefable):
     def to_arrow_schema(self) -> Schema: ...
     def equals(self, other: ParquetSchema) -> bool: ...
     def column(self, i: int) -> ColumnSchema: ...
+
 
 class ColumnSchema(_Weakrefable):
     def __init__(self, schema: ParquetSchema, index: int) -> None: ...
@@ -330,8 +346,10 @@ class ColumnSchema(_Weakrefable):
     @property
     def scale(self) -> int | None: ...
 
+
 class ParquetReader(_Weakrefable):
     def __init__(self, memory_pool: MemoryPool | None = None) -> None: ...
+
     def open(
         self,
         source: StrPath | NativeFile | IO,
@@ -357,6 +375,7 @@ class ParquetReader(_Weakrefable):
     def num_row_groups(self) -> int: ...
     def set_use_threads(self, use_threads: bool) -> None: ...
     def set_batch_size(self, batch_size: int) -> None: ...
+
     def iter_batches(
         self,
         batch_size: int,
@@ -364,24 +383,30 @@ class ParquetReader(_Weakrefable):
         column_indices: list[int] | None = None,
         use_threads: bool = True,
     ) -> Iterator[RecordBatch]: ...
+
     def read_row_group(
         self, i: int, column_indices: list[int] | None = None, use_threads: bool = True
     ) -> Table: ...
+
     def read_row_groups(
         self,
         row_groups: list[int],
         column_indices: list[int] | None = None,
         use_threads: bool = True,
     ) -> Table: ...
+
     def read_all(
         self, column_indices: list[int] | None = None, use_threads: bool = True
     ) -> Table: ...
-    def scan_contents(self, column_indices: list[int] | None = None, batch_size: int = 65536): ...
+    def scan_contents(
+        self, column_indices: list[int] | None = None, batch_size: int = 65536): ...
+
     def column_name_idx(self, column_name: str) -> int: ...
     def read_column(self, column_index: int) -> ChunkedArray: ...
     def close(self) -> None: ...
     @property
     def closed(self) -> bool: ...
+
 
 class ParquetWriter(_Weakrefable):
     def __init__(
@@ -458,5 +483,10 @@ class ParquetWriter(_Weakrefable):
     @property
     def store_decimal_as_integer(self) -> bool: ...
 
-class FileEncryptionProperties: ...
-class FileDecryptionProperties: ...
+
+class FileEncryptionProperties:
+    ...
+
+
+class FileDecryptionProperties:
+    ...

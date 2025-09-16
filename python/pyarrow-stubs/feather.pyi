@@ -32,18 +32,25 @@ __all__ = [
     "read_table",
 ]
 
+
 class FeatherDataset:
     path_or_paths: str | list[str]
     validate_schema: bool
 
-    def __init__(self, path_or_paths: str | list[str], validate_schema: bool = True) -> None: ...
+    def __init__(self, path_or_paths: str |
+                 list[str], validate_schema: bool = True) -> None: ...
+
     def read_table(self, columns: list[str] | None = None) -> Table: ...
     def validate_schemas(self, piece, table: Table) -> None: ...
+
     def read_pandas(
         self, columns: list[str] | None = None, use_threads: bool = True
     ) -> pd.DataFrame: ...
 
+
 def check_chunked_overflow(name: str, col) -> None: ...
+
+
 def write_feather(
     df: pd.DataFrame | Table,
     dest: StrPath | IO,
@@ -52,6 +59,8 @@ def write_feather(
     chunksize: int | None = None,
     version: Literal[1, 2] = 2,
 ) -> None: ...
+
+
 def read_feather(
     source: StrPath | IO,
     columns: list[str] | None = None,
@@ -59,6 +68,8 @@ def read_feather(
     memory_map: bool = False,
     **kwargs,
 ) -> pd.DataFrame: ...
+
+
 def read_table(
     source: StrPath | IO,
     columns: list[str] | None = None,

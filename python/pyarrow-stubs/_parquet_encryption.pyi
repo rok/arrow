@@ -22,6 +22,7 @@ from typing import Callable
 from ._parquet import FileDecryptionProperties, FileEncryptionProperties
 from .lib import _Weakrefable
 
+
 class EncryptionConfiguration(_Weakrefable):
     footer_key: str
     column_keys: dict[str, list[str]]
@@ -45,15 +46,18 @@ class EncryptionConfiguration(_Weakrefable):
         data_key_length_bits: int | None = None,
     ) -> None: ...
 
+
 class DecryptionConfiguration(_Weakrefable):
     cache_lifetime: dt.timedelta
     def __init__(self, *, cache_lifetime: dt.timedelta | None = None): ...
+
 
 class KmsConnectionConfig(_Weakrefable):
     kms_instance_id: str
     kms_instance_url: str
     key_access_token: str
     custom_kms_conf: dict[str, str]
+
     def __init__(
         self,
         *,
@@ -64,17 +68,22 @@ class KmsConnectionConfig(_Weakrefable):
     ) -> None: ...
     def refresh_key_access_token(self, value: str) -> None: ...
 
+
 class KmsClient(_Weakrefable):
     def wrap_key(self, key_bytes: bytes, master_key_identifier: str) -> str: ...
     def unwrap_key(self, wrapped_key: str, master_key_identifier: str) -> str: ...
 
+
 class CryptoFactory(_Weakrefable):
-    def __init__(self, kms_client_factory: Callable[[KmsConnectionConfig], KmsClient]): ...
+    def __init__(self, kms_client_factory: Callable[[
+                 KmsConnectionConfig], KmsClient]): ...
+
     def file_encryption_properties(
         self,
         kms_connection_config: KmsConnectionConfig,
         encryption_config: EncryptionConfiguration,
     ) -> FileEncryptionProperties: ...
+
     def file_decryption_properties(
         self,
         kms_connection_config: KmsConnectionConfig,

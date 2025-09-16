@@ -45,6 +45,7 @@ from pyarrow._s3fs import (  # noqa
 
 FileStats = FileInfo
 
+
 def copy_files(
     source: str,
     destination: str,
@@ -55,9 +56,11 @@ def copy_files(
     use_threads: bool = True,
 ) -> None: ...
 
+
 class FSSpecHandler(FileSystemHandler):  # type: ignore[misc]
     fs: SupportedFileSystem
     def __init__(self, fs: SupportedFileSystem) -> None: ...
+
 
 __all__ = [
     # _fs

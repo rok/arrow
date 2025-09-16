@@ -21,7 +21,10 @@ from _typeshed import StrPath
 
 from .lib import Buffer, NativeFile, Table, _Weakrefable
 
-class FeatherError(Exception): ...
+
+class FeatherError(Exception):
+    ...
+
 
 def write_feather(
     table: Table,
@@ -31,6 +34,7 @@ def write_feather(
     chunksize: int | None = None,
     version: int = 2,
 ): ...
+
 
 class FeatherReader(_Weakrefable):
     def __init__(
