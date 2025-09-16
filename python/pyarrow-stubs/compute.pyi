@@ -216,9 +216,9 @@ NumericOrDurationScalar: TypeAlias = NumericScalar | lib.DurationScalar
 NumericOrTemporalScalar: TypeAlias = NumericScalar | TemporalScalar
 
 _NumericOrTemporalScalarT = TypeVar("_NumericOrTemporalScalarT", bound=NumericOrTemporalScalar)
+_NumericScalarT = TypeVar("_NumericScalarT", bound=NumericScalar)
 NumericArray: TypeAlias = ArrayOrChunkedArray[_NumericScalarT]
 _NumericArrayT = TypeVar("_NumericArrayT", bound=NumericArray)
-_NumericScalarT = TypeVar("_NumericScalarT", bound=NumericScalar)
 _NumericOrDurationT = TypeVar("_NumericOrDurationT", bound=NumericOrDurationScalar)
 NumericOrDurationArray: TypeAlias = ArrayOrChunkedArray[NumericOrDurationScalar]
 _NumericOrDurationArrayT = TypeVar("_NumericOrDurationArrayT", bound=NumericOrDurationArray)

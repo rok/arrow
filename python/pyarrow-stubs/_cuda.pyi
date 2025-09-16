@@ -2,13 +2,12 @@ from typing import Any
 
 import cuda  # type: ignore[import-not-found]
 
-from numba.cuda.cudadrv import driver as _numba_driver  # type: ignore[import-not-found]
+from numba.cuda.cudadrv import driver as _numba_driver  # type: ignore[import-untyped]
 
-# from . import lib
-from .lib import _Weakrefable, Buffer, MemoryPool, NativeFile, RecordBatch, Schema, DictionaryMemo, Message, MemoryManager, Device
+from . import lib
 from ._stubs_typing import ArrayLike
 
-class Context(_Weakrefable):
+class Context(lib._Weakrefable):
     """
     CUDA driver context.
     """
@@ -107,7 +106,7 @@ class Context(_Weakrefable):
           Allocated buffer.
         """
     @property
-    def memory_manager(self) -> MemoryManager:
+    def memory_manager(self) -> lib.MemoryManager:
         """
         The default memory manager tied to this context's device.
 
@@ -116,7 +115,7 @@ class Context(_Weakrefable):
         MemoryManager
         """
     @property
-    def device(self) -> Device:
+    def device(self) -> lib.Device:
         """
         The device instance associated with this context.
 
@@ -165,7 +164,7 @@ class Context(_Weakrefable):
         """
     def buffer_from_data(
         self,
-        data: CudaBuffer | HostBuffer | Buffer | ArrayLike,
+        data: CudaBuffer | HostBuffer | lib.Buffer | ArrayLike,
         offset: int = 0,
         size: int = -1,
     ) -> CudaBuffer:
@@ -212,10 +211,10 @@ class Context(_Weakrefable):
 
         """
 
-class IpcMemHandle(_Weakrefable):
+class IpcMemHandle(lib._Weakrefable):
     """A serializable container for a CUDA IPC handle."""
     @staticmethod
-    def from_buffer(opaque_handle: Buffer) -> IpcMemHandle:
+    def from_buffer(opaque_handle: lib.Buffer) -> IpcMemHandle:
         """Create IpcMemHandle from opaque buffer (e.g. from another
         process)
 
@@ -228,7 +227,7 @@ class IpcMemHandle(_Weakrefable):
         -------
         ipc_handle : IpcMemHandle
         """
-    def serialize(self, pool: MemoryPool | None = None) -> Buffer:
+    def serialize(self, pool: lib.MemoryPool | None = None) -> lib.Buffer:
         """Write IpcMemHandle to a Buffer
 
         Parameters
@@ -242,7 +241,7 @@ class IpcMemHandle(_Weakrefable):
           The serialized buffer.
         """
 
-class CudaBuffer(Buffer):
+class CudaBuffer(lib.Buffer):
     """An Arrow buffer with data located in a GPU device.
 
     To create a CudaBuffer instance, use Context.device_buffer().
@@ -252,7 +251,7 @@ class CudaBuffer(Buffer):
     """
 
     @staticmethod
-    def from_buffer(buf: Buffer) -> CudaBuffer:
+    def from_buffer(buf: lib.Buffer) -> CudaBuffer:
         """Convert back generic buffer into CudaBuffer
 
         Parameters
@@ -284,10 +283,10 @@ class CudaBuffer(Buffer):
         self,
         position: int = 0,
         nbytes: int = -1,
-        buf: Buffer | None = None,
-        memory_pool: MemoryPool | None = None,
+        buf: lib.Buffer | None = None,
+        memory_pool: lib.MemoryPool | None = None,
         resizable: bool = False,
-    ) -> Buffer:
+    ) -> lib.Buffer:
         """Copy memory from GPU device to CPU host
 
         Caller is responsible for ensuring that all tasks affecting
@@ -320,7 +319,7 @@ class CudaBuffer(Buffer):
 
         """
     def copy_from_host(
-        self, data: Buffer | ArrayLike, position: int = 0, nbytes: int = -1
+        self, data: lib.Buffer | ArrayLike, position: int = 0, nbytes: int = -1
     ) -> int:
         """Copy data from host to device.
 
@@ -402,7 +401,7 @@ class CudaBuffer(Buffer):
     def to_pybytes(self) -> bytes:
         """Return device buffer content as Python bytes."""
 
-class HostBuffer(Buffer):
+class HostBuffer(lib.Buffer):
     """Device-accessible CPU memory created using cudaHostAlloc.
 
     To create a HostBuffer instance, use
@@ -412,7 +411,7 @@ class HostBuffer(Buffer):
     @property
     def size(self) -> int: ...
 
-class BufferReader(NativeFile):
+class BufferReader(lib.NativeFile):
     """File interface for zero-copy read from CUDA buffers.
 
     Note: Read methods return pointers to device memory. This means
@@ -440,7 +439,7 @@ class BufferReader(NativeFile):
 
         """
 
-class BufferWriter(NativeFile):
+class BufferWriter(lib.NativeFile):
     """File interface for writing to CUDA buffers.
 
     By default writes are unbuffered. Use set_buffer_size to enable
@@ -491,7 +490,7 @@ def new_host_buffer(size: int, device: int = 0) -> HostBuffer:
       Allocated host buffer
     """
 
-def serialize_record_batch(batch: RecordBatch, ctx: Context) -> CudaBuffer:
+def serialize_record_batch(batch: lib.RecordBatch, ctx: Context) -> CudaBuffer:
     """Write record batch message to GPU device memory
 
     Parameters
@@ -508,8 +507,8 @@ def serialize_record_batch(batch: RecordBatch, ctx: Context) -> CudaBuffer:
     """
 
 def read_message(
-    source: CudaBuffer | cuda.BufferReader, pool: MemoryManager | None = None
-) -> Message:
+    source: CudaBuffer | cuda.BufferReader, pool: lib.MemoryManager | None = None
+) -> lib.Message:
     """Read Arrow IPC message located on GPU device
 
     Parameters
@@ -526,12 +525,12 @@ def read_message(
     """
 
 def read_record_batch(
-    buffer: Buffer,
-    object: Schema,
+    buffer: lib.Buffer,
+    object: lib.Schema,
     *,
-    dictionary_memo: DictionaryMemo | None = None,
-    pool: MemoryPool | None = None,
-) -> RecordBatch:
+    dictionary_memo: lib.DictionaryMemo | None = None,
+    pool: lib.MemoryPool | None = None,
+) -> lib.RecordBatch:
     """Construct RecordBatch referencing IPC message located on CUDA device.
 
     While the metadata is copied to host memory for deserialization,
