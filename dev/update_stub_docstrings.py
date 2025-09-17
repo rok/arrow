@@ -117,6 +117,46 @@ class DocUpdater(libcst.CSTTransformer):
         return updated_node
 
 
+class ReplaceEllipsis(libcst.CSTTransformer):
+    def __init__(self, package, namespace):
+        self.stack = [namespace] if namespace else []
+        self.indentation = 0
+        self.package = package
+
+    def _get_docstring(self, name, indentation):
+        # print(name)
+        try:
+            obj = self.package.get_member(name)
+            if obj.has_docstring:
+                indentation_prefix = indentation * "    "
+                docstring = indent(obj.docstring.value, indentation_prefix)
+                docstring = f'"""\n{docstring}\n{indentation_prefix}"""'
+                # print(f"{name} has {len(docstring)} long docstring.")
+                return docstring
+        except KeyError:
+            print(f"{name} has no docstring.")
+            return ""
+
+    def visit_FunctionDef(self, node):
+        self.stack.append(node.name.value)
+        self.indentation += 1
+
+    def leave_FunctionDef(self, original_node, updated_node):
+        node_name = ".".join(self.stack)
+        indentation = self.indentation
+        self.stack.pop()
+        self.indentation -= 1
+
+        if isinstance(updated_node.body.body[0].value, libcst.Ellipsis):
+            print(node_name)
+            docstring = self._get_docstring(node_name, indentation)
+            if docstring and len(docstring) > 0:
+                new_docstring = libcst.SimpleString(value=docstring)
+                new_body = updated_node.body.with_changes(body=[libcst.Expr(value=new_docstring)])
+                return updated_node.with_changes(body=new_body)
+        return updated_node
+
+
 @click.command()
 @click.option('--pyarrow_folder', '-f', type=click.Path(resolve_path=True))
 def update_stub_files(pyarrow_folder):
