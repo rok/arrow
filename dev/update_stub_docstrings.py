@@ -30,157 +30,117 @@ from textwrap import indent
 import click
 # TODO: perhaps replace griffe with importlib
 import griffe
+from griffe import AliasResolutionError
 import libcst
 
 
-class DocUpdater(libcst.CSTTransformer):
-    def __init__(self, package, namespace):
-        self.stack = [namespace] if namespace else []
-        self._docstring = None
-        self.indentation = 0
-        self.package = package
+def _get_docstring(name, package, indentation):
+    # print("extract_docstrings", name)
+    try:
+        obj = package.get_member(name)
+    except (KeyError, ValueError, AliasResolutionError):
+        # Some cython __init__ symbols can't be found
+        # e.g. pyarrow.lib.OSFile.__init__
+        stack = name.split(".")
+        parent_name = ".".join(stack[:-1])
 
-    def _get_docstring(self, name):
-        # print("extract_docstrings", name)
         try:
-            obj = self.package.get_member(name)
-        except KeyError:
-            # Some cython __init__ symbols can't be found
-            # e.g. pyarrow.lib.OSFile.__init__
-            parent_name = ".".join(self.stack[:-1])
+            obj = package.get_member(parent_name).all_members[stack[-1]]
+        except (KeyError, ValueError, AliasResolutionError):
+            print(f"{name} not found in {package.name}, it's probably ok.")
+            return None
 
-            try:
-                obj = self.package.get_member(parent_name).all_members[self.stack[-1]]
-            except KeyError:
-                # print(f"{name} not found in {self.package.name}, it's probably ok.")
-                return None
+    if obj.has_docstring:
+        docstring = obj.docstring.value
+        # remove signature if present in docstring
+        if docstring.startswith(obj.name) or (
+            (hasattr(obj.parent, "name") and
+                docstring.startswith(f"{obj.parent.name}.{obj.name}"))):
+            docstring = "\n".join(docstring.splitlines()[2:])
+        indentation_prefix = indentation * "    "
+        docstring = indent(docstring + '\n"""', indentation_prefix)
+        docstring = '"""\n' + docstring
 
-        if obj.has_docstring:
-            docstring = obj.docstring.value
-            # remove signature if present in docstring
-            if docstring.startswith(obj.name) or (
-                (hasattr(obj.parent, "name") and
-                    docstring.startswith(f"{obj.parent.name}.{obj.name}"))):
-                return "\n".join(docstring.splitlines()[2:])
-            else:
-                return docstring
-        return None
+        return docstring
+    return None
 
-    def visit_ClassDef(self, node):
-        # TODO: class docstrings?
-        self.stack.append(node.name.value)
-        self.indentation += 1
-        node_name = ".".join(self.stack)
-        docstring = self._get_docstring(node_name)
-
-        if docstring:
-            if not node.get_docstring(clean=False):
-                print("Missing docstring (in annotations) for:", node_name)
-                return False
-            self._docstring = f'"""{node.get_docstring(clean=False)}"""'
-            return True
-        return False
-
-    def visit_FunctionDef(self, node):
-        self.stack.append(node.name.value)
-        self.indentation += 1
-        node_name = ".".join(self.stack)
-        docstring = self._get_docstring(node_name)
-
-        if docstring:
-            if not node.get_docstring(clean=False):
-                print("Missing docstring (in annotations) for:", node_name)
-                return False
-            self._docstring = f'"""{node.get_docstring(clean=False)}"""'
-            return True
-        return False
-
-    def leave_ClassDef(self, original_node, updated_node):
-        self.stack.pop()
-        self.indentation -= 1
-        return updated_node
-
-    def leave_FunctionDef(self, original_node, updated_node):
-        self.stack.pop()
-        self.indentation -= 1
-        return updated_node
-
-    def leave_SimpleString(self, original_node, updated_node):
-        node_name = ".".join(self.stack)
-
-        if original_node.value == self._docstring:
-            indentation = self.indentation * "    "
-            indented_docstring = indent(self._get_docstring(node_name), indentation)
-            docstring = f'"""\n{indented_docstring}\n{indentation}"""'
-            return updated_node.with_changes(value=docstring)
-
-        return updated_node
+def _has_ellipsis(node):
+    if hasattr(node.body.body[0], "value") and isinstance(node.body.body[0].value, libcst.Ellipsis):
+        return True
+    return False
 
 
 class ReplaceEllipsis(libcst.CSTTransformer):
     def __init__(self, package, namespace):
-        self.stack = [namespace] if namespace else []
-        self.indentation = 0
         self.package = package
+        self.base_namespace = namespace
+        self.stack = []
+        self.indentation = 0
 
-    def _get_docstring(self, name, indentation):
-        # print(name)
-        try:
-            obj = self.package.get_member(name)
-            if obj.has_docstring:
-                indentation_prefix = indentation * "    "
-                docstring = indent(obj.docstring.value, indentation_prefix)
-                docstring = f'"""\n{docstring}\n{indentation_prefix}"""'
-                # print(f"{name} has {len(docstring)} long docstring.")
-                return docstring
-        except KeyError:
-            print(f"{name} has no docstring.")
-            return ""
+    def _replace_ellipsis(self, original_node, updated_node):
+        name = ".".join(self.stack)
+        if self.base_namespace:
+            name = self.base_namespace + "." + name
+
+        if _has_ellipsis(updated_node):
+            docstring = _get_docstring(name, self.package, self.indentation)
+            if docstring is not None and len(docstring) > 0:
+                new_docstring = libcst.SimpleString(value=docstring)
+                new_body = [
+                    libcst.SimpleWhitespace(self.indentation * "    "),
+                    libcst.Expr(value=new_docstring),
+                    libcst.Newline()
+                ]
+                new_body = libcst.IndentedBlock(body=new_body)
+                updated_node = updated_node.with_changes(body=new_body)
+        self.stack.pop()
+        self.indentation -= 1
+        return updated_node
+
+    def visit_ClassDef(self, node):
+        self.stack.append(node.name.value)
+        self.indentation += 1
+    def leave_ClassDef(self, original_node, updated_node):
+        return self._replace_ellipsis(original_node, updated_node)
 
     def visit_FunctionDef(self, node):
         self.stack.append(node.name.value)
         self.indentation += 1
-
     def leave_FunctionDef(self, original_node, updated_node):
-        node_name = ".".join(self.stack)
-        indentation = self.indentation
-        self.stack.pop()
-        self.indentation -= 1
-
-        if isinstance(updated_node.body.body[0].value, libcst.Ellipsis):
-            print(node_name)
-            docstring = self._get_docstring(node_name, indentation)
-            if docstring and len(docstring) > 0:
-                new_docstring = libcst.SimpleString(value=docstring)
-                new_body = updated_node.body.with_changes(body=[libcst.Expr(value=new_docstring)])
-                return updated_node.with_changes(body=new_body)
-        return updated_node
+        return self._replace_ellipsis(original_node, updated_node)
 
 
 @click.command()
 @click.option('--pyarrow_folder', '-f', type=click.Path(resolve_path=True))
-def update_stub_files(pyarrow_folder):
+def add_docs_to_stub_files(pyarrow_folder):
     print("Updating docstrings of stub files in:", pyarrow_folder)
     package = griffe.load("pyarrow", try_relative_path=True,
                           force_inspection=True, resolve_aliases=True)
+    lib_modules = ["array", "builder", "compat", "config", "device", "error", "io",
+                   "_ipc", "memory", "pandas_shim", "scalar", "table", "tensor", "_types"]
 
     for stub_file in Path(pyarrow_folder).rglob('*.pyi'):
         if stub_file.name == "_stubs_typing.pyi":
             continue
-
         print(f"[{stub_file}]")
 
         with open(stub_file, 'r') as f:
             tree = libcst.parse_module(f.read())
 
-        if stub_file.name != "__init__.pyi":
-            modified_tree = tree.visit(DocUpdater(package, "lib"))
-        else:
-            modified_tree = tree.visit(DocUpdater(package, None))
+        module = stub_file.with_suffix('').name
+        if module in lib_modules:
+            module = "lib"
+        elif stub_file.parent.name in ["parquet", "interchange"]:
+            module = f"{stub_file.parent.name}.{module}"
+        elif module == "__init__":
+            module = ""
+
+        modified_tree = tree.visit(ReplaceEllipsis(package, module))
         with open(stub_file, "w") as f:
             f.write(modified_tree.code)
+        print("\n")
 
 
 if __name__ == "__main__":
     docstrings_map = {}
-    update_stub_files(obj={})
+    add_docs_to_stub_files(obj={})
