@@ -19,7 +19,6 @@
 from typing import NamedTuple
 
 from .array import *
-# from .benchmark import *
 from .builder import *
 from .compat import *
 from .config import *
