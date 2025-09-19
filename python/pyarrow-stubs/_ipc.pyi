@@ -36,6 +36,7 @@ from ._types import DictionaryMemo, KeyValueMetadata
 
 
 class MetadataVersion(enum.IntEnum):
+    ...
     V1 = enum.auto()
     V2 = enum.auto()
     V3 = enum.auto()
@@ -44,7 +45,7 @@ class MetadataVersion(enum.IntEnum):
 
 
 class WriteStats(NamedTuple):
-
+    ...
     num_messages: int
     num_record_batches: int
     num_dictionary_batches: int
@@ -53,7 +54,7 @@ class WriteStats(NamedTuple):
 
 
 class ReadStats(NamedTuple):
-
+    ...
     num_messages: int
     num_record_batches: int
     num_dictionary_batches: int
@@ -62,7 +63,7 @@ class ReadStats(NamedTuple):
 
 
 class IpcReadOptions(_Weakrefable):
-
+    ...
     ensure_native_endian: bool
     use_threads: bool
     included_fields: list[int]
@@ -77,7 +78,7 @@ class IpcReadOptions(_Weakrefable):
 
 
 class IpcWriteOptions(_Weakrefable):
-
+    ...
     metadata_version: MetadataVersion
     allow_64bit: bool
     use_legacy_format: bool
@@ -100,7 +101,7 @@ class IpcWriteOptions(_Weakrefable):
 
 
 class Message(_Weakrefable):
-
+    ...
     @property
     def type(self) -> str: ...
     @property
@@ -120,7 +121,7 @@ class Message(_Weakrefable):
 
 
 class MessageReader(_Weakrefable):
-
+    ...
     @classmethod
     def open_stream(cls, source: bytes | NativeFile |
                     IOBase | SupportPyBuffer) -> Self: ...
@@ -135,7 +136,7 @@ class MessageReader(_Weakrefable):
 
 
 class _CRecordBatchWriter(_Weakrefable):
-
+    ...
     def write(self, table_or_batch: Table | RecordBatch): ...
 
     def write_batch(
@@ -155,6 +156,7 @@ class _CRecordBatchWriter(_Weakrefable):
 
 
 class _RecordBatchStreamWriter(_CRecordBatchWriter):
+    ...
     @property
     def _use_legacy_format(self) -> bool: ...
     @property
@@ -164,11 +166,12 @@ class _RecordBatchStreamWriter(_CRecordBatchWriter):
 
 
 class _ReadPandasMixin:
+    ...
     def read_pandas(self, **options) -> pd.DataFrame: ...
 
 
 class RecordBatchReader(_Weakrefable):
-
+    ...
     def __iter__(self) -> Self: ...
     def read_next_batch(self) -> RecordBatch: ...
 
@@ -211,6 +214,7 @@ class RecordBatchReader(_Weakrefable):
 
 
 class _RecordBatchStreamReader(RecordBatchReader):
+    ...
     @property
     def stats(self) -> ReadStats: ...
 
@@ -220,12 +224,13 @@ class _RecordBatchFileWriter(_RecordBatchStreamWriter):
 
 
 class RecordBatchWithMetadata(NamedTuple):
-
+    ...
     batch: RecordBatch
     custom_metadata: KeyValueMetadata
 
 
 class _RecordBatchFileReader(_Weakrefable):
+    ...
     @property
     def num_record_batches(self) -> int: ...
 
