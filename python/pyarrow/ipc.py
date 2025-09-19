@@ -278,3 +278,4 @@ def deserialize_pandas(buf, *, use_threads=True):
     with pa.RecordBatchStreamReader(buffer_reader) as reader:
         table = reader.read_all()
     return table.to_pandas(use_threads=use_threads)
+

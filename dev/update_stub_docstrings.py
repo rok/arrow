@@ -122,12 +122,12 @@ def add_docs_to_stub_files(pyarrow_folder):
     for stub_file in Path(pyarrow_folder).rglob('*.pyi'):
         if stub_file.name == "_stubs_typing.pyi":
             continue
-        print(f"[{stub_file}]")
+        module = stub_file.with_suffix('').name
+        print(f"[{stub_file} {module}]")
 
         with open(stub_file, 'r') as f:
             tree = libcst.parse_module(f.read())
 
-        module = stub_file.with_suffix('').name
         if module in lib_modules:
             module = "lib"
         elif stub_file.parent.name in ["parquet", "interchange"]:
