@@ -32,7 +32,7 @@ else:
 
 from typing import Union, overload
 
-from fsspec import AbstractFileSystem  # type: ignore[import-untyped]
+from fsspec import AbstractFileSystem  # type: ignore[import-not-found]
 
 from .lib import NativeFile, _Weakrefable
 
