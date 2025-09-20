@@ -21,7 +21,7 @@
 # Usage
 # =====
 #
-# python ../dev/update_stub_docstrings.py -f ./pyarrow/
+# python ./dev/update_stub_docstrings.py -f ./python/pyarrow-stubs
 
 
 from pathlib import Path
@@ -32,6 +32,7 @@ import click
 import griffe
 from griffe import AliasResolutionError
 import libcst
+from libcst import matchers as m
 
 
 def _get_docstring(name, package, indentation):
@@ -52,22 +53,20 @@ def _get_docstring(name, package, indentation):
 
     if obj.has_docstring:
         docstring = obj.docstring.value
-        # remove signature if present in docstring
+        # Remove signature if present in docstring
         if docstring.startswith(obj.name) or (
             (hasattr(obj.parent, "name") and
                 docstring.startswith(f"{obj.parent.name}.{obj.name}"))):
             docstring = "\n".join(docstring.splitlines()[2:])
+        # Skip empty docstrings
+        if docstring.strip() == "":
+            return None
+        # Indent docstring
         indentation_prefix = indentation * "    "
         docstring = indent(docstring + '\n"""', indentation_prefix)
         docstring = '"""\n' + docstring
-
         return docstring
     return None
-
-def _has_ellipsis(node):
-    if hasattr(node.body.body[0], "value") and isinstance(node.body.body[0].value, libcst.Ellipsis):
-        return True
-    return False
 
 
 class ReplaceEllipsis(libcst.CSTTransformer):
@@ -77,14 +76,93 @@ class ReplaceEllipsis(libcst.CSTTransformer):
         self.stack = []
         self.indentation = 0
 
-    def _replace_ellipsis(self, original_node, updated_node):
+    # Insert module level docstring if _clone_signature is used
+    def leave_Module(self, original_node, updated_node):
+        new_body = []
+        clone_matcher = m.SimpleStatementLine(
+            body=[m.Assign(
+                value=m.Call(func=m.Name(value="_clone_signature"))
+            ), m.ZeroOrMore()]
+        )
+        for statement in updated_node.body:
+            new_body.append(statement)
+            if m.matches(statement, clone_matcher):
+                name = statement.body[0].targets[0].target.value
+                if self.base_namespace:
+                    name = f"{self.base_namespace}.{name}"
+                docstring = _get_docstring(name, self.package, 0)
+                if docstring is not None:
+                    new_expr = libcst.Expr(value=libcst.SimpleString(docstring))
+                    new_line = libcst.SimpleStatementLine(body=[new_expr])
+                    new_body.append(new_line)
+
+        return updated_node.with_changes(body=new_body)
+
+    def visit_ClassDef(self, node):
+        self.stack.append(node.name.value)
+        self.indentation += 1
+
+    def leave_ClassDef(self, original_node, updated_node):
         name = ".".join(self.stack)
         if self.base_namespace:
             name = self.base_namespace + "." + name
 
-        if _has_ellipsis(updated_node):
+        class_matcher_1 = m.ClassDef(
+            name=m.Name(),
+            body=m.IndentedBlock(
+                body=[m.SimpleStatementLine(
+                    body=[m.Expr(m.Ellipsis()), m.ZeroOrMore()]
+                ), m.ZeroOrMore()]
+            )
+        )
+        class_matcher_2 = m.ClassDef(
+            name=m.Name(),
+            body=m.IndentedBlock(
+                body=[m.FunctionDef(), m.ZeroOrMore()]
+            )
+        )
+
+        if m.matches(updated_node, class_matcher_1):
             docstring = _get_docstring(name, self.package, self.indentation)
-            if docstring is not None and len(docstring) > 0:
+            if docstring is not None:
+                new_node = libcst.SimpleString(value=docstring)
+                updated_node = updated_node.deep_replace(
+                    updated_node.body.body[0].body[0].value, new_node)
+
+        if m.matches(updated_node, class_matcher_2):
+            docstring = _get_docstring(name, self.package, self.indentation)
+            if docstring is not None:
+                new_docstring = libcst.SimpleString(value=docstring)
+                new_body = [
+                    libcst.SimpleWhitespace(self.indentation * "    "),
+                    libcst.Expr(value=new_docstring),
+                    libcst.Newline()
+                ] + list(updated_node.body.body)
+                new_body = libcst.IndentedBlock(body=new_body)
+                updated_node = updated_node.with_changes(body=new_body)
+
+        self.stack.pop()
+        self.indentation -= 1
+        return updated_node
+
+    def visit_FunctionDef(self, node):
+        self.stack.append(node.name.value)
+        self.indentation += 1
+
+    def leave_FunctionDef(self, original_node, updated_node):
+        name = ".".join(self.stack)
+        if self.base_namespace:
+            name = self.base_namespace + "." + name
+
+        function_matcher = m.FunctionDef(
+            name=m.Name(),
+            body=m.SimpleStatementSuite(
+                body=[m.Expr(
+                    m.Ellipsis()
+                )]))
+        if m.matches(original_node, function_matcher):
+            docstring = _get_docstring(name, self.package, self.indentation)
+            if docstring is not None:
                 new_docstring = libcst.SimpleString(value=docstring)
                 new_body = [
                     libcst.SimpleWhitespace(self.indentation * "    "),
@@ -93,21 +171,10 @@ class ReplaceEllipsis(libcst.CSTTransformer):
                 ]
                 new_body = libcst.IndentedBlock(body=new_body)
                 updated_node = updated_node.with_changes(body=new_body)
+
         self.stack.pop()
         self.indentation -= 1
         return updated_node
-
-    def visit_ClassDef(self, node):
-        self.stack.append(node.name.value)
-        self.indentation += 1
-    def leave_ClassDef(self, original_node, updated_node):
-        return self._replace_ellipsis(original_node, updated_node)
-
-    def visit_FunctionDef(self, node):
-        self.stack.append(node.name.value)
-        self.indentation += 1
-    def leave_FunctionDef(self, original_node, updated_node):
-        return self._replace_ellipsis(original_node, updated_node)
 
 
 @click.command()
@@ -117,7 +184,8 @@ def add_docs_to_stub_files(pyarrow_folder):
     package = griffe.load("pyarrow", try_relative_path=True,
                           force_inspection=True, resolve_aliases=True)
     lib_modules = ["array", "builder", "compat", "config", "device", "error", "io",
-                   "_ipc", "memory", "pandas_shim", "scalar", "table", "tensor", "_types"]
+                   "_ipc", "memory", "pandas_shim", "scalar", "table", "tensor",
+                   "_types"]
 
     for stub_file in Path(pyarrow_folder).rglob('*.pyi'):
         if stub_file.name == "_stubs_typing.pyi":

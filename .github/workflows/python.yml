@@ -140,7 +140,7 @@ jobs:
 
       - name: Type check with mypy and pyright
         run: |-
-            python -m pip install mypy pyright scipy-stubs pandas-stubs types-python-dateutil types-psutil types-requests griffe libcst
+            python -m pip install mypy pyright scipy-stubs pandas-stubs types-python-dateutil types-psutil types-requests griffe libcst types-cffi
             pushd python;
             # pip install -e .
             mypy pyarrow-stubs pyarrow/tests/test_array.py pyarrow/tests/test_io.py
