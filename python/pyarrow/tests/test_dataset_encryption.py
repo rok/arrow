@@ -135,6 +135,8 @@ def do_test_dataset_encryption_decryption(table, extra_column_path=None):
         encrypt_kms_connection_config = create_kms_connection_config(write_keys)
         decrypt_kms_connection_config = create_kms_connection_config(read_keys)
 
+        assert ds is not None
+        assert pe is not None
         crypto_factory = pe.CryptoFactory(kms_factory)
         parquet_encryption_cfg = ds.ParquetEncryptionConfig(
             crypto_factory, encrypt_kms_connection_config, encryption_config
@@ -396,6 +398,9 @@ def test_large_row_encryption_decryption():
         plaintext_footer=False,
         data_key_length_bits=128,
     )
+    assert ds is not None
+    assert pe is not None
+    assert pq is not None
     pqe_config = ds.ParquetEncryptionConfig(
         crypto_factory, kms_config, encryption_config
     )
