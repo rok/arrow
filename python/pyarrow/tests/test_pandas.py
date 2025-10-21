@@ -4606,7 +4606,6 @@ def test_array_to_pandas_types_mapper():
     assert result.dtype == np.dtype("int64")
 
 
-@pytest.mark.pandas
 def test_chunked_array_to_pandas_types_mapper():
     # https://issues.apache.org/jira/browse/ARROW-9664
     if Version(pd.__version__) < Version("1.2.0"):
@@ -5097,7 +5096,7 @@ def test_roundtrip_nested_map_array_with_pydicts_sliced():
 
     ty = pa.list_(pa.map_(pa.string(), pa.list_(pa.string())))
 
-    def assert_roundtrip(series: pd.Series, data: pa.ChunkedArray) -> None:  # type: ignore[type-arg]
+    def assert_roundtrip(series, data):
         array_roundtrip = pa.chunked_array(pa.Array.from_pandas(series, type=ty))
         array_roundtrip.validate(full=True)
         assert data.equals(array_roundtrip)
