@@ -2347,7 +2347,7 @@ def test_partitioning_function():
 
     # unsupported flavor
     with pytest.raises(ValueError):
-        ds.partitioning(schema, flavor="unsupported")
+        ds.partitioning(schema, flavor="unsupported")  # type: ignore[arg-type]
 
 
 @pytest.mark.parquet
