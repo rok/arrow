@@ -45,6 +45,7 @@ Compression: TypeAlias = Literal[
 ]
 NullEncoding: TypeAlias = Literal["mask", "encode"]
 NullSelectionBehavior: TypeAlias = Literal["drop", "emit_null"]
+TimeUnit: TypeAlias = Literal["s", "ms", "us", "ns"]
 Mask: TypeAlias = (
     Sequence[bool | None]
     | NDArray[np.bool_]
@@ -123,7 +124,7 @@ class SupportArrowDeviceArray(Protocol):
 
 
 class SupportArrowSchema(Protocol):
-    def __arrow_c_schema(self) -> Any: ...
+    def __arrow_c_schema__(self) -> Any: ...
 
 
 class NullableCollection(Protocol[_V]):  # type: ignore[reportInvalidTypeVarUse]

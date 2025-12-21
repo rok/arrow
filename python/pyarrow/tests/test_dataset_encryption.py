@@ -85,7 +85,7 @@ def create_encryption_config(footer_key=FOOTER_KEY_NAME, column_keys=COLUMN_KEYS
 
 
 def create_decryption_config():
-    return pe.DecryptionConfiguration(cache_lifetime=300)
+    return pe.DecryptionConfiguration(cache_lifetime=timedelta(seconds=300))
 
 
 def create_kms_connection_config(keys=KEYS):
@@ -435,6 +435,9 @@ def test_large_row_encryption_decryption():
     encryption_unavailable, reason="Parquet Encryption is not currently enabled"
 )
 def test_dataset_encryption_with_selected_column_statistics():
+    assert ds is not None
+    assert pq is not None
+
     table = create_sample_table()
 
     encryption_config = create_encryption_config()
@@ -478,7 +481,7 @@ def test_dataset_encryption_with_selected_column_statistics():
 
     for fragment in dataset.get_fragments():
         decryption_properties = crypto_factory.file_decryption_properties(
-            kms_connection_config, decryption_config, fragment.path, mockfs)
+            kms_connection_config, decryption_config, fragment.path, mockfs)  # type: ignore[call-arg]
         with pq.ParquetFile(
             fragment.path,
             decryption_properties=decryption_properties,
@@ -487,12 +490,14 @@ def test_dataset_encryption_with_selected_column_statistics():
             for rg_idx in range(parquet_file.metadata.num_row_groups):
                 row_group = parquet_file.metadata.row_group(rg_idx)
 
-                assert row_group.column(0).statistics is not None
-                assert row_group.column(0).statistics.min == 2019
-                assert row_group.column(0).statistics.max == 2022
+                stats0 = row_group.column(0).statistics
+                assert stats0 is not None
+                assert stats0.min == 2019
+                assert stats0.max == 2022
 
-                assert row_group.column(1).statistics is not None
-                assert row_group.column(1).statistics.min == 2
-                assert row_group.column(1).statistics.max == 100
+                stats1 = row_group.column(1).statistics
+                assert stats1 is not None
+                assert stats1.min == 2
+                assert stats1.max == 100
 
                 assert row_group.column(2).statistics is None

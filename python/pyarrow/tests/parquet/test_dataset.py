@@ -937,8 +937,7 @@ def _test_write_to_dataset_with_partitions(base_path,
         'group2': list('eefeffgeee'),
         'num': list(range(10)),
         'nan': [np.nan] * 10,
-        'date': np.arange('2017-01-01', '2017-01-11', dtype='datetime64[D]').astype(
-            'datetime64[ns]')
+        'date': pd.date_range('2017-01-01', periods=10, freq='D').values.astype('datetime64[ns]')
     })
     cols = output_df.columns.tolist()
     partition_by = ['group1', 'group2']
@@ -995,8 +994,7 @@ def _test_write_to_dataset_no_partitions(base_path,
         'group1': list('aaabbbbccc'),
         'group2': list('eefeffgeee'),
         'num': list(range(10)),
-        'date': np.arange('2017-01-01', '2017-01-11', dtype='datetime64[D]').astype(
-            'datetime64[ns]')
+        'date': pd.date_range('2017-01-01', periods=10, freq='D').values.astype('datetime64[ns]')
     })
     cols = output_df.columns.tolist()
     output_table = pa.Table.from_pandas(output_df)

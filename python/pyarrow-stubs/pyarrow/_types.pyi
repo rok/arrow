@@ -44,7 +44,7 @@ from typing_extensions import TypeVar, deprecated
 
 from .io import Buffer
 from .scalar import ExtensionScalar
-
+from ._stubs_typing import TimeUnit
 
 class _Weakrefable:
     ...
@@ -192,7 +192,7 @@ class BinaryViewType(_BasicDataType[bytes]):
     ...
 
 
-_Unit = TypeVar("_Unit", bound=Literal["s", "ms", "us", "ns"], default=Literal["us"])
+_Unit = TypeVar("_Unit", bound=TimeUnit, default=Literal["us"])
 _Tz = TypeVar("_Tz", str, None, default=None)
 
 

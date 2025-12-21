@@ -74,14 +74,10 @@ def _alltypes_example(size=100):
         'float32': np.arange(size, dtype=np.float32),
         'float64': np.arange(size, dtype=np.float64),
         'bool': np.random.randn(size) > 0,
-        'datetime[s]': np.arange("2016-01-01T00:00:00.001", size,
-                                 dtype='datetime64[s]'),
-        'datetime[ms]': np.arange("2016-01-01T00:00:00.001", size,
-                                  dtype='datetime64[ms]'),
-        'datetime[us]': np.arange("2016-01-01T00:00:00.001", size,
-                                  dtype='datetime64[us]'),
-        'datetime[ns]': np.arange("2016-01-01T00:00:00.001", size,
-                                  dtype='datetime64[ns]'),
+        'datetime[s]': pd.date_range("2016-01-01T00:00:00.001", periods=size, freq='s').values,
+        'datetime[ms]': pd.date_range("2016-01-01T00:00:00.001", periods=size, freq='ms').values,
+        'datetime[us]': pd.date_range("2016-01-01T00:00:00.001", periods=size, freq='us').values,
+        'datetime[ns]': pd.date_range("2016-01-01T00:00:00.001", periods=size, freq='ns').values,
         'timedelta64[s]': np.arange(0, size, dtype='timedelta64[s]'),
         'timedelta64[ms]': np.arange(0, size, dtype='timedelta64[ms]'),
         'timedelta64[us]': np.arange(0, size, dtype='timedelta64[us]'),
@@ -3156,9 +3152,8 @@ class TestConvertMisc:
         boolean_objects[5] = None
         cases.append(boolean_objects)
 
-        cases.append(np.arange("2016-01-01T00:00:00.001", N * K,
-                               dtype='datetime64[ms]')
-                     .reshape(N, K).copy())
+        cases.append(pd.date_range("2016-01-01T00:00:00.001", periods=N * K, freq='ms')
+                     .values.reshape(N, K).copy())
 
         strided_mask = (random_numbers > 0).astype(bool)[:, 0]
 

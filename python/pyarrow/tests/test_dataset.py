@@ -4946,8 +4946,7 @@ def test_write_table_partitioned_dict(tempdir):
 def test_write_dataset_parquet(tempdir):
     table = pa.table([
         pa.array(range(20), type="uint32"),
-        pa.array(np.arange("2012-01-01", 20, dtype="datetime64[D]").astype(
-            "datetime64[ns]")),
+        pa.array(pd.date_range("2012-01-01", periods=20, freq='D').values.astype("datetime64[ns]")),
         pa.array(np.repeat(['a', 'b'], 10))
     ], names=["f1", "f2", "part"])
 

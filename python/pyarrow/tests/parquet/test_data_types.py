@@ -18,7 +18,6 @@
 import decimal
 import io
 import random
-from typing import cast
 
 try:
     import numpy as np
@@ -391,7 +390,7 @@ def test_parquet_nested_convenience(tempdir):
 
     read = pq.read_table(
         path, columns=['a'])
-    tm.assert_frame_equal(read.to_pandas(), cast(pd.DataFrame, df[['a']]))
+    tm.assert_frame_equal(read.to_pandas(), df[['a']])
 
     read = pq.read_table(
         path, columns=['a', 'b'])

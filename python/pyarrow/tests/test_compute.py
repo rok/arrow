@@ -2297,7 +2297,7 @@ def test_strptime():
 @pytest.mark.pandas
 @pytest.mark.timezone_data
 def test_strftime():
-    times = ["2018-03-10 09:00", "2038-01-31 12:23", None]
+    times: list[str | None] = ["2018-03-10 09:00", "2038-01-31 12:23", None]
     timezones = ["CET", "UTC", "Europe/Ljubljana"]
 
     formats = ["%a", "%A", "%w", "%d", "%b", "%B", "%m", "%y", "%Y", "%H", "%I",
@@ -2307,7 +2307,7 @@ def test_strftime():
         formats.extend(["%c", "%x", "%X"])
 
     for timezone in timezones:
-        ts = pd.to_datetime(times).tz_localize(timezone)
+        ts = pd.to_datetime(times).tz_localize(timezone)  # type: ignore[no-matching-overload]
         for unit in ["s", "ms", "us", "ns"]:
             tsa = pa.array(ts, type=pa.timestamp(unit, timezone))
             for fmt in formats:
@@ -2360,7 +2360,7 @@ def test_strftime():
 
     # Test timestamps without timezone
     fmt = "%Y-%m-%dT%H:%M:%S"
-    ts = pd.to_datetime(times)
+    ts = pd.to_datetime(times)  # type: ignore[no-matching-overload]
     tsa = pa.array(ts, type=pa.timestamp("s"))
     result = pc.strftime(tsa, options=pc.StrftimeOptions(fmt))
     st = ts.strftime(fmt)  # type: ignore[call-non-callable]
@@ -3440,7 +3440,7 @@ def test_struct_fields_options():
         pc.struct_field(arr, '.a.foo')
 
     with pytest.raises(pa.ArrowInvalid, match="cannot be called without options"):
-        pc.struct_field(arr)
+        pc.struct_field(arr)  # type: ignore[call-arg]
 
 
 def test_case_when():

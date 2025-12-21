@@ -1872,7 +1872,7 @@ class TestThreadedStreamingCSVRead(BaseStreamingCSVRead):
 
 
 class BaseTestCompressedCSVRead:
-    def write_file(self, path, content):
+    def write_file(self, path, contents):
         pass
     csv_filename = ""
 

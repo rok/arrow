@@ -116,7 +116,7 @@ from pyarrow._compute import HashAggregateKernel as HashAggregateKernel  # noqa:
 # Udf
 
 from pyarrow._compute import _Order, _Placement
-from pyarrow._stubs_typing import ArrayLike, ScalarLike, PyScalar
+from pyarrow._stubs_typing import ArrayLike, ScalarLike, PyScalar, TimeUnit
 from pyarrow._types import _RunEndType
 from . import lib
 
@@ -1351,7 +1351,7 @@ def strptime(
     strings: StringScalar | StringArray | Expression,
     /,
     format: str,
-    unit: Literal["s", "ms", "us", "ns"],
+    unit: TimeUnit,
     error_is_null: bool = False,
     *,
     options: StrptimeOptions | None = None,
