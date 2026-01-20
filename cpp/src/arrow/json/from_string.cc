@@ -58,15 +58,34 @@ using ::arrow::internal::checked_pointer_cast;
 
 namespace {
 
+bool IsWhitespace(char c) { return c == ' ' || c == '\t' || c == '\n' || c == '\r'; }
+
 // Preprocess JSON string to handle non-standard NaN/Inf literals.
 // simdjson strictly follows the JSON spec which doesn't allow these literals.
-// This function replaces NaN, Inf, -Inf with quoted strings that we handle later.
+// This function replaces NaN/Inf/-Inf/-Infinity in value positions with quoted strings
+// that we handle later to preserve RapidJSON behavior.
 std::string PreprocessNanInf(std::string_view json_string) {
   std::string result;
   result.reserve(json_string.size() + 32);  // Reserve extra space for quotes
 
+  enum class Container { Array, Object };
+
   bool in_string = false;
   bool escape_next = false;
+  bool expect_value = true;
+  bool expect_key = false;
+  std::vector<Container> stack;
+
+  auto is_value_delim = [](char ch) {
+    return IsWhitespace(ch) || ch == ',' || ch == ']' || ch == '}';
+  };
+
+  auto replace_token = [&](std::string_view token, std::string_view replacement,
+                           size_t* index) {
+    result.append(replacement);
+    *index += token.size() - 1;
+    expect_value = false;
+  };
 
   for (size_t i = 0; i < json_string.size(); ++i) {
     char c = json_string[i];
@@ -77,75 +96,106 @@ std::string PreprocessNanInf(std::string_view json_string) {
       continue;
     }
 
-    if (c == '\\' && in_string) {
+    if (in_string) {
       result.push_back(c);
-      escape_next = true;
+      if (c == '\\') {
+        escape_next = true;
+      } else if (c == '"') {
+        in_string = false;
+        if (!stack.empty() && stack.back() == Container::Object && expect_key) {
+          expect_key = false;
+        } else {
+          expect_value = false;
+        }
+      }
       continue;
     }
 
     if (c == '"') {
       result.push_back(c);
-      in_string = !in_string;
+      in_string = true;
       continue;
     }
 
-    if (!in_string) {
-      // Check for NaN
-      if (i + 3 <= json_string.size() &&
-          (json_string[i] == 'N' && json_string[i + 1] == 'a' &&
-           json_string[i + 2] == 'N')) {
-        // Make sure it's not part of a larger word
-        bool before_ok =
-            (i == 0 || !std::isalnum(static_cast<unsigned char>(json_string[i - 1])));
-        bool after_ok = (i + 3 >= json_string.size() ||
-                         !std::isalnum(static_cast<unsigned char>(json_string[i + 3])));
-        if (before_ok && after_ok) {
-          result += "\"NaN\"";
-          i += 2;
-          continue;
+    if (IsWhitespace(c)) {
+      result.push_back(c);
+      continue;
+    }
+
+    switch (c) {
+      case '{':
+        result.push_back(c);
+        stack.push_back(Container::Object);
+        expect_key = true;
+        expect_value = false;
+        continue;
+      case '[':
+        result.push_back(c);
+        stack.push_back(Container::Array);
+        expect_value = true;
+        expect_key = false;
+        continue;
+      case '}':
+      case ']':
+        result.push_back(c);
+        if (!stack.empty()) {
+          stack.pop_back();
         }
+        expect_key = false;
+        expect_value = false;
+        continue;
+      case ':':
+        result.push_back(c);
+        expect_key = false;
+        expect_value = true;
+        continue;
+      case ',':
+        result.push_back(c);
+        if (!stack.empty() && stack.back() == Container::Object) {
+          expect_key = true;
+          expect_value = false;
+        } else {
+          expect_value = true;
+          expect_key = false;
+        }
+        continue;
+      default:
+        break;
+    }
+
+    if (expect_value) {
+      const auto remaining = json_string.size() - i;
+      auto after_ok = [&](size_t len) {
+        return (i + len >= json_string.size()) || is_value_delim(json_string[i + len]);
+      };
+
+      if (remaining >= 9 && json_string.substr(i, 9) == "-Infinity" && after_ok(9)) {
+        replace_token("-Infinity", "\"-Infinity\"", &i);
+        continue;
       }
-      // Check for Inf (not -Inf, that's handled separately)
-      if (i + 3 <= json_string.size() &&
-          (json_string[i] == 'I' && json_string[i + 1] == 'n' &&
-           json_string[i + 2] == 'f')) {
-        bool before_ok =
-            (i == 0 || !std::isalnum(static_cast<unsigned char>(json_string[i - 1])));
-        bool after_ok = (i + 3 >= json_string.size() ||
-                         !std::isalnum(static_cast<unsigned char>(json_string[i + 3])));
-        if (before_ok && after_ok) {
-          result += "\"Inf\"";
-          i += 2;
-          continue;
-        }
+      if (remaining >= 8 && json_string.substr(i, 8) == "Infinity" && after_ok(8)) {
+        replace_token("Infinity", "\"Infinity\"", &i);
+        continue;
       }
-      // Check for -Inf
-      if (i + 4 <= json_string.size() &&
-          (json_string[i] == '-' && json_string[i + 1] == 'I' &&
-           json_string[i + 2] == 'n' && json_string[i + 3] == 'f')) {
-        bool before_ok =
-            (i == 0 || !std::isalnum(static_cast<unsigned char>(json_string[i - 1])));
-        bool after_ok = (i + 4 >= json_string.size() ||
-                         !std::isalnum(static_cast<unsigned char>(json_string[i + 4])));
-        if (before_ok && after_ok) {
-          result += "\"-Inf\"";
-          i += 3;
-          continue;
-        }
+      if (remaining >= 4 && json_string.substr(i, 4) == "-Inf" && after_ok(4)) {
+        replace_token("-Inf", "\"-Inf\"", &i);
+        continue;
       }
-      // Check for -NaN
-      if (i + 4 <= json_string.size() &&
-          (json_string[i] == '-' && json_string[i + 1] == 'N' &&
-           json_string[i + 2] == 'a' && json_string[i + 3] == 'N')) {
-        bool before_ok =
-            (i == 0 || !std::isalnum(static_cast<unsigned char>(json_string[i - 1])));
-        bool after_ok = (i + 4 >= json_string.size() ||
-                         !std::isalnum(static_cast<unsigned char>(json_string[i + 4])));
-        if (before_ok && after_ok) {
-          result += "\"-NaN\"";
-          i += 3;
-          continue;
-        }
+      if (remaining >= 3 && json_string.substr(i, 3) == "Inf" && after_ok(3)) {
+        replace_token("Inf", "\"Inf\"", &i);
+        continue;
+      }
+      if (remaining >= 4 && json_string.substr(i, 4) == "-NaN" && after_ok(4)) {
+        replace_token("-NaN", "\"-NaN\"", &i);
+        continue;
+      }
+      if (remaining >= 3 && json_string.substr(i, 3) == "NaN" && after_ok(3)) {
+        replace_token("NaN", "\"NaN\"", &i);
+        continue;
+      }
+
+      if (c == '-' || (c >= '0' && c <= '9') || c == 't' || c == 'f' || c == 'n') {
+        expect_value = false;
       }
     }
 
@@ -169,8 +219,6 @@ bool IsStringLikeType(const std::shared_ptr<DataType>& type) {
       return false;
   }
 }
-
-bool IsWhitespace(char c) { return c == ' ' || c == '\t' || c == '\n' || c == '\r'; }
 
 Status AppendCodepointAsUtf8(uint32_t codepoint, std::string* out) {
   if (codepoint > 0x10FFFF) {
@@ -372,29 +420,6 @@ Result<std::vector<std::optional<std::string>>> ParseJsonStringArrayUnsafe(
     return Status::Invalid("Expected ',' or ']' in JSON array");
   }
   return Status::Invalid("Unterminated JSON array");
-}
-
-Result<std::optional<std::string>> ParseJsonStringScalarUnsafe(std::string_view input) {
-  size_t pos = 0;
-  RETURN_NOT_OK(SkipWhitespace(input, &pos));
-  if (pos >= input.size()) {
-    return Status::Invalid("Empty JSON input");
-  }
-  if (input[pos] == '"') {
-    std::string value;
-    RETURN_NOT_OK(ParseJsonStringValue(input, &pos, &value));
-    RETURN_NOT_OK(SkipWhitespace(input, &pos));
-    if (pos != input.size()) {
-      return Status::Invalid("Trailing content after JSON scalar");
-    }
-    return value;
-  }
-  RETURN_NOT_OK(ParseJsonNull(input, &pos));
-  RETURN_NOT_OK(SkipWhitespace(input, &pos));
-  if (pos != input.size()) {
-    return Status::Invalid("Trailing content after JSON scalar");
-  }
-  return std::nullopt;
 }
 
 Result<std::shared_ptr<Array>> BuildStringLikeArray(
@@ -732,10 +757,10 @@ enable_if_half_float<T, Status> ConvertNumber(simdjson::dom::element json_obj,
     if (str == "NaN" || str == "-NaN") {
       *out = Float16(std::nan("")).bits();
       return Status::OK();
-    } else if (str == "Inf") {
+    } else if (str == "Inf" || str == "Infinity") {
       *out = Float16(INFINITY).bits();
       return Status::OK();
-    } else if (str == "-Inf") {
+    } else if (str == "-Inf" || str == "-Infinity") {
       *out = Float16(-INFINITY).bits();
       return Status::OK();
     }
@@ -767,10 +792,10 @@ enable_if_physical_floating_point<T, Status> ConvertNumber(
     if (str == "NaN" || str == "-NaN") {
       *out = static_cast<typename T::c_type>(std::nan(""));
       return Status::OK();
-    } else if (str == "Inf") {
+    } else if (str == "Inf" || str == "Infinity") {
       *out = static_cast<typename T::c_type>(INFINITY);
       return Status::OK();
-    } else if (str == "-Inf") {
+    } else if (str == "-Inf" || str == "-Infinity") {
       *out = static_cast<typename T::c_type>(-INFINITY);
       return Status::OK();
     }
@@ -1562,8 +1587,16 @@ Result<std::shared_ptr<Scalar>> ScalarFromJSONString(
   if (result.error()) {
     // Preserve RapidJSON's permissive UTF-8 behavior for string-like types.
     if (result.error() == simdjson::UTF8_ERROR && IsStringLikeType(type)) {
-      ARROW_ASSIGN_OR_RAISE(auto value, ParseJsonStringScalarUnsafe(json_string));
-      ARROW_ASSIGN_OR_RAISE(auto array, BuildStringLikeArray(type, {std::move(value)}));
+      std::string wrapped;
+      wrapped.reserve(json_string.size() + 2);
+      wrapped.push_back('[');
+      wrapped.append(json_string.data(), json_string.size());
+      wrapped.push_back(']');
+      ARROW_ASSIGN_OR_RAISE(auto values, ParseJsonStringArrayUnsafe(wrapped));
+      if (values.size() != 1) {
+        return Status::Invalid("Expected a single JSON value");
+      }
+      ARROW_ASSIGN_OR_RAISE(auto array, BuildStringLikeArray(type, {values.front()}));
       DCHECK_EQ(array->length(), 1);
       return array->GetScalar(0);
     }
