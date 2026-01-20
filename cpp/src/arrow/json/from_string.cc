@@ -170,9 +170,7 @@ bool IsStringLikeType(const std::shared_ptr<DataType>& type) {
   }
 }
 
-bool IsWhitespace(char c) {
-  return c == ' ' || c == '\t' || c == '\n' || c == '\r';
-}
+bool IsWhitespace(char c) { return c == ' ' || c == '\t' || c == '\n' || c == '\r'; }
 
 Status AppendCodepointAsUtf8(uint32_t codepoint, std::string* out) {
   if (codepoint > 0x10FFFF) {
@@ -201,8 +199,7 @@ Status AppendCodepointAsUtf8(uint32_t codepoint, std::string* out) {
 }
 
 bool IsHexDigit(char c) {
-  return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') ||
-         (c >= 'A' && c <= 'F');
+  return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
 }
 
 Result<uint32_t> ParseHex4(std::string_view input, size_t pos) {
@@ -1566,8 +1563,7 @@ Result<std::shared_ptr<Scalar>> ScalarFromJSONString(
     // Preserve RapidJSON's permissive UTF-8 behavior for string-like types.
     if (IsStringLikeType(type)) {
       ARROW_ASSIGN_OR_RAISE(auto value, ParseJsonStringScalarUnsafe(preprocessed));
-      ARROW_ASSIGN_OR_RAISE(auto array,
-                            BuildStringLikeArray(type, {std::move(value)}));
+      ARROW_ASSIGN_OR_RAISE(auto array, BuildStringLikeArray(type, {std::move(value)}));
       DCHECK_EQ(array->length(), 1);
       return array->GetScalar(0);
     }

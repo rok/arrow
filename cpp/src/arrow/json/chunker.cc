@@ -49,6 +49,12 @@ static size_t ConsumeWhitespace(string_view view) {
 ///   - The position after the first complete document if found
 ///   - 0 if the input is empty or contains only whitespace
 ///   - string_view::npos if there is no complete document (partial/invalid)
+///
+/// This function uses brace/bracket depth tracking to find candidate document
+/// boundaries, then validates with simdjson. The validation step is necessary
+/// because structurally balanced JSON (e.g., `{1}`) may still be semantically
+/// invalid (missing key). Without validation, such invalid documents would be
+/// passed to the main parser, causing errors at the wrong stage of processing.
 static size_t ConsumeWholeObject(string_view input) {
   if (input.empty()) {
     return 0;
@@ -60,10 +66,8 @@ static size_t ConsumeWholeObject(string_view input) {
     return 0;  // Only whitespace
   }
 
-  // Scan for document boundaries manually by tracking brace depth.
-  // When we find a potential document boundary (depth returns to 0),
-  // validate it with simdjson's DOM parser.
-  simdjson::dom::parser parser;
+  // Scan for document boundaries by tracking brace/bracket depth.
+  // When depth returns to 0, we've found a candidate document boundary.
   int depth = 0;
   bool in_string = false;
   bool escape_next = false;
@@ -82,7 +86,7 @@ static size_t ConsumeWholeObject(string_view input) {
       continue;
     }
 
-    if (c == '"' && !escape_next) {
+    if (c == '"') {
       in_string = !in_string;
       continue;
     }
@@ -98,17 +102,15 @@ static size_t ConsumeWholeObject(string_view input) {
         }
         depth--;
         if (depth == 0) {
-          // Found the end of the first document
-          // Validate by parsing this substring (from start, not from beginning)
-          size_t len = i + 1;
-          size_t doc_len = len - start;
-          simdjson::padded_string doc_str(input.data() + start, doc_len);
-          auto validation = parser.parse(doc_str);
-          if (!validation.error()) {
-            return len;  // Return position relative to input start, not doc start
+          // Found a candidate document boundary - validate with simdjson
+          size_t end_pos = i + 1;
+          size_t doc_len = end_pos - start;
+          simdjson::padded_string padded(input.data() + start, doc_len);
+          simdjson::dom::parser parser;
+          if (!parser.parse(padded).error()) {
+            return end_pos;
           }
-          // Validation failed - the content from start to here is invalid JSON
-          // Return npos to indicate a parse error
+          // Validation failed - structurally complete but semantically invalid
           return string_view::npos;
         } else if (depth < 0) {
           // More closing than opening - invalid
@@ -118,7 +120,7 @@ static size_t ConsumeWholeObject(string_view input) {
     }
   }
 
-  // No complete document found
+  // No complete document found (still inside a document)
   return string_view::npos;
 }
 

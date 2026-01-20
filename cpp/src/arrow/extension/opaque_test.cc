@@ -134,7 +134,8 @@ TEST(OpaqueType, Deserialize) {
       type->Deserialize(null(), R"()"));
   EXPECT_RAISES_WITH_MESSAGE_THAT(
       Invalid,
-      testing::AnyOf(testing::HasSubstr("Missing a name"), testing::HasSubstr("TAPE_ERROR"),
+      testing::AnyOf(testing::HasSubstr("Missing a name"),
+                     testing::HasSubstr("TAPE_ERROR"),
                      testing::HasSubstr("improper structure")),
       type->Deserialize(null(), R"({)"));
   EXPECT_RAISES_WITH_MESSAGE_THAT(Invalid, testing::HasSubstr("not an object"),

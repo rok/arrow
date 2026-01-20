@@ -874,7 +874,7 @@ Result<IntType> GetMemberInt(const simdjson::dom::object& obj, const std::string
   }
   auto int_result = result.get_int64();
   if (int_result.error()) {
-    return Status::Invalid("field was not an int line ", __LINE__);
+    return Status::Invalid("field ", key, " was not an integer");
   }
   return static_cast<IntType>(int_result.value());
 }
@@ -886,7 +886,7 @@ Result<bool> GetMemberBool(const simdjson::dom::object& obj, const std::string& 
   }
   auto bool_result = result.get_bool();
   if (bool_result.error()) {
-    return Status::Invalid("field was not a boolean line ", __LINE__);
+    return Status::Invalid("field ", key, " was not a boolean");
   }
   return bool_result.value();
 }
@@ -899,7 +899,7 @@ Result<std::string> GetMemberString(const simdjson::dom::object& obj,
   }
   auto str_result = result.get_string();
   if (str_result.error()) {
-    return Status::Invalid("field was not a string line ", __LINE__);
+    return Status::Invalid("field ", key, " was not a string");
   }
   return std::string(str_result.value());
 }
@@ -912,7 +912,7 @@ Result<simdjson::dom::object> GetMemberObject(const simdjson::dom::object& obj,
   }
   auto obj_result = result.get_object();
   if (obj_result.error()) {
-    return Status::Invalid("field was not an object line ", __LINE__);
+    return Status::Invalid("field ", key, " was not an object");
   }
   return obj_result.value();
 }
@@ -931,7 +931,7 @@ Result<simdjson::dom::array> GetMemberArray(const simdjson::dom::object& obj,
   }
   auto arr_result = result.get_array();
   if (arr_result.error()) {
-    return Status::Invalid("field was not an array line ", __LINE__);
+    return Status::Invalid("field ", key, " was not an array");
   }
   return arr_result.value();
 }

@@ -1102,8 +1102,7 @@ TYPED_TEST(TestStringKernels, Utf8Reverse) {
 
   // inputs with malformed utf8 chars would produce garbage output, but the end result
   // would produce arrays with same lengths. Hence checking offset buffer equality
-  auto malformed_input =
-      ArrayFromJSON(this->type(), "[\"ɑ\xFFɑa\", \"ɽ\xe1\xbdɽa\"]");
+  auto malformed_input = ArrayFromJSON(this->type(), "[\"ɑ\xFFɑa\", \"ɽ\xe1\xbdɽa\"]");
   const Result<Datum>& res = CallFunction("utf8_reverse", {malformed_input});
   ASSERT_TRUE(res->array()->buffers[1]->Equals(*malformed_input->data()->buffers[1]));
 }
@@ -1248,8 +1247,7 @@ TYPED_TEST(TestStringKernels, Utf8Lower) {
   this->CheckUnary("utf8_lower", "[\"ȺȺȺȺ\"]", this->type(), "[\"ⱥⱥⱥⱥ\"]");
 
   // Test invalid data
-  auto invalid_input =
-      ArrayFromJSON(this->type(), "[\"Ⱥa\xFFⱭ\", \"Ɽ\xe1\xbdⱤaA\"]");
+  auto invalid_input = ArrayFromJSON(this->type(), "[\"Ⱥa\xFFⱭ\", \"Ɽ\xe1\xbdⱤaA\"]");
   EXPECT_RAISES_WITH_MESSAGE_THAT(Invalid, testing::HasSubstr("Invalid UTF8 sequence"),
                                   CallFunction("utf8_lower", {invalid_input}));
 }
@@ -1269,8 +1267,7 @@ TYPED_TEST(TestStringKernels, Utf8SwapCase) {
                    "[\"HeLLo, wOrLD!\", \"$. a35?\"]");
 
   // Test invalid data
-  auto invalid_input =
-      ArrayFromJSON(this->type(), "[\"Ⱥa\xFFⱭ\", \"Ɽ\xe1\xbdⱤaA\"]");
+  auto invalid_input = ArrayFromJSON(this->type(), "[\"Ⱥa\xFFⱭ\", \"Ɽ\xe1\xbdⱤaA\"]");
   EXPECT_RAISES_WITH_MESSAGE_THAT(Invalid, testing::HasSubstr("Invalid UTF8 sequence"),
                                   CallFunction("utf8_swapcase", {invalid_input}));
 }
