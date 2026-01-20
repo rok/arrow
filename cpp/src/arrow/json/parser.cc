@@ -936,7 +936,7 @@ class Handler<UnexpectedFieldBehavior::Error> : public HandlerBase {
         ++num_rows_;
       }
     } catch (const simdjson::simdjson_error& e) {
-      return ParseError(e.what());
+      return ParseError(SimdjsonErrorMessage(e.error()));
     }
 
     // Check for truncated/incomplete JSON at the end of the stream
@@ -1014,7 +1014,7 @@ class Handler<UnexpectedFieldBehavior::Error> : public HandlerBase {
         return VisitArray(arr);
       }
       default:
-        return ParseError("unknown JSON type");
+        return ParseError("Invalid value");
     }
   }
 
@@ -1074,7 +1074,7 @@ class Handler<UnexpectedFieldBehavior::Error> : public HandlerBase {
         return VisitArray(arr);
       }
       default:
-        return ParseError("unknown JSON type");
+        return ParseError("Invalid value");
     }
   }
 
@@ -1145,7 +1145,7 @@ class Handler<UnexpectedFieldBehavior::Ignore> : public HandlerBase {
         ++num_rows_;
       }
     } catch (const simdjson::simdjson_error& e) {
-      return ParseError(e.what());
+      return ParseError(SimdjsonErrorMessage(e.error()));
     }
 
     // Check for truncated/incomplete JSON at the end of the stream
@@ -1222,7 +1222,7 @@ class Handler<UnexpectedFieldBehavior::Ignore> : public HandlerBase {
         return VisitArray(arr);
       }
       default:
-        return ParseError("unknown JSON type");
+        return ParseError("Invalid value");
     }
   }
 
@@ -1281,7 +1281,7 @@ class Handler<UnexpectedFieldBehavior::Ignore> : public HandlerBase {
         return VisitArray(arr);
       }
       default:
-        return ParseError("unknown JSON type");
+        return ParseError("Invalid value");
     }
   }
 
@@ -1350,7 +1350,7 @@ class Handler<UnexpectedFieldBehavior::InferType> : public HandlerBase {
         ++num_rows_;
       }
     } catch (const simdjson::simdjson_error& e) {
-      return ParseError(e.what());
+      return ParseError(SimdjsonErrorMessage(e.error()));
     }
 
     // Check for truncated/incomplete JSON at the end of the stream
@@ -1432,7 +1432,7 @@ class Handler<UnexpectedFieldBehavior::InferType> : public HandlerBase {
         return VisitArray(arr);
       }
       default:
-        return ParseError("unknown JSON type");
+        return ParseError("Invalid value");
     }
   }
 
@@ -1496,7 +1496,7 @@ class Handler<UnexpectedFieldBehavior::InferType> : public HandlerBase {
         return VisitArray(arr);
       }
       default:
-        return ParseError("unknown JSON type");
+        return ParseError("Invalid value");
     }
   }
 

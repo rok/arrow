@@ -137,6 +137,11 @@ class ParsingBoundaryFinder : public BoundaryFinder {
     combined.append(partial);
     combined.append(block);
 
+    const size_t start = ConsumeWhitespace(combined);
+    if (start < combined.size() && combined[start] != '{' && combined[start] != '[') {
+      return Status::Invalid("JSON parse error: Invalid value");
+    }
+
     auto length = ConsumeWholeObject(combined);
     if (length == string_view::npos) {
       *out_pos = -1;
@@ -152,6 +157,13 @@ class ParsingBoundaryFinder : public BoundaryFinder {
   Status FindLast(std::string_view block, int64_t* out_pos) override {
     const size_t block_length = block.size();
     size_t consumed_length = 0;
+
+    if (block_length > 0) {
+      const size_t start = ConsumeWhitespace(block);
+      if (start < block.size() && block[start] != '{' && block[start] != '[') {
+        return Status::Invalid("JSON parse error: Invalid value");
+      }
+    }
 
     while (consumed_length < block_length) {
       auto length = ConsumeWholeObject(block);
