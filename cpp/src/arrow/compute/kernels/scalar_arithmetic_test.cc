@@ -2888,7 +2888,8 @@ TYPED_TEST(TestUnaryArithmeticFloating, Log) {
   this->AssertUnaryOpRaises(Ln, "[-1]", "logarithm of negative number");
   this->AssertUnaryOpRaises(Ln, "[-Inf]", "logarithm of negative number");
 
-  // Don't bounce through JSON for this value
+  // N.B. RapidJSON on some platforms raises "Number too big to be stored in double" so
+  // don't bounce through JSON
   EXPECT_RAISES_WITH_MESSAGE_THAT(Invalid,
                                   ::testing::HasSubstr("logarithm of negative number"),
                                   Ln(lowest_val, this->options_));

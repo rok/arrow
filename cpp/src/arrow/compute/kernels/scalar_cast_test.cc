@@ -31,7 +31,6 @@
 #include "arrow/chunked_array.h"
 #include "arrow/extension_type.h"
 #include "arrow/status.h"
-#include "arrow/testing/builder.h"
 #include "arrow/testing/extension_type.h"
 #include "arrow/testing/gtest_util.h"
 #include "arrow/testing/random.h"
@@ -56,65 +55,34 @@ using internal::checked_pointer_cast;
 
 namespace compute {
 
-// Build array with invalid UTF-8 without JSON parsing (simdjson validates UTF-8)
-template <typename TYPE>
-static std::shared_ptr<Array> InvalidUtf8Impl() {
-  std::vector<std::string> values = {"Hi", "olá mundo", "你好世界", "", "\xa0\xa1"};
-  std::shared_ptr<Array> out;
-  ArrayFromVector<TYPE, std::string>(values, &out);
-  return out;
-}
-
 static std::shared_ptr<Array> InvalidUtf8(std::shared_ptr<DataType> type) {
-  switch (type->id()) {
-    case Type::BINARY:
-      return InvalidUtf8Impl<BinaryType>();
-    case Type::STRING:
-      return InvalidUtf8Impl<StringType>();
-    case Type::LARGE_BINARY:
-      return InvalidUtf8Impl<LargeBinaryType>();
-    case Type::LARGE_STRING:
-      return InvalidUtf8Impl<LargeStringType>();
-    case Type::BINARY_VIEW:
-      return InvalidUtf8Impl<BinaryViewType>();
-    case Type::STRING_VIEW:
-      return InvalidUtf8Impl<StringViewType>();
-    default:
-      return nullptr;
-  }
-}
-
-// Build array with invalid UTF-8 without JSON parsing (simdjson validates UTF-8)
-// All values are 3 bytes for fixed_size_binary(3) compatibility
-template <typename TYPE>
-static std::shared_ptr<Array> FixedSizeInvalidUtf8Impl(
-    const std::shared_ptr<DataType>& type) {
-  std::vector<std::string> values = {"Hi!", "lá", "你", "   ", "\xa0\xa1\xa2"};
-  std::shared_ptr<Array> out;
-  ArrayFromVector<TYPE, std::string>(type, values, &out);
-  return out;
+  return ArrayFromJSON(type,
+                       "["
+                       R"(
+                       "Hi",
+                       "olá mundo",
+                       "你好世界",
+                       "",
+                       )"
+                       "\"\xa0\xa1\""
+                       "]");
 }
 
 static std::shared_ptr<Array> FixedSizeInvalidUtf8(std::shared_ptr<DataType> type) {
-  switch (type->id()) {
-    case Type::FIXED_SIZE_BINARY:
-      EXPECT_EQ(3, checked_cast<const FixedSizeBinaryType&>(*type).byte_width());
-      return FixedSizeInvalidUtf8Impl<FixedSizeBinaryType>(type);
-    case Type::BINARY:
-      return FixedSizeInvalidUtf8Impl<BinaryType>(type);
-    case Type::STRING:
-      return FixedSizeInvalidUtf8Impl<StringType>(type);
-    case Type::LARGE_BINARY:
-      return FixedSizeInvalidUtf8Impl<LargeBinaryType>(type);
-    case Type::LARGE_STRING:
-      return FixedSizeInvalidUtf8Impl<LargeStringType>(type);
-    case Type::BINARY_VIEW:
-      return FixedSizeInvalidUtf8Impl<BinaryViewType>(type);
-    case Type::STRING_VIEW:
-      return FixedSizeInvalidUtf8Impl<StringViewType>(type);
-    default:
-      return nullptr;
+  if (type->id() == Type::FIXED_SIZE_BINARY) {
+    // Assume a particular width for testing
+    EXPECT_EQ(3, checked_cast<const FixedSizeBinaryType&>(*type).byte_width());
   }
+  return ArrayFromJSON(type,
+                       "["
+                       R"(
+                       "Hi!",
+                       "lá",
+                       "你",
+                       "   ",
+                       )"
+                       "\"\xa0\xa1\xa2\""
+                       "]");
 }
 
 static std::vector<std::shared_ptr<DataType>> kNumericTypes = {

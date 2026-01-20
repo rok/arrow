@@ -19,6 +19,7 @@
 #include <cmath>
 #include <cstdint>
 #include <limits>
+#include <optional>
 #include <sstream>
 #include <string_view>
 #include <type_traits>
@@ -152,6 +153,342 @@ std::string PreprocessNanInf(std::string_view json_string) {
   }
 
   return result;
+}
+
+bool IsStringLikeType(const std::shared_ptr<DataType>& type) {
+  switch (type->id()) {
+    case Type::STRING:
+    case Type::BINARY:
+    case Type::LARGE_STRING:
+    case Type::LARGE_BINARY:
+    case Type::STRING_VIEW:
+    case Type::BINARY_VIEW:
+    case Type::FIXED_SIZE_BINARY:
+      return true;
+    default:
+      return false;
+  }
+}
+
+bool IsWhitespace(char c) {
+  return c == ' ' || c == '\t' || c == '\n' || c == '\r';
+}
+
+Status AppendCodepointAsUtf8(uint32_t codepoint, std::string* out) {
+  if (codepoint > 0x10FFFF) {
+    return Status::Invalid("Invalid Unicode code point in JSON string");
+  }
+  if (codepoint <= 0x7F) {
+    out->push_back(static_cast<char>(codepoint));
+    return Status::OK();
+  }
+  if (codepoint <= 0x7FF) {
+    out->push_back(static_cast<char>(0xC0 | (codepoint >> 6)));
+    out->push_back(static_cast<char>(0x80 | (codepoint & 0x3F)));
+    return Status::OK();
+  }
+  if (codepoint <= 0xFFFF) {
+    out->push_back(static_cast<char>(0xE0 | (codepoint >> 12)));
+    out->push_back(static_cast<char>(0x80 | ((codepoint >> 6) & 0x3F)));
+    out->push_back(static_cast<char>(0x80 | (codepoint & 0x3F)));
+    return Status::OK();
+  }
+  out->push_back(static_cast<char>(0xF0 | (codepoint >> 18)));
+  out->push_back(static_cast<char>(0x80 | ((codepoint >> 12) & 0x3F)));
+  out->push_back(static_cast<char>(0x80 | ((codepoint >> 6) & 0x3F)));
+  out->push_back(static_cast<char>(0x80 | (codepoint & 0x3F)));
+  return Status::OK();
+}
+
+bool IsHexDigit(char c) {
+  return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') ||
+         (c >= 'A' && c <= 'F');
+}
+
+Result<uint32_t> ParseHex4(std::string_view input, size_t pos) {
+  if (pos + 4 > input.size()) {
+    return Status::Invalid("Truncated \\u escape in JSON string");
+  }
+  uint32_t value = 0;
+  for (size_t i = 0; i < 4; ++i) {
+    char c = input[pos + i];
+    if (!IsHexDigit(c)) {
+      return Status::Invalid("Invalid hex digit in \\u escape");
+    }
+    value <<= 4;
+    if (c >= '0' && c <= '9') {
+      value |= static_cast<uint32_t>(c - '0');
+    } else if (c >= 'a' && c <= 'f') {
+      value |= static_cast<uint32_t>(c - 'a' + 10);
+    } else {
+      value |= static_cast<uint32_t>(c - 'A' + 10);
+    }
+  }
+  return value;
+}
+
+Status SkipWhitespace(std::string_view input, size_t* pos) {
+  while (*pos < input.size() && IsWhitespace(input[*pos])) {
+    ++(*pos);
+  }
+  return Status::OK();
+}
+
+Status ParseJsonStringValue(std::string_view input, size_t* pos, std::string* out) {
+  if (*pos >= input.size() || input[*pos] != '"') {
+    return Status::Invalid("Expected JSON string");
+  }
+  ++(*pos);
+  out->clear();
+  while (*pos < input.size()) {
+    char c = input[*pos];
+    if (c == '"') {
+      ++(*pos);
+      return Status::OK();
+    }
+    if (static_cast<unsigned char>(c) < 0x20) {
+      return Status::Invalid("Control character in JSON string");
+    }
+    if (c == '\\') {
+      ++(*pos);
+      if (*pos >= input.size()) {
+        return Status::Invalid("Truncated escape in JSON string");
+      }
+      char esc = input[*pos];
+      switch (esc) {
+        case '"':
+        case '\\':
+        case '/':
+          out->push_back(esc);
+          ++(*pos);
+          break;
+        case 'b':
+          out->push_back('\b');
+          ++(*pos);
+          break;
+        case 'f':
+          out->push_back('\f');
+          ++(*pos);
+          break;
+        case 'n':
+          out->push_back('\n');
+          ++(*pos);
+          break;
+        case 'r':
+          out->push_back('\r');
+          ++(*pos);
+          break;
+        case 't':
+          out->push_back('\t');
+          ++(*pos);
+          break;
+        case 'u': {
+          ++(*pos);
+          ARROW_ASSIGN_OR_RAISE(uint32_t codepoint, ParseHex4(input, *pos));
+          *pos += 4;
+          if (codepoint >= 0xD800 && codepoint <= 0xDBFF) {
+            if (*pos + 6 > input.size() || input[*pos] != '\\' ||
+                input[*pos + 1] != 'u') {
+              return Status::Invalid("Missing low surrogate in JSON string");
+            }
+            *pos += 2;
+            ARROW_ASSIGN_OR_RAISE(uint32_t low, ParseHex4(input, *pos));
+            *pos += 4;
+            if (low < 0xDC00 || low > 0xDFFF) {
+              return Status::Invalid("Invalid low surrogate in JSON string");
+            }
+            codepoint = 0x10000 + ((codepoint - 0xD800) << 10) + (low - 0xDC00);
+          } else if (codepoint >= 0xDC00 && codepoint <= 0xDFFF) {
+            return Status::Invalid("Unexpected low surrogate in JSON string");
+          }
+          RETURN_NOT_OK(AppendCodepointAsUtf8(codepoint, out));
+          break;
+        }
+        default:
+          return Status::Invalid("Invalid escape in JSON string");
+      }
+      continue;
+    }
+    out->push_back(c);
+    ++(*pos);
+  }
+  return Status::Invalid("Unterminated JSON string");
+}
+
+Status ParseJsonNull(std::string_view input, size_t* pos) {
+  if (*pos + 4 <= input.size() && input.substr(*pos, 4) == "null") {
+    *pos += 4;
+    return Status::OK();
+  }
+  return Status::Invalid("Expected null");
+}
+
+Result<std::vector<std::optional<std::string>>> ParseJsonStringArrayUnsafe(
+    std::string_view input) {
+  size_t pos = 0;
+  RETURN_NOT_OK(SkipWhitespace(input, &pos));
+  if (pos >= input.size() || input[pos] != '[') {
+    return Status::Invalid("Expected JSON array");
+  }
+  ++pos;
+
+  std::vector<std::optional<std::string>> values;
+  RETURN_NOT_OK(SkipWhitespace(input, &pos));
+  if (pos < input.size() && input[pos] == ']') {
+    ++pos;
+    RETURN_NOT_OK(SkipWhitespace(input, &pos));
+    if (pos != input.size()) {
+      return Status::Invalid("Trailing content after JSON array");
+    }
+    return values;
+  }
+
+  while (pos < input.size()) {
+    RETURN_NOT_OK(SkipWhitespace(input, &pos));
+    if (pos >= input.size()) {
+      return Status::Invalid("Unexpected end of JSON array");
+    }
+    if (input[pos] == '"') {
+      std::string value;
+      RETURN_NOT_OK(ParseJsonStringValue(input, &pos, &value));
+      values.emplace_back(std::move(value));
+    } else {
+      RETURN_NOT_OK(ParseJsonNull(input, &pos));
+      values.emplace_back(std::nullopt);
+    }
+    RETURN_NOT_OK(SkipWhitespace(input, &pos));
+    if (pos >= input.size()) {
+      return Status::Invalid("Unexpected end of JSON array");
+    }
+    if (input[pos] == ',') {
+      ++pos;
+      continue;
+    }
+    if (input[pos] == ']') {
+      ++pos;
+      RETURN_NOT_OK(SkipWhitespace(input, &pos));
+      if (pos != input.size()) {
+        return Status::Invalid("Trailing content after JSON array");
+      }
+      return values;
+    }
+    return Status::Invalid("Expected ',' or ']' in JSON array");
+  }
+  return Status::Invalid("Unterminated JSON array");
+}
+
+Result<std::optional<std::string>> ParseJsonStringScalarUnsafe(std::string_view input) {
+  size_t pos = 0;
+  RETURN_NOT_OK(SkipWhitespace(input, &pos));
+  if (pos >= input.size()) {
+    return Status::Invalid("Empty JSON input");
+  }
+  if (input[pos] == '"') {
+    std::string value;
+    RETURN_NOT_OK(ParseJsonStringValue(input, &pos, &value));
+    RETURN_NOT_OK(SkipWhitespace(input, &pos));
+    if (pos != input.size()) {
+      return Status::Invalid("Trailing content after JSON scalar");
+    }
+    return value;
+  }
+  RETURN_NOT_OK(ParseJsonNull(input, &pos));
+  RETURN_NOT_OK(SkipWhitespace(input, &pos));
+  if (pos != input.size()) {
+    return Status::Invalid("Trailing content after JSON scalar");
+  }
+  return std::nullopt;
+}
+
+Result<std::shared_ptr<Array>> BuildStringLikeArray(
+    const std::shared_ptr<DataType>& type,
+    const std::vector<std::optional<std::string>>& values) {
+  switch (type->id()) {
+    case Type::STRING: {
+      StringBuilder builder;
+      for (const auto& value : values) {
+        if (value.has_value()) {
+          RETURN_NOT_OK(builder.Append(*value));
+        } else {
+          RETURN_NOT_OK(builder.AppendNull());
+        }
+      }
+      return builder.Finish();
+    }
+    case Type::BINARY: {
+      BinaryBuilder builder;
+      for (const auto& value : values) {
+        if (value.has_value()) {
+          RETURN_NOT_OK(builder.Append(*value));
+        } else {
+          RETURN_NOT_OK(builder.AppendNull());
+        }
+      }
+      return builder.Finish();
+    }
+    case Type::LARGE_STRING: {
+      LargeStringBuilder builder;
+      for (const auto& value : values) {
+        if (value.has_value()) {
+          RETURN_NOT_OK(builder.Append(*value));
+        } else {
+          RETURN_NOT_OK(builder.AppendNull());
+        }
+      }
+      return builder.Finish();
+    }
+    case Type::LARGE_BINARY: {
+      LargeBinaryBuilder builder;
+      for (const auto& value : values) {
+        if (value.has_value()) {
+          RETURN_NOT_OK(builder.Append(*value));
+        } else {
+          RETURN_NOT_OK(builder.AppendNull());
+        }
+      }
+      return builder.Finish();
+    }
+    case Type::STRING_VIEW: {
+      StringViewBuilder builder;
+      for (const auto& value : values) {
+        if (value.has_value()) {
+          RETURN_NOT_OK(builder.Append(*value));
+        } else {
+          RETURN_NOT_OK(builder.AppendNull());
+        }
+      }
+      return builder.Finish();
+    }
+    case Type::BINARY_VIEW: {
+      BinaryViewBuilder builder;
+      for (const auto& value : values) {
+        if (value.has_value()) {
+          RETURN_NOT_OK(builder.Append(*value));
+        } else {
+          RETURN_NOT_OK(builder.AppendNull());
+        }
+      }
+      return builder.Finish();
+    }
+    case Type::FIXED_SIZE_BINARY: {
+      auto fixed_type = checked_pointer_cast<FixedSizeBinaryType>(type);
+      FixedSizeBinaryBuilder builder(fixed_type);
+      for (const auto& value : values) {
+        if (value.has_value()) {
+          if (value->size() != static_cast<size_t>(fixed_type->byte_width())) {
+            return Status::Invalid("Invalid string length ", value->size(),
+                                   " in JSON input for ", type->ToString());
+          }
+          RETURN_NOT_OK(builder.Append(*value));
+        } else {
+          RETURN_NOT_OK(builder.AppendNull());
+        }
+      }
+      return builder.Finish();
+    }
+    default:
+      return Status::TypeError("Unsupported type for string parsing: ", type->ToString());
+  }
 }
 
 const char* JsonTypeName(simdjson::dom::element_type json_type) {
@@ -1161,6 +1498,11 @@ Result<std::shared_ptr<Array>> ArrayFromJSONString(const std::shared_ptr<DataTyp
   simdjson::padded_string padded_json(preprocessed);
   auto result = parser.parse(padded_json);
   if (result.error()) {
+    // Preserve RapidJSON's permissive UTF-8 behavior for string-like types.
+    if (IsStringLikeType(type)) {
+      ARROW_ASSIGN_OR_RAISE(auto values, ParseJsonStringArrayUnsafe(preprocessed));
+      return BuildStringLikeArray(type, values);
+    }
     return Status::Invalid("JSON parse error: ", simdjson::error_message(result.error()));
   }
   auto json_doc = result.value();
@@ -1221,6 +1563,14 @@ Result<std::shared_ptr<Scalar>> ScalarFromJSONString(
   simdjson::padded_string padded_json(preprocessed);
   auto result = parser.parse(padded_json);
   if (result.error()) {
+    // Preserve RapidJSON's permissive UTF-8 behavior for string-like types.
+    if (IsStringLikeType(type)) {
+      ARROW_ASSIGN_OR_RAISE(auto value, ParseJsonStringScalarUnsafe(preprocessed));
+      ARROW_ASSIGN_OR_RAISE(auto array,
+                            BuildStringLikeArray(type, {std::move(value)}));
+      DCHECK_EQ(array->length(), 1);
+      return array->GetScalar(0);
+    }
     return Status::Invalid("JSON parse error: ", simdjson::error_message(result.error()));
   }
   auto json_doc = result.value();
