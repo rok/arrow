@@ -984,6 +984,16 @@ else()
 endif()
 
 if(ARROW_JSON)
+  set(ARROW_SIMDJSON_IMPL_SRC "")
+  if(TARGET simdjson::simdjson)
+    get_target_property(SIMDJSON_TARGET_TYPE simdjson::simdjson TYPE)
+    if(SIMDJSON_TARGET_TYPE STREQUAL "INTERFACE_LIBRARY")
+      set(ARROW_SIMDJSON_IMPL_SRC json/simdjson_impl.cc)
+      set_source_files_properties(json/simdjson_impl.cc
+                                  PROPERTIES COMPILE_DEFINITIONS
+                                             SIMDJSON_IMPLEMENTATION)
+    endif()
+  endif()
   arrow_add_object_library(ARROW_JSON
                            extension/fixed_shape_tensor.cc
                            extension/opaque.cc
@@ -995,7 +1005,8 @@ if(ARROW_JSON)
                            json/object_parser.cc
                            json/object_writer.cc
                            json/parser.cc
-                           json/reader.cc)
+                           json/reader.cc
+                           ${ARROW_SIMDJSON_IMPL_SRC})
   foreach(ARROW_JSON_TARGET ${ARROW_JSON_TARGETS})
     target_link_libraries(${ARROW_JSON_TARGET} PRIVATE simdjson::simdjson)
   endforeach()
