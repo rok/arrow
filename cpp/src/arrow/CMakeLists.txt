@@ -1006,7 +1006,8 @@ if(ARROW_JSON)
     endif()
     if(ARROW_SIMDJSON_IMPL_SRC)
       set_source_files_properties(json/simdjson_impl.cc
-                                  PROPERTIES COMPILE_DEFINITIONS SIMDJSON_IMPLEMENTATION)
+                                  PROPERTIES COMPILE_DEFINITIONS SIMDJSON_IMPLEMENTATION
+                                             SKIP_UNITY_BUILD_INCLUSION ON)
     endif()
   endif()
   arrow_add_object_library(ARROW_JSON
