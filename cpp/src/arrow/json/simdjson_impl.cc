@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-// This file intentionally provides the simdjson implementation when simdjson is
-// header-only. The SIMDJSON_IMPLEMENTATION define is injected via CMake.
+// This file provides simdjson's implementation when the library is header-only.
+// The SIMDJSON_IMPLEMENTATION define is injected via CMake.
 
 #include <simdjson.h>
