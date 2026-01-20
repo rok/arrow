@@ -270,8 +270,7 @@ TEST(ChunkerTest, Errors) {
   auto status =
       chunker->ProcessWithPartial(rest, Buffer::FromString(parts[2]), &completion, &rest);
   ASSERT_RAISES(Invalid, status);
-  EXPECT_THAT(status.message(),
-              ::testing::StartsWith("JSON parse error: Invalid value"));
+  EXPECT_THAT(status.message(), ::testing::StartsWith("JSON parse error: Invalid value"));
 }
 
 TEST_P(BaseChunkerTest, StraddlingEmpty) {

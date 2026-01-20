@@ -990,8 +990,7 @@ if(ARROW_JSON)
     if(SIMDJSON_TARGET_TYPE STREQUAL "INTERFACE_LIBRARY")
       set(ARROW_SIMDJSON_IMPL_SRC json/simdjson_impl.cc)
       set_source_files_properties(json/simdjson_impl.cc
-                                  PROPERTIES COMPILE_DEFINITIONS
-                                             SIMDJSON_IMPLEMENTATION)
+                                  PROPERTIES COMPILE_DEFINITIONS SIMDJSON_IMPLEMENTATION)
     endif()
   endif()
   arrow_add_object_library(ARROW_JSON

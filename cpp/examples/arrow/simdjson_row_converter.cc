@@ -239,8 +239,8 @@ class RowBatchBuilder {
 
   // Default implementation
   arrow::Status Visit(const arrow::Array& array) {
-    return arrow::Status::NotImplemented(
-        "Cannot convert to JSON for array of type ", array.type()->ToString());
+    return arrow::Status::NotImplemented("Cannot convert to JSON for array of type ",
+                                         array.type()->ToString());
   }
 
   arrow::Status Visit(const arrow::BooleanArray& array) {
@@ -416,9 +416,11 @@ class JsonValueConverter {
 
 arrow::Result<std::shared_ptr<arrow::RecordBatch>> ConvertToRecordBatch(
     const std::vector<Row>& rows, const std::shared_ptr<arrow::Schema>& schema) {
-  auto batch_builder = arrow::RecordBatchBuilder::Make(schema, arrow::default_memory_pool());
+  auto batch_builder =
+      arrow::RecordBatchBuilder::Make(schema, arrow::default_memory_pool());
   ARROW_RETURN_NOT_OK(batch_builder.status());
-  std::unique_ptr<arrow::RecordBatchBuilder> builder = std::move(batch_builder).ValueOrDie();
+  std::unique_ptr<arrow::RecordBatchBuilder> builder =
+      std::move(batch_builder).ValueOrDie();
 
   for (int i = 0; i < schema->num_fields(); ++i) {
     const arrow::Field* field = schema->field(i).get();
