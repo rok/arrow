@@ -987,6 +987,13 @@ if(ARROW_JSON)
   set(ARROW_SIMDJSON_IMPL_SRC "")
   if(TARGET simdjson::simdjson)
     get_target_property(SIMDJSON_TARGET_TYPE simdjson::simdjson TYPE)
+    get_target_property(SIMDJSON_INTERFACE_DEFINITIONS simdjson::simdjson
+                        INTERFACE_COMPILE_DEFINITIONS)
+    if(SIMDJSON_INTERFACE_DEFINITIONS)
+      if("SIMDJSON_HEADER_ONLY" IN_LIST SIMDJSON_INTERFACE_DEFINITIONS)
+        set(ARROW_SIMDJSON_IMPL_SRC json/simdjson_impl.cc)
+      endif()
+    endif()
     if(SIMDJSON_TARGET_TYPE STREQUAL "INTERFACE_LIBRARY")
       set(ARROW_SIMDJSON_IMPL_SRC json/simdjson_impl.cc)
     else()
@@ -998,8 +1005,17 @@ if(ARROW_JSON)
                             IMPORTED_LOCATION_DEBUG)
         get_target_property(SIMDJSON_IMPORTED_LOCATION_RELEASE simdjson::simdjson
                             IMPORTED_LOCATION_RELEASE)
-        if(NOT SIMDJSON_IMPORTED_LOCATION AND NOT SIMDJSON_IMPORTED_LOCATION_DEBUG AND
-           NOT SIMDJSON_IMPORTED_LOCATION_RELEASE)
+        get_target_property(SIMDJSON_IMPORTED_IMPLIB simdjson::simdjson IMPORTED_IMPLIB)
+        get_target_property(SIMDJSON_IMPORTED_IMPLIB_DEBUG simdjson::simdjson
+                            IMPORTED_IMPLIB_DEBUG)
+        get_target_property(SIMDJSON_IMPORTED_IMPLIB_RELEASE simdjson::simdjson
+                            IMPORTED_IMPLIB_RELEASE)
+        if(NOT SIMDJSON_IMPORTED_LOCATION
+           AND NOT SIMDJSON_IMPORTED_LOCATION_DEBUG
+           AND NOT SIMDJSON_IMPORTED_LOCATION_RELEASE
+           AND NOT SIMDJSON_IMPORTED_IMPLIB
+           AND NOT SIMDJSON_IMPORTED_IMPLIB_DEBUG
+           AND NOT SIMDJSON_IMPORTED_IMPLIB_RELEASE)
           set(ARROW_SIMDJSON_IMPL_SRC json/simdjson_impl.cc)
         endif()
       endif()
