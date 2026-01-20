@@ -1496,8 +1496,8 @@ Result<std::shared_ptr<Array>> ArrayFromJSONString(const std::shared_ptr<DataTyp
   auto result = parser.parse(padded_json);
   if (result.error()) {
     // Preserve RapidJSON's permissive UTF-8 behavior for string-like types.
-    if (IsStringLikeType(type)) {
-      ARROW_ASSIGN_OR_RAISE(auto values, ParseJsonStringArrayUnsafe(preprocessed));
+    if (result.error() == simdjson::UTF8_ERROR && IsStringLikeType(type)) {
+      ARROW_ASSIGN_OR_RAISE(auto values, ParseJsonStringArrayUnsafe(json_string));
       return BuildStringLikeArray(type, values);
     }
     return Status::Invalid("JSON parse error: ", simdjson::error_message(result.error()));
@@ -1561,8 +1561,8 @@ Result<std::shared_ptr<Scalar>> ScalarFromJSONString(
   auto result = parser.parse(padded_json);
   if (result.error()) {
     // Preserve RapidJSON's permissive UTF-8 behavior for string-like types.
-    if (IsStringLikeType(type)) {
-      ARROW_ASSIGN_OR_RAISE(auto value, ParseJsonStringScalarUnsafe(preprocessed));
+    if (result.error() == simdjson::UTF8_ERROR && IsStringLikeType(type)) {
+      ARROW_ASSIGN_OR_RAISE(auto value, ParseJsonStringScalarUnsafe(json_string));
       ARROW_ASSIGN_OR_RAISE(auto array, BuildStringLikeArray(type, {std::move(value)}));
       DCHECK_EQ(array->length(), 1);
       return array->GetScalar(0);
