@@ -18,24 +18,21 @@
 #include <numeric>
 #include <sstream>
 
+#include <simdjson.h>
+
 #include "arrow/extension/fixed_shape_tensor.h"
 #include "arrow/extension/tensor_internal.h"
+#include "arrow/json/json_util.h"
 #include "arrow/scalar.h"
 
 #include "arrow/array/array_nested.h"
 #include "arrow/array/array_primitive.h"
-#include "arrow/json/rapidjson_defs.h"  // IWYU pragma: keep
 #include "arrow/tensor.h"
 #include "arrow/util/int_util_overflow.h"
 #include "arrow/util/logging_internal.h"
 #include "arrow/util/print_internal.h"
 #include "arrow/util/sort_internal.h"
 #include "arrow/util/string.h"
-
-#include <rapidjson/document.h>
-#include <rapidjson/writer.h>
-
-namespace rj = arrow::rapidjson;
 
 namespace arrow {
 
@@ -125,36 +122,36 @@ std::string FixedShapeTensorType::ToString(bool show_metadata) const {
 }
 
 std::string FixedShapeTensorType::Serialize() const {
-  rj::Document document;
-  document.SetObject();
-  rj::Document::AllocatorType& allocator = document.GetAllocator();
+  json::JsonWriter writer;
+  writer.StartObject();
 
-  rj::Value shape(rj::kArrayType);
+  writer.Key("shape");
+  writer.StartArray();
   for (auto v : shape_) {
-    shape.PushBack(v, allocator);
+    writer.Int64(v);
   }
-  document.AddMember(rj::Value("shape", allocator), shape, allocator);
+  writer.EndArray();
 
   if (!permutation_.empty()) {
-    rj::Value permutation(rj::kArrayType);
+    writer.Key("permutation");
+    writer.StartArray();
     for (auto v : permutation_) {
-      permutation.PushBack(v, allocator);
+      writer.Int64(v);
     }
-    document.AddMember(rj::Value("permutation", allocator), permutation, allocator);
+    writer.EndArray();
   }
 
   if (!dim_names_.empty()) {
-    rj::Value dim_names(rj::kArrayType);
-    for (const std::string& v : dim_names_) {
-      dim_names.PushBack(rj::Value{}.SetString(v.c_str(), allocator), allocator);
+    writer.Key("dim_names");
+    writer.StartArray();
+    for (const auto& name : dim_names_) {
+      writer.String(name);
     }
-    document.AddMember(rj::Value("dim_names", allocator), dim_names, allocator);
+    writer.EndArray();
   }
 
-  rj::StringBuffer buffer;
-  rj::Writer<rj::StringBuffer> writer(buffer);
-  document.Accept(writer);
-  return buffer.GetString();
+  writer.EndObject();
+  return std::string(writer.GetString());
 }
 
 Result<std::shared_ptr<DataType>> FixedShapeTensorType::Deserialize(
@@ -165,29 +162,48 @@ Result<std::shared_ptr<DataType>> FixedShapeTensorType::Deserialize(
   }
   auto value_type =
       internal::checked_pointer_cast<FixedSizeListType>(storage_type)->value_type();
-  rj::Document document;
-  if (document.Parse(serialized_data.data(), serialized_data.length()).HasParseError() ||
-      !document.HasMember("shape") || !document["shape"].IsArray()) {
+
+  simdjson::dom::parser parser;
+  simdjson::padded_string padded_json(serialized_data);
+  auto result = parser.parse(padded_json);
+  if (result.error()) {
+    return Status::Invalid("Invalid serialized JSON data: ", serialized_data);
+  }
+  auto document = result.value();
+  if (!document.is_object()) {
+    return Status::Invalid("Invalid serialized JSON data: ", serialized_data);
+  }
+
+  auto obj = document.get_object().value();
+  auto shape_field = obj["shape"];
+  if (shape_field.error() || !shape_field.is_array()) {
     return Status::Invalid("Invalid serialized JSON data: ", serialized_data);
   }
 
   std::vector<int64_t> shape;
-  for (auto& x : document["shape"].GetArray()) {
-    shape.emplace_back(x.GetInt64());
+  auto shape_arr = shape_field.get_array().value();
+  for (auto x : shape_arr) {
+    shape.emplace_back(x.get_int64().value());
   }
+
   std::vector<int64_t> permutation;
-  if (document.HasMember("permutation")) {
-    for (auto& x : document["permutation"].GetArray()) {
-      permutation.emplace_back(x.GetInt64());
+  auto perm_field = obj["permutation"];
+  if (!perm_field.error() && perm_field.is_array()) {
+    auto perm_arr = perm_field.get_array().value();
+    for (auto x : perm_arr) {
+      permutation.emplace_back(x.get_int64().value());
     }
     if (shape.size() != permutation.size()) {
       return Status::Invalid("Invalid permutation");
     }
   }
+
   std::vector<std::string> dim_names;
-  if (document.HasMember("dim_names")) {
-    for (auto& x : document["dim_names"].GetArray()) {
-      dim_names.emplace_back(x.GetString());
+  auto dim_names_field = obj["dim_names"];
+  if (!dim_names_field.error() && dim_names_field.is_array()) {
+    auto dim_names_arr = dim_names_field.get_array().value();
+    for (auto x : dim_names_arr) {
+      dim_names.emplace_back(std::string(x.get_string().value()));
     }
     if (shape.size() != dim_names.size()) {
       return Status::Invalid("Invalid dim_names");

@@ -25,22 +25,20 @@
 #include <utility>
 #include <vector>
 
+#include <simdjson.h>
+
 #include "arrow/array.h"
 #include "arrow/array/builder_binary.h"
 #include "arrow/io/memory.h"
 #include "arrow/json/converter.h"
 #include "arrow/json/options.h"
 #include "arrow/json/parser.h"
-#include "arrow/json/rapidjson_defs.h"
 #include "arrow/testing/gtest_util.h"
 #include "arrow/type.h"
 #include "arrow/util/checked_cast.h"
 #include "arrow/visit_type_inline.h"
 
-#include "rapidjson/document.h"
-#include "rapidjson/prettywriter.h"
-#include "rapidjson/reader.h"
-#include "rapidjson/writer.h"
+#include "arrow/json/json_util.h"
 
 namespace arrow {
 
@@ -48,11 +46,10 @@ using internal::checked_cast;
 
 namespace json {
 
-namespace rj = arrow::rapidjson;
-
-using rj::StringBuffer;
 using std::string_view;
-using Writer = rj::Writer<StringBuffer>;
+
+// Use the shared JsonWriter class as Writer for test compatibility
+using Writer = JsonWriter;
 
 struct GenerateOptions {
   // Probability of a field being written
@@ -64,8 +61,6 @@ struct GenerateOptions {
 
   static constexpr GenerateOptions Defaults() { return GenerateOptions{}; }
 };
-
-inline static Status OK(bool ok) { return ok ? Status::OK() : Status::Invalid(""); }
 
 template <typename Engine>
 inline static Status Generate(
@@ -86,28 +81,35 @@ inline static Status Generate(
 
 template <typename Engine>
 struct GenerateImpl {
-  Status Visit(const NullType&) { return OK(writer.Null()); }
+  Status Visit(const NullType&) {
+    writer.Null();
+    return Status::OK();
+  }
 
   Status Visit(const BooleanType&) {
-    return OK(writer.Bool(std::uniform_int_distribution<uint16_t>{}(e) & 1));
+    writer.Bool(std::uniform_int_distribution<uint16_t>{}(e) & 1);
+    return Status::OK();
   }
 
   template <typename T>
   enable_if_physical_unsigned_integer<T, Status> Visit(const T&) {
     auto val = std::uniform_int_distribution<>{}(e);
-    return OK(writer.Uint64(static_cast<typename T::c_type>(val)));
+    writer.Uint64(static_cast<uint64_t>(static_cast<typename T::c_type>(val)));
+    return Status::OK();
   }
 
   template <typename T>
   enable_if_physical_signed_integer<T, Status> Visit(const T&) {
     auto val = std::uniform_int_distribution<>{}(e);
-    return OK(writer.Int64(static_cast<typename T::c_type>(val)));
+    writer.Int64(static_cast<int64_t>(static_cast<typename T::c_type>(val)));
+    return Status::OK();
   }
 
   template <typename T>
   enable_if_physical_floating_point<T, Status> Visit(const T&) {
     auto val = std::normal_distribution<typename T::c_type>{0, 1 << 10}(e);
-    return OK(writer.Double(val));
+    writer.Double(static_cast<double>(val));
+    return Status::OK();
   }
 
   Status GenerateAscii(const DataType&) {
@@ -115,7 +117,8 @@ struct GenerateImpl {
     std::uniform_int_distribution<uint16_t> gen_char(32, 126);  // FIXME generate UTF8
     std::string s(size, '\0');
     for (char& ch : s) ch = static_cast<char>(gen_char(e));
-    return OK(writer.String(s.c_str()));
+    writer.String(s);
+    return Status::OK();
   }
 
   template <typename T>
@@ -132,7 +135,8 @@ struct GenerateImpl {
     for (int i = 0; i < size; ++i) {
       RETURN_NOT_OK(Generate(t.value_type(), e, &writer, options));
     }
-    return OK(writer.EndArray(size));
+    writer.EndArray();
+    return Status::OK();
   }
 
   Status Visit(const ListViewType& t) { return NotImplemented(t); }
@@ -162,7 +166,7 @@ struct GenerateImpl {
   }
 
   Engine& e;
-  rj::Writer<rj::StringBuffer>& writer;
+  Writer& writer;
   const GenerateOptions& options;
 };
 
@@ -180,12 +184,10 @@ inline static Status Generate(const std::shared_ptr<DataType>& type, Engine& e,
 template <typename Engine>
 inline static Status Generate(const std::vector<std::shared_ptr<Field>>& fields,
                               Engine& e, Writer* writer, const GenerateOptions& options) {
-  RETURN_NOT_OK(OK(writer->StartObject()));
+  writer->StartObject();
 
-  int num_fields = 0;
   auto write_field = [&](const Field& f) {
-    ++num_fields;
-    writer->Key(f.name().c_str());
+    writer->Key(f.name());
     return Generate(f.type(), e, writer, options);
   };
 
@@ -210,7 +212,8 @@ inline static Status Generate(const std::vector<std::shared_ptr<Field>>& fields,
     }
   }
 
-  return OK(writer->EndObject(num_fields));
+  writer->EndObject();
+  return Status::OK();
 }
 
 inline static Status MakeStream(string_view src_str,
@@ -258,14 +261,16 @@ inline static Status ParseFromString(ParseOptions options, string_view src_str,
 }
 
 static inline std::string PrettyPrint(string_view one_line) {
-  rj::Document document;
-
-  // Must pass size to avoid ASAN issues.
-  document.Parse(one_line.data(), one_line.size());
-  rj::StringBuffer sb;
-  rj::PrettyWriter<rj::StringBuffer> writer(sb);
-  document.Accept(writer);
-  return sb.GetString();
+  simdjson::dom::parser parser;
+  simdjson::padded_string padded(one_line);
+  auto result = parser.parse(padded);
+  if (result.error()) {
+    return std::string(one_line);
+  }
+  // simdjson doesn't have a built-in prettify function, so we output as-is
+  std::ostringstream ss;
+  ss << result.value();
+  return ss.str();
 }
 
 template <typename T>

@@ -16,13 +16,13 @@
 // under the License.
 
 #include "arrow/json/object_writer.h"
-#include "arrow/json/rapidjson_defs.h"  // IWYU pragma: keep
 
-#include <rapidjson/document.h>
-#include <rapidjson/stringbuffer.h>
-#include <rapidjson/writer.h>
+#include <sstream>
+#include <utility>
+#include <variant>
+#include <vector>
 
-namespace rj = arrow::rapidjson;
+#include "arrow/json/json_util.h"
 
 namespace arrow {
 namespace json {
@@ -30,36 +30,43 @@ namespace internal {
 
 class ObjectWriter::Impl {
  public:
-  Impl() : root_(rj::kObjectType) {}
+  using Value = std::variant<std::string, bool>;
 
   void SetString(std::string_view key, std::string_view value) {
-    rj::Document::AllocatorType& allocator = document_.GetAllocator();
-
-    rj::Value str_key(key.data(), allocator);
-    rj::Value str_value(value.data(), allocator);
-
-    root_.AddMember(str_key, str_value, allocator);
+    members_.emplace_back(std::string(key), std::string(value));
   }
 
   void SetBool(std::string_view key, bool value) {
-    rj::Document::AllocatorType& allocator = document_.GetAllocator();
-
-    rj::Value str_key(key.data(), allocator);
-
-    root_.AddMember(str_key, value, allocator);
+    members_.emplace_back(std::string(key), value);
   }
 
   std::string Serialize() {
-    rj::StringBuffer buffer;
-    rj::Writer<rj::StringBuffer> writer(buffer);
-    root_.Accept(writer);
+    std::ostringstream out;
+    out << '{';
 
-    return buffer.GetString();
+    bool first = true;
+    for (const auto& [key, value] : members_) {
+      if (!first) {
+        out << ',';
+      }
+      first = false;
+
+      out << ::arrow::json::EscapeJsonString(key);
+      out << ':';
+
+      if (std::holds_alternative<std::string>(value)) {
+        out << ::arrow::json::EscapeJsonString(std::get<std::string>(value));
+      } else {
+        out << (std::get<bool>(value) ? "true" : "false");
+      }
+    }
+
+    out << '}';
+    return out.str();
   }
 
  private:
-  rj::Document document_;
-  rj::Value root_;
+  std::vector<std::pair<std::string, Value>> members_;
 };
 
 ObjectWriter::ObjectWriter() : impl_(new ObjectWriter::Impl()) {}

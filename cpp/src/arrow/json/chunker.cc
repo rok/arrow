@@ -18,12 +18,12 @@
 #include "arrow/json/chunker.h"
 
 #include <algorithm>
+#include <string>
 #include <string_view>
 #include <utility>
 #include <vector>
 
-#include "arrow/json/rapidjson_defs.h"
-#include "rapidjson/reader.h"
+#include <simdjson.h>
 
 #include "arrow/buffer.h"
 #include "arrow/json/options.h"
@@ -35,87 +35,91 @@ using std::string_view;
 
 namespace json {
 
-namespace rj = arrow::rapidjson;
-
 static size_t ConsumeWhitespace(string_view view) {
-#ifdef RAPIDJSON_SIMD
-  auto data = view.data();
-  auto nonws_begin = rj::SkipWhitespace_SIMD(data, data + view.size());
-  return nonws_begin - data;
-#else
   auto ws_count = view.find_first_not_of(" \t\r\n");
   if (ws_count == string_view::npos) {
     return view.size();
   } else {
     return ws_count;
   }
-#endif
 }
 
-/// RapidJson custom stream for reading JSON stored in multiple buffers
-/// http://rapidjson.org/md_doc_stream.html#CustomStream
-class MultiStringStream {
- public:
-  using Ch = char;
-  explicit MultiStringStream(std::vector<string_view> strings)
-      : strings_(std::move(strings)) {
-    std::reverse(strings_.begin(), strings_.end());
-  }
-  explicit MultiStringStream(const BufferVector& buffers) : strings_(buffers.size()) {
-    for (size_t i = 0; i < buffers.size(); ++i) {
-      strings_[i] = string_view(*buffers[i]);
-    }
-    std::reverse(strings_.begin(), strings_.end());
-  }
-  char Peek() const {
-    if (strings_.size() == 0) return '\0';
-    return strings_.back()[0];
-  }
-  char Take() {
-    if (strings_.size() == 0) return '\0';
-    char taken = strings_.back()[0];
-    if (strings_.back().size() == 1) {
-      strings_.pop_back();
-    } else {
-      strings_.back() = strings_.back().substr(1);
-    }
-    ++index_;
-    return taken;
-  }
-  size_t Tell() { return index_; }
-  void Put(char) { ARROW_LOG(FATAL) << "not implemented"; }
-  void Flush() { ARROW_LOG(FATAL) << "not implemented"; }
-  char* PutBegin() {
-    ARROW_LOG(FATAL) << "not implemented";
-    return nullptr;
-  }
-  size_t PutEnd(char*) {
-    ARROW_LOG(FATAL) << "not implemented";
+/// Find the end position of the first complete JSON document in the input.
+/// Returns:
+///   - The position after the first complete document if found
+///   - 0 if the input is empty or contains only whitespace
+///   - string_view::npos if there is no complete document (partial/invalid)
+static size_t ConsumeWholeObject(string_view input) {
+  if (input.empty()) {
     return 0;
   }
 
- private:
-  size_t index_ = 0;
-  std::vector<string_view> strings_;
-};
-
-template <typename Stream>
-static size_t ConsumeWholeObject(Stream&& stream) {
-  static constexpr unsigned parse_flags = rj::kParseIterativeFlag |
-                                          rj::kParseStopWhenDoneFlag |
-                                          rj::kParseNumbersAsStringsFlag;
-  rj::BaseReaderHandler<rj::UTF8<>> handler;
-  rj::Reader reader;
-  // parse a single JSON object
-  switch (reader.Parse<parse_flags>(stream, handler).Code()) {
-    case rj::kParseErrorNone:
-      return stream.Tell();
-    case rj::kParseErrorDocumentEmpty:
-      return 0;
-    default:
-      // rapidjson emitted an error, the most recent object was partial
-      return string_view::npos;
+  // Skip leading whitespace
+  size_t start = ConsumeWhitespace(input);
+  if (start >= input.size()) {
+    return 0;  // Only whitespace
   }
+
+  // Scan for document boundaries manually by tracking brace depth.
+  // When we find a potential document boundary (depth returns to 0),
+  // validate it with simdjson's DOM parser.
+  simdjson::dom::parser parser;
+  int depth = 0;
+  bool in_string = false;
+  bool escape_next = false;
+  bool started = false;  // Track if we've seen an opening brace/bracket
+
+  for (size_t i = start; i < input.size(); ++i) {
+    char c = input[i];
+
+    if (escape_next) {
+      escape_next = false;
+      continue;
+    }
+
+    if (c == '\\' && in_string) {
+      escape_next = true;
+      continue;
+    }
+
+    if (c == '"' && !escape_next) {
+      in_string = !in_string;
+      continue;
+    }
+
+    if (!in_string) {
+      if (c == '{' || c == '[') {
+        started = true;
+        depth++;
+      } else if (c == '}' || c == ']') {
+        if (!started) {
+          // Closing brace/bracket before any opening - invalid document
+          return 0;
+        }
+        depth--;
+        if (depth == 0) {
+          // Found the end of the first document
+          // Validate by parsing this substring (from start, not from beginning)
+          size_t len = i + 1;
+          size_t doc_len = len - start;
+          simdjson::padded_string doc_str(input.data() + start, doc_len);
+          auto validation = parser.parse(doc_str);
+          if (!validation.error()) {
+            return len;  // Return position relative to input start, not doc start
+          }
+          // Validation failed - the content from start to here is invalid JSON
+          // Return npos to indicate a parse error
+          return string_view::npos;
+        } else if (depth < 0) {
+          // More closing than opening - invalid
+          return 0;
+        }
+      }
+    }
+  }
+
+  // No complete document found
+  return string_view::npos;
 }
 
 namespace {
@@ -125,7 +129,13 @@ namespace {
 class ParsingBoundaryFinder : public BoundaryFinder {
  public:
   Status FindFirst(string_view partial, string_view block, int64_t* out_pos) override {
-    auto length = ConsumeWholeObject(MultiStringStream({partial, block}));
+    // simdjson requires contiguous memory, so concatenate partial and block
+    std::string combined;
+    combined.reserve(partial.size() + block.size());
+    combined.append(partial);
+    combined.append(block);
+
+    auto length = ConsumeWholeObject(combined);
     if (length == string_view::npos) {
       *out_pos = -1;
     } else if (ARROW_PREDICT_FALSE(length < partial.size())) {
@@ -140,10 +150,9 @@ class ParsingBoundaryFinder : public BoundaryFinder {
   Status FindLast(std::string_view block, int64_t* out_pos) override {
     const size_t block_length = block.size();
     size_t consumed_length = 0;
+
     while (consumed_length < block_length) {
-      rj::MemoryStream ms(reinterpret_cast<const char*>(block.data()), block.size());
-      using InputStream = rj::EncodedInputStream<rj::UTF8<>, rj::MemoryStream>;
-      auto length = ConsumeWholeObject(InputStream(ms));
+      auto length = ConsumeWholeObject(block);
       if (length == string_view::npos || length == 0) {
         // found incomplete object or block is empty
         break;
@@ -151,6 +160,7 @@ class ParsingBoundaryFinder : public BoundaryFinder {
       consumed_length += length;
       block = block.substr(length);
     }
+
     if (consumed_length == 0) {
       *out_pos = -1;
     } else {

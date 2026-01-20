@@ -17,6 +17,7 @@
 
 #include "arrow/extension/json.h"
 
+#include "arrow/array/builder_binary.h"
 #include "arrow/array/validate.h"
 #include "arrow/ipc/test_common.h"
 #include "arrow/record_batch.h"
@@ -62,9 +63,32 @@ TEST_F(TestJsonExtensionType, JsonRoundtrip) {
 }
 
 TEST_F(TestJsonExtensionType, InvalidUTF8) {
+  // Strings with invalid UTF-8 sequences - using C++ string literals to avoid JSON
+  // parsing (simdjson requires valid UTF-8 in JSON input)
+  std::string invalid1 = std::string("Ⱥa") + "\xFF" + "Ɑ";
+  std::string invalid2 = std::string("Ɽ") + "\xe1\xbd" + "ⱤaA";
+
   for (const auto& storage_type : {utf8(), large_utf8(), utf8_view()}) {
     auto json_type = json(storage_type);
-    auto invalid_input = ArrayFromJSON(storage_type, "[\"Ⱥa\xFFⱭ\", \"Ɽ\xe1\xbdⱤaA\"]");
+
+    // Build array directly instead of using ArrayFromJSON to allow invalid UTF-8
+    std::shared_ptr<Array> invalid_input;
+    if (storage_type->id() == Type::STRING) {
+      StringBuilder builder;
+      ASSERT_OK(builder.Append(invalid1));
+      ASSERT_OK(builder.Append(invalid2));
+      ASSERT_OK(builder.Finish(&invalid_input));
+    } else if (storage_type->id() == Type::LARGE_STRING) {
+      LargeStringBuilder builder;
+      ASSERT_OK(builder.Append(invalid1));
+      ASSERT_OK(builder.Append(invalid2));
+      ASSERT_OK(builder.Finish(&invalid_input));
+    } else {
+      StringViewBuilder builder;
+      ASSERT_OK(builder.Append(invalid1));
+      ASSERT_OK(builder.Append(invalid2));
+      ASSERT_OK(builder.Finish(&invalid_input));
+    }
     auto ext_arr = ExtensionType::WrapArray(json_type, invalid_input);
 
     ASSERT_RAISES_WITH_MESSAGE(Invalid,

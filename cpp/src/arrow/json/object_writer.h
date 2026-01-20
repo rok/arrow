@@ -28,7 +28,6 @@ namespace json {
 namespace internal {
 
 /// This class is a helper to serialize a json object to a string.
-/// It uses rapidjson in implementation.
 class ARROW_EXPORT ObjectWriter {
  public:
   ObjectWriter();

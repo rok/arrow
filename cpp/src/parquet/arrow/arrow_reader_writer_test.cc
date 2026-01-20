@@ -1493,7 +1493,13 @@ class TestBinaryLikeParquetIO : public ParquetIOTestBase {
                       const std::shared_ptr<DataType>& fallback_type) {
     const auto specific_array = ::arrow::ArrayFromJSON(specific_type, json);
     const auto fallback_array = ::arrow::ArrayFromJSON(fallback_type, json);
+    CheckRoundTripWithArrays(binary_type, specific_array, fallback_array);
+  }
 
+  // Overload for cases where JSON cannot represent the data (e.g., invalid UTF-8)
+  void CheckRoundTripWithArrays(::arrow::Type::type binary_type,
+                                const std::shared_ptr<Array>& specific_array,
+                                const std::shared_ptr<Array>& fallback_array) {
     // When the original Arrow schema isn't stored, the array is decoded as
     // the fallback type (since there is no specific Parquet logical
     // type for it).
@@ -1519,13 +1525,45 @@ class TestBinaryLikeParquetIO : public ParquetIOTestBase {
 };
 
 TEST_F(TestBinaryLikeParquetIO, LargeBinary) {
-  CheckRoundTrip("[\"foo\", \"\", null, \"\xff\"]", ::arrow::Type::LARGE_BINARY,
-                 ::arrow::large_binary(), ::arrow::binary());
+  // Build arrays directly to include invalid UTF-8 byte sequence (\xff)
+  // which cannot be represented in JSON parsed by simdjson
+  std::string invalid_utf8 = std::string("\xff");
+  ::arrow::LargeBinaryBuilder large_builder;
+  ASSERT_OK(large_builder.Append("foo"));
+  ASSERT_OK(large_builder.Append(""));
+  ASSERT_OK(large_builder.AppendNull());
+  ASSERT_OK(large_builder.Append(invalid_utf8));
+  ASSERT_OK_AND_ASSIGN(auto large_array, large_builder.Finish());
+
+  ::arrow::BinaryBuilder binary_builder;
+  ASSERT_OK(binary_builder.Append("foo"));
+  ASSERT_OK(binary_builder.Append(""));
+  ASSERT_OK(binary_builder.AppendNull());
+  ASSERT_OK(binary_builder.Append(invalid_utf8));
+  ASSERT_OK_AND_ASSIGN(auto binary_array, binary_builder.Finish());
+
+  CheckRoundTripWithArrays(::arrow::Type::LARGE_BINARY, large_array, binary_array);
 }
 
 TEST_F(TestBinaryLikeParquetIO, BinaryView) {
-  CheckRoundTrip("[\"foo\", \"\", null, \"\xff\"]", ::arrow::Type::BINARY_VIEW,
-                 ::arrow::binary_view(), ::arrow::binary());
+  // Build arrays directly to include invalid UTF-8 byte sequence (\xff)
+  // which cannot be represented in JSON parsed by simdjson
+  std::string invalid_utf8 = std::string("\xff");
+  ::arrow::BinaryViewBuilder view_builder;
+  ASSERT_OK(view_builder.Append("foo"));
+  ASSERT_OK(view_builder.Append(""));
+  ASSERT_OK(view_builder.AppendNull());
+  ASSERT_OK(view_builder.Append(invalid_utf8));
+  ASSERT_OK_AND_ASSIGN(auto view_array, view_builder.Finish());
+
+  ::arrow::BinaryBuilder binary_builder;
+  ASSERT_OK(binary_builder.Append("foo"));
+  ASSERT_OK(binary_builder.Append(""));
+  ASSERT_OK(binary_builder.AppendNull());
+  ASSERT_OK(binary_builder.Append(invalid_utf8));
+  ASSERT_OK_AND_ASSIGN(auto binary_array, binary_builder.Finish());
+
+  CheckRoundTripWithArrays(::arrow::Type::BINARY_VIEW, view_array, binary_array);
 }
 
 TEST_F(TestBinaryLikeParquetIO, LargeString) {

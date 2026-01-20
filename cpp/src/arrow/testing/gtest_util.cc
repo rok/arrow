@@ -53,7 +53,6 @@
 #include "arrow/ipc/reader.h"
 #include "arrow/ipc/writer.h"
 #include "arrow/json/from_string.h"
-#include "arrow/json/rapidjson_defs.h"  // IWYU pragma: keep
 #include "arrow/pretty_print.h"
 #include "arrow/record_batch.h"
 #include "arrow/status.h"
@@ -68,9 +67,7 @@
 #include "arrow/util/thread_pool.h"
 #include "arrow/util/windows_compatibility.h"
 
-#include <rapidjson/document.h>
-
-namespace rj = arrow::rapidjson;
+#include <simdjson.h>
 
 namespace arrow {
 
@@ -437,24 +434,32 @@ std::shared_ptr<Tensor> TensorFromJSON(const std::shared_ptr<DataType>& type,
                                        std::string_view dim_names) {
   std::shared_ptr<Array> array = arrow::ArrayFromJSON(type, data);
 
-  rj::Document json_shape;
-  json_shape.Parse(shape.data(), shape.length());
+  simdjson::dom::parser parser;
+
+  simdjson::padded_string padded_shape(shape);
+  auto json_shape = parser.parse(padded_shape).value();
   std::vector<int64_t> shape_vector;
-  for (auto& x : json_shape.GetArray()) {
-    shape_vector.emplace_back(x.GetInt64());
+  auto shape_arr = json_shape.get_array().value();
+  for (auto x : shape_arr) {
+    shape_vector.emplace_back(x.get_int64().value());
   }
-  rj::Document json_strides;
-  json_strides.Parse(strides.data(), strides.length());
+
+  simdjson::padded_string padded_strides(strides);
+  auto json_strides = parser.parse(padded_strides).value();
   std::vector<int64_t> strides_vector;
-  for (auto& x : json_strides.GetArray()) {
-    strides_vector.emplace_back(x.GetInt64());
+  auto strides_arr = json_strides.get_array().value();
+  for (auto x : strides_arr) {
+    strides_vector.emplace_back(x.get_int64().value());
   }
-  rj::Document json_dim_names;
-  json_dim_names.Parse(dim_names.data(), dim_names.length());
+
+  simdjson::padded_string padded_dim_names(dim_names);
+  auto json_dim_names = parser.parse(padded_dim_names).value();
   std::vector<std::string> dim_names_vector;
-  for (auto& x : json_dim_names.GetArray()) {
-    dim_names_vector.emplace_back(x.GetString());
+  auto dim_names_arr = json_dim_names.get_array().value();
+  for (auto x : dim_names_arr) {
+    dim_names_vector.emplace_back(x.get_string().value());
   }
+
   return *Tensor::Make(type, array->data()->buffers[1], shape_vector, strides_vector,
                        dim_names_vector);
 }

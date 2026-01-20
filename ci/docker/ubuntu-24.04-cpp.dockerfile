@@ -117,7 +117,7 @@ RUN apt-get update -y -q && \
         python3-rados \
         python3-venv \
         rados-objclass-dev \
-        rapidjson-dev \
+        libsimdjson-dev \
         rsync \
         tzdata \
         tzdata-legacy \

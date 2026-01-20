@@ -308,12 +308,9 @@ if needs_csv
 endif
 
 if needs_json or needs_integration
-    rapidjson_dep = dependency(
-        'RapidJSON',
-        fallback: ['rapidjson', 'rapidjson_dep'],
-    )
+    simdjson_dep = dependency('simdjson', fallback: ['simdjson', 'simdjson_dep'])
 else
-    rapidjson_dep = disabler()
+    simdjson_dep = disabler()
 endif
 
 azure_dep = disabler()
@@ -516,7 +513,7 @@ if needs_json
                 'json/parser.cc',
                 'json/reader.cc',
             ],
-            'dependencies': [rapidjson_dep],
+            'dependencies': [simdjson_dep],
         },
     }
 endif

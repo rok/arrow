@@ -17,11 +17,10 @@
 
 #include "arrow/flight/sql/odbc/odbc_impl/json_converter.h"
 
-#include <rapidjson/rapidjson.h>
-#include <rapidjson/writer.h>
 #include <boost/beast/core/detail/base64.hpp>
 #include "arrow/builder.h"
 #include "arrow/flight/sql/odbc/odbc_impl/util.h"
+#include "arrow/json/json_util.h"
 #include "arrow/scalar.h"
 #include "arrow/visitor.h"
 
@@ -31,32 +30,31 @@ namespace base64 = boost::beast::detail::base64;
 
 namespace arrow::flight::sql::odbc {
 
+using json::JsonWriter;
 using util::ThrowIfNotOK;
 
 namespace {
 template <typename ScalarT>
-Status ConvertScalarToStringAndWrite(const ScalarT& scalar,
-                                     rapidjson::Writer<rapidjson::StringBuffer>& writer) {
+Status ConvertScalarToStringAndWrite(const ScalarT& scalar, JsonWriter& writer) {
   ARROW_ASSIGN_OR_RAISE(auto string_scalar, scalar.CastTo(arrow::utf8()))
   const auto& view = reinterpret_cast<StringScalar*>(string_scalar.get())->view();
-  writer.String(view.data(), view.length(), true);
+  writer.String(view);
   return Status::OK();
 }
 
 template <typename BinaryScalarT>
-Status ConvertBinaryToBase64StringAndWrite(
-    const BinaryScalarT& scalar, rapidjson::Writer<rapidjson::StringBuffer>& writer) {
+Status ConvertBinaryToBase64StringAndWrite(const BinaryScalarT& scalar,
+                                           JsonWriter& writer) {
   const auto& view = scalar.view();
   size_t encoded_size = base64::encoded_size(view.length());
   std::vector<char> encoded(std::max(encoded_size, static_cast<size_t>(1)));
   base64::encode(&encoded[0], view.data(), view.length());
-  writer.String(&encoded[0], encoded_size, true);
+  writer.String(std::string_view(&encoded[0], encoded_size));
   return Status::OK();
 }
 
 template <typename ListScalarT>
-Status WriteListScalar(const ListScalarT& scalar,
-                       rapidjson::Writer<rapidjson::StringBuffer>& writer,
+Status WriteListScalar(const ListScalarT& scalar, JsonWriter& writer,
                        ScalarVisitor* visitor) {
   writer.StartArray();
   for (int64_t i = 0; i < scalar.value->length(); ++i) {
@@ -75,74 +73,60 @@ Status WriteListScalar(const ListScalarT& scalar,
 
 class ScalarToJson : public ScalarVisitor {
  private:
-  rapidjson::StringBuffer string_buffer_;
-  rapidjson::Writer<rapidjson::StringBuffer> writer_{string_buffer_};
+  JsonWriter writer_;
 
  public:
-  void Reset() {
-    string_buffer_.Clear();
-    writer_.Reset(string_buffer_);
-  }
+  void Reset() { writer_.Clear(); }
 
-  std::string ToString() { return string_buffer_.GetString(); }
+  std::string ToString() { return std::string(writer_.GetString()); }
 
   Status Visit(const NullScalar& scalar) override {
     writer_.Null();
-
     return Status::OK();
   }
 
   Status Visit(const BooleanScalar& scalar) override {
     writer_.Bool(scalar.value);
-
     return Status::OK();
   }
 
   Status Visit(const Int8Scalar& scalar) override {
-    writer_.Int(scalar.value);
-
+    writer_.Int64(static_cast<int64_t>(scalar.value));
     return Status::OK();
   }
 
   Status Visit(const Int16Scalar& scalar) override {
-    writer_.Int(scalar.value);
-
+    writer_.Int64(static_cast<int64_t>(scalar.value));
     return Status::OK();
   }
 
   Status Visit(const Int32Scalar& scalar) override {
-    writer_.Int(scalar.value);
-
+    writer_.Int64(static_cast<int64_t>(scalar.value));
     return Status::OK();
   }
 
   Status Visit(const Int64Scalar& scalar) override {
     writer_.Int64(scalar.value);
-
     return Status::OK();
   }
 
   Status Visit(const UInt8Scalar& scalar) override {
-    writer_.Uint(scalar.value);
-
+    writer_.Uint64(static_cast<uint64_t>(scalar.value));
     return Status::OK();
   }
 
   Status Visit(const UInt16Scalar& scalar) override {
-    writer_.Uint(scalar.value);
-
+    writer_.Uint64(static_cast<uint64_t>(scalar.value));
     return Status::OK();
   }
 
   Status Visit(const UInt32Scalar& scalar) override {
-    writer_.Uint(scalar.value);
-
+    writer_.Uint64(static_cast<uint64_t>(scalar.value));
     return Status::OK();
   }
 
   Status Visit(const UInt64Scalar& scalar) override {
     writer_.Uint64(scalar.value);
-
     return Status::OK();
   }
 
@@ -151,21 +135,17 @@ class ScalarToJson : public ScalarVisitor {
   }
 
   Status Visit(const FloatScalar& scalar) override {
-    writer_.Double(scalar.value);
-
+    writer_.Double(static_cast<double>(scalar.value));
     return Status::OK();
   }
 
   Status Visit(const DoubleScalar& scalar) override {
     writer_.Double(scalar.value);
-
     return Status::OK();
   }
 
   Status Visit(const StringScalar& scalar) override {
-    const auto& view = scalar.view();
-    writer_.String(view.data(), view.length());
-
+    writer_.String(scalar.view());
     return Status::OK();
   }
 
@@ -174,9 +154,7 @@ class ScalarToJson : public ScalarVisitor {
   }
 
   Status Visit(const LargeStringScalar& scalar) override {
-    const auto& view = scalar.view();
-    writer_.String(view.data(), view.length());
-
+    writer_.String(scalar.view());
     return Status::OK();
   }
 
@@ -226,16 +204,22 @@ class ScalarToJson : public ScalarVisitor {
   }
 
   Status Visit(const Decimal128Scalar& scalar) override {
-    const auto& view = scalar.ToString();
-    writer_.RawValue(view.data(), view.length(), rapidjson::kNumberType);
-
+    // Write decimal as a raw number (not quoted)
+    const auto& str = scalar.ToString();
+    writer_.RawChar(str[0]);
+    for (size_t i = 1; i < str.size(); ++i) {
+      writer_.RawChar(str[i]);
+    }
     return Status::OK();
   }
 
   Status Visit(const Decimal256Scalar& scalar) override {
-    const auto& view = scalar.ToString();
-    writer_.RawValue(view.data(), view.length(), rapidjson::kNumberType);
-
+    // Write decimal as a raw number (not quoted)
+    const auto& str = scalar.ToString();
+    writer_.RawChar(str[0]);
+    for (size_t i = 1; i < str.size(); ++i) {
+      writer_.RawChar(str[i]);
+    }
     return Status::OK();
   }
 
@@ -264,7 +248,7 @@ class ScalarToJson : public ScalarVisitor {
       const auto& result = scalar.field(i);
       ThrowIfNotOK(result.status());
       const auto& value = result.ValueOrDie();
-      writer_.Key(data_type->field(i)->name().c_str());
+      writer_.Key(data_type->field(i)->name());
       if (value->is_valid) {
         ThrowIfNotOK(value->Accept(this));
       } else {

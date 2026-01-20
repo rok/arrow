@@ -86,7 +86,7 @@ RUN if [ -n "${gcc}" ]; then \
         python3-dev \
         python3-pip \
         python3-venv \
-        rapidjson-dev \
+        libsimdjson-dev \
         rsync \
         tzdata \
         tzdata-legacy \

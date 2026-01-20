@@ -28,6 +28,7 @@
 #include <gtest/gtest.h>
 
 #include "arrow/array.h"
+#include "arrow/array/builder_binary.h"
 #include "arrow/array/util.h"
 #include "arrow/buffer.h"
 #include "arrow/compute/cast.h"
@@ -1321,7 +1322,13 @@ class TestListLikeScalar : public ::testing::Test {
 
     {
       // Invalid UTF8 in child data
-      ScalarType scalar(ArrayFromJSON(utf8(), "[null, null, \"\xff\"]"));
+      // Build the array without JSON parsing since simdjson validates UTF-8
+      StringBuilder builder;
+      ASSERT_OK(builder.AppendNull());
+      ASSERT_OK(builder.AppendNull());
+      ASSERT_OK(builder.Append("\xff"));
+      ASSERT_OK_AND_ASSIGN(auto arr, builder.Finish());
+      ScalarType scalar(arr);
       ASSERT_OK(scalar.Validate());
       ASSERT_RAISES(Invalid, scalar.ValidateFull());
     }

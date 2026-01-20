@@ -723,8 +723,7 @@ static const char* json_example6 = R"example(
 )example";
 
 void TestSchemaRoundTrip(const std::shared_ptr<Schema>& schema) {
-  rj::StringBuffer sb;
-  rj::Writer<rj::StringBuffer> writer(sb);
+  json::JsonWriter writer;
 
   DictionaryFieldMapper mapper(*schema);
 
@@ -732,40 +731,38 @@ void TestSchemaRoundTrip(const std::shared_ptr<Schema>& schema) {
   ASSERT_OK(json::WriteSchema(*schema, mapper, &writer));
   writer.EndObject();
 
-  std::string json_schema = sb.GetString();
+  std::string json_schema(writer.GetString());
 
-  rj::Document d;
-  // Pass explicit size to avoid ASAN issues with
-  // SIMD loads in RapidJson.
-  d.Parse(json_schema.data(), json_schema.size());
+  simdjson::dom::parser parser;
+  simdjson::padded_string padded(json_schema);
+  auto result = parser.parse(padded);
+  ASSERT_FALSE(result.error()) << "JSON parsing failed";
 
   DictionaryMemo in_memo;
   ASSERT_OK_AND_ASSIGN(auto result_schema,
-                       json::ReadSchema(d, default_memory_pool(), &in_memo));
+                       json::ReadSchema(result.value(), default_memory_pool(), &in_memo));
   AssertSchemaEqual(schema, result_schema, /*check_metadata=*/true);
 }
 
 void TestArrayRoundTrip(const Array& array) {
   static std::string name = "dummy";
 
-  rj::StringBuffer sb;
-  rj::Writer<rj::StringBuffer> writer(sb);
+  json::JsonWriter writer;
 
   ASSERT_OK(json::WriteArray(name, array, &writer));
 
-  std::string array_as_json = sb.GetString();
+  std::string array_as_json(writer.GetString());
 
-  rj::Document d;
-  // Pass explicit size to avoid ASAN issues with
-  // SIMD loads in RapidJson.
-  d.Parse(array_as_json.data(), array_as_json.size());
-  if (d.HasParseError()) {
+  simdjson::dom::parser parser;
+  simdjson::padded_string padded(array_as_json);
+  auto result = parser.parse(padded);
+  if (result.error()) {
     FAIL() << "JSON parsing failed";
   }
 
-  ASSERT_OK_AND_ASSIGN(
-      auto result_array,
-      json::ReadArray(default_memory_pool(), d, ::arrow::field(name, array.type())));
+  ASSERT_OK_AND_ASSIGN(auto result_array,
+                       json::ReadArray(default_memory_pool(), result.value(),
+                                       ::arrow::field(name, array.type())));
   ASSERT_OK(result_array->ValidateFull());
 
   // std::cout << array_as_json << std::endl;
