@@ -167,21 +167,9 @@ class ParsingBoundaryFinder : public BoundaryFinder {
 
     while (consumed_length < block_length) {
       auto length = ConsumeWholeObject(block);
-      if (length == string_view::npos) {
-        const size_t start = ConsumeWhitespace(block);
-        if (start < block.size() && block[start] != '{' && block[start] != '[') {
-          return Status::Invalid("JSON parse error: Invalid value");
-        }
-        // found incomplete object
-        break;
-      }
-      if (length == 0) {
-        // Check if remaining block contains invalid content (not starting with { or [)
-        const size_t start = ConsumeWhitespace(block);
-        if (start < block.size() && block[start] != '{' && block[start] != '[') {
-          return Status::Invalid("JSON parse error: Invalid value");
-        }
-        // found incomplete object or block is empty
+      if (length == string_view::npos || length == 0) {
+        // Incomplete or invalid document - stop here.
+        // The remaining content is left as "partial" for later error handling.
         break;
       }
       consumed_length += length;
