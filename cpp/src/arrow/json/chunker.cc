@@ -176,6 +176,11 @@ class ParsingBoundaryFinder : public BoundaryFinder {
         break;
       }
       if (length == 0) {
+        // Check if remaining block contains invalid content (not starting with { or [)
+        const size_t start = ConsumeWhitespace(block);
+        if (start < block.size() && block[start] != '{' && block[start] != '[') {
+          return Status::Invalid("JSON parse error: Invalid value");
+        }
         // found incomplete object or block is empty
         break;
       }
