@@ -2632,11 +2632,14 @@ if(ARROW_WITH_SIMDJSON)
   # Note: simdjson is a private dependency - it's linked into libarrow
   # and doesn't need to be exposed to downstream consumers.
 
-  # On Windows, force header-only mode for simdjson to avoid linking issues
-  # with vcpkg-provided simdjson. We add SIMDJSON_HEADER_ONLY to the target's
-  # interface compile definitions so all consumers get it automatically.
-  if(WIN32 AND TARGET simdjson::simdjson)
-    message(STATUS "Windows detected with simdjson target - forcing header-only mode")
+  # When using vcpkg-provided simdjson, force header-only mode to avoid linking
+  # issues. vcpkg's simdjson package provides a stub static library that expects
+  # consumers to use header-only mode. This applies to all platforms, not just
+  # Windows. We detect vcpkg by checking for VCPKG_TARGET_TRIPLET.
+  # We add SIMDJSON_HEADER_ONLY to the target's interface compile definitions
+  # so all consumers get it automatically.
+  if(VCPKG_TARGET_TRIPLET AND TARGET simdjson::simdjson)
+    message(STATUS "vcpkg detected with simdjson target - forcing header-only mode")
     message(STATUS "  SIMDJSON_VENDORED=${SIMDJSON_VENDORED}")
     get_target_property(_simdjson_type simdjson::simdjson TYPE)
     message(STATUS "  simdjson target type: ${_simdjson_type}")
