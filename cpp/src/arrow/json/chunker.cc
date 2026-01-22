@@ -168,8 +168,20 @@ class ParsingBoundaryFinder : public BoundaryFinder {
     while (consumed_length < block_length) {
       auto length = ConsumeWholeObject(block);
       if (length == string_view::npos || length == 0) {
-        // Incomplete or invalid document - stop here.
-        // The remaining content is left as "partial" for later error handling.
+        // Check if remaining content is clearly invalid (not just a stray bracket)
+        const size_t start = ConsumeWhitespace(block);
+        if (start < block.size()) {
+          char first_char = block[start];
+          if (first_char != '{' && first_char != '[') {
+            size_t remaining_len = block.size() - start;
+            // A single stray '}' or ']' could be an artifact of chunking boundaries,
+            // so defer that error to ProcessWithPartial. But multiple characters
+            // starting with something other than '{' or '[' is clearly invalid.
+            if (remaining_len > 1 || (first_char != '}' && first_char != ']')) {
+              return Status::Invalid("JSON parse error: Invalid value");
+            }
+          }
+        }
         break;
       }
       consumed_length += length;

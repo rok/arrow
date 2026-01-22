@@ -2629,6 +2629,10 @@ if(ARROW_WITH_SIMDJSON)
                      ${ARROW_SIMDJSON_REQUIRED_VERSION}
                      IS_RUNTIME_DEPENDENCY
                      FALSE)
+  if(NOT SIMDJSON_VENDORED)
+    provide_find_module(simdjsonAlt "Arrow")
+    list(APPEND ARROW_SYSTEM_DEPENDENCIES simdjsonAlt)
+  endif()
 endif()
 
 macro(build_xsimd)

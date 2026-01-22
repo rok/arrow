@@ -996,26 +996,41 @@ if(ARROW_JSON)
     endif()
     if(SIMDJSON_TARGET_TYPE STREQUAL "INTERFACE_LIBRARY")
       set(ARROW_SIMDJSON_IMPL_SRC json/simdjson_impl.cc)
+    elseif(WIN32)
+      # On Windows, always use header-only mode to avoid linking issues with
+      # vcpkg-provided simdjson. The header-only approach is reliable and
+      # well-tested.
+      set(ARROW_SIMDJSON_IMPL_SRC json/simdjson_impl.cc)
     else()
       get_target_property(SIMDJSON_IMPORTED simdjson::simdjson IMPORTED)
       if(SIMDJSON_IMPORTED)
-        get_target_property(SIMDJSON_IMPORTED_LOCATION simdjson::simdjson
-                            IMPORTED_LOCATION)
-        get_target_property(SIMDJSON_IMPORTED_LOCATION_DEBUG simdjson::simdjson
-                            IMPORTED_LOCATION_DEBUG)
-        get_target_property(SIMDJSON_IMPORTED_LOCATION_RELEASE simdjson::simdjson
-                            IMPORTED_LOCATION_RELEASE)
-        get_target_property(SIMDJSON_IMPORTED_IMPLIB simdjson::simdjson IMPORTED_IMPLIB)
-        get_target_property(SIMDJSON_IMPORTED_IMPLIB_DEBUG simdjson::simdjson
-                            IMPORTED_IMPLIB_DEBUG)
-        get_target_property(SIMDJSON_IMPORTED_IMPLIB_RELEASE simdjson::simdjson
-                            IMPORTED_IMPLIB_RELEASE)
-        if(NOT SIMDJSON_IMPORTED_LOCATION
-           AND NOT SIMDJSON_IMPORTED_LOCATION_DEBUG
-           AND NOT SIMDJSON_IMPORTED_LOCATION_RELEASE
-           AND NOT SIMDJSON_IMPORTED_IMPLIB
-           AND NOT SIMDJSON_IMPORTED_IMPLIB_DEBUG
-           AND NOT SIMDJSON_IMPORTED_IMPLIB_RELEASE)
+        # Check if simdjson has actual library files to link against.
+        # First check IMPORTED_CONFIGURATIONS (set by vcpkg and other package managers)
+        set(SIMDJSON_HAS_LIB FALSE)
+        get_target_property(_configs simdjson::simdjson IMPORTED_CONFIGURATIONS)
+        if(_configs)
+          foreach(CONFIG ${_configs})
+            string(TOUPPER "${CONFIG}" CONFIG_UPPER)
+            get_target_property(_loc simdjson::simdjson "IMPORTED_LOCATION_${CONFIG_UPPER}")
+            get_target_property(_imp simdjson::simdjson "IMPORTED_IMPLIB_${CONFIG_UPPER}")
+            if(_loc OR _imp)
+              set(SIMDJSON_HAS_LIB TRUE)
+              break()
+            endif()
+          endforeach()
+        endif()
+        # Also check common configuration names as fallback
+        if(NOT SIMDJSON_HAS_LIB)
+          foreach(CONFIG "" "_DEBUG" "_RELEASE" "_RELWITHDEBINFO" "_MINSIZEREL")
+            get_target_property(_loc simdjson::simdjson "IMPORTED_LOCATION${CONFIG}")
+            get_target_property(_imp simdjson::simdjson "IMPORTED_IMPLIB${CONFIG}")
+            if(_loc OR _imp)
+              set(SIMDJSON_HAS_LIB TRUE)
+              break()
+            endif()
+          endforeach()
+        endif()
+        if(NOT SIMDJSON_HAS_LIB)
           set(ARROW_SIMDJSON_IMPL_SRC json/simdjson_impl.cc)
         endif()
       endif()
@@ -1043,7 +1058,11 @@ if(ARROW_JSON)
     target_link_libraries(${ARROW_JSON_TARGET} PRIVATE simdjson::simdjson)
   endforeach()
   list(APPEND ARROW_SHARED_PRIVATE_LINK_LIBS simdjson::simdjson)
-  list(APPEND ARROW_STATIC_INSTALL_INTERFACE_LIBS simdjson::simdjson)
+  # Only add to install interface when not bundled; bundled libs go into
+  # arrow_bundled_dependencies instead
+  if(NOT SIMDJSON_VENDORED)
+    list(APPEND ARROW_STATIC_INSTALL_INTERFACE_LIBS simdjson::simdjson)
+  endif()
 else()
   set(ARROW_JSON_TARGET_SHARED)
   set(ARROW_JSON_TARGET_STATIC)
