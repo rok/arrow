@@ -1078,7 +1078,10 @@ if(ARROW_JSON)
                            json/parser.cc
                            json/reader.cc
                            ${ARROW_SIMDJSON_IMPL_SRC})
+  message(STATUS "ARROW_JSON: ARROW_JSON_TARGETS=${ARROW_JSON_TARGETS}")
+  message(STATUS "ARROW_JSON: ARROW_SIMDJSON_HEADER_ONLY=${ARROW_SIMDJSON_HEADER_ONLY}")
   foreach(ARROW_JSON_TARGET ${ARROW_JSON_TARGETS})
+    message(STATUS "ARROW_JSON: Processing target ${ARROW_JSON_TARGET}")
     target_link_libraries(${ARROW_JSON_TARGET} PRIVATE simdjson::simdjson)
     # When in header-only mode, we need SIMDJSON_HEADER_ONLY defined for ALL files
     # that include simdjson headers (not just the implementation file).
@@ -1086,6 +1089,7 @@ if(ARROW_JSON)
     # but some vcpkg configurations have a static library with header-only interface
     # definitions, which doesn't propagate correctly. Adding explicitly ensures it works.
     if(ARROW_SIMDJSON_HEADER_ONLY)
+      message(STATUS "ARROW_JSON: Adding SIMDJSON_HEADER_ONLY to ${ARROW_JSON_TARGET}")
       target_compile_definitions(${ARROW_JSON_TARGET} PRIVATE SIMDJSON_HEADER_ONLY)
     endif()
   endforeach()
