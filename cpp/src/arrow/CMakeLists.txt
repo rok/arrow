@@ -684,15 +684,11 @@ if(TARGET simdjson::simdjson)
   if(WIN32)
     # On Windows, always use header-only mode to avoid linking issues with
     # vcpkg-provided simdjson. The vcpkg simdjson target may not properly
-    # propagate SIMDJSON_HEADER_ONLY, so we force it ourselves.
+    # propagate SIMDJSON_HEADER_ONLY, so we force it ourselves by adding
+    # a global compile definition.
     set(ARROW_SIMDJSON_FORCE_HEADER_ONLY TRUE)
+    add_compile_definitions(SIMDJSON_HEADER_ONLY)
   endif()
-endif()
-
-# Set SIMDJSON_HEADER_ONLY for testing sources that use simdjson
-if(ARROW_SIMDJSON_FORCE_HEADER_ONLY)
-  set_source_files_properties(testing/gtest_util.cc PROPERTIES COMPILE_DEFINITIONS
-                                                               SIMDJSON_HEADER_ONLY)
 endif()
 
 #
@@ -700,11 +696,6 @@ endif()
 #
 
 if(ARROW_BUILD_INTEGRATION OR ARROW_BUILD_TESTS)
-  if(ARROW_SIMDJSON_FORCE_HEADER_ONLY)
-    set_source_files_properties(integration/json_integration.cc
-                                integration/json_internal.cc
-                                PROPERTIES COMPILE_DEFINITIONS SIMDJSON_HEADER_ONLY)
-  endif()
   arrow_add_object_library(ARROW_INTEGRATION integration/json_integration.cc
                            integration/json_internal.cc)
   foreach(ARROW_INTEGRATION_TARGET ${ARROW_INTEGRATION_TARGETS})
@@ -1068,21 +1059,6 @@ if(ARROW_JSON)
       set_source_files_properties(json/simdjson_impl.cc
                                   PROPERTIES COMPILE_DEFINITIONS SIMDJSON_IMPLEMENTATION
                                              SKIP_UNITY_BUILD_INCLUSION ON)
-    endif()
-    # When forcing header-only mode, all source files using simdjson need the
-    # SIMDJSON_HEADER_ONLY definition so they don't expect external library linkage
-    if(ARROW_SIMDJSON_FORCE_HEADER_ONLY)
-      set(ARROW_JSON_SIMDJSON_SOURCES
-          extension/fixed_shape_tensor.cc
-          extension/opaque.cc
-          json/chunker.cc
-          json/converter.cc
-          json/from_string.cc
-          json/object_parser.cc
-          json/parser.cc
-          json/reader.cc)
-      set_source_files_properties(${ARROW_JSON_SIMDJSON_SOURCES}
-                                  PROPERTIES COMPILE_DEFINITIONS SIMDJSON_HEADER_ONLY)
     endif()
   endif()
   arrow_add_object_library(ARROW_JSON
