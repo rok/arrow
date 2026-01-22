@@ -681,20 +681,18 @@ if(TARGET simdjson::simdjson)
   get_target_property(SIMDJSON_TARGET_TYPE simdjson::simdjson TYPE)
   get_target_property(SIMDJSON_INTERFACE_DEFINITIONS simdjson::simdjson
                       INTERFACE_COMPILE_DEFINITIONS)
-  # Check if simdjson is already configured for header-only mode
-  if(SIMDJSON_INTERFACE_DEFINITIONS)
-    if("SIMDJSON_HEADER_ONLY" IN_LIST SIMDJSON_INTERFACE_DEFINITIONS)
-      # Already header-only via interface definitions; no extra action needed
-    endif()
-  endif()
-  if(SIMDJSON_TARGET_TYPE STREQUAL "INTERFACE_LIBRARY")
-    # Interface library means header-only; no extra action needed
-  elseif(WIN32)
+  if(WIN32)
     # On Windows, always use header-only mode to avoid linking issues with
-    # vcpkg-provided simdjson. The header-only approach is reliable and
-    # well-tested. We need to define SIMDJSON_HEADER_ONLY for all consumers.
+    # vcpkg-provided simdjson. The vcpkg simdjson target may not properly
+    # propagate SIMDJSON_HEADER_ONLY, so we force it ourselves.
     set(ARROW_SIMDJSON_FORCE_HEADER_ONLY TRUE)
   endif()
+endif()
+
+# Set SIMDJSON_HEADER_ONLY for testing sources that use simdjson
+if(ARROW_SIMDJSON_FORCE_HEADER_ONLY)
+  set_source_files_properties(testing/gtest_util.cc PROPERTIES COMPILE_DEFINITIONS
+                                                               SIMDJSON_HEADER_ONLY)
 endif()
 
 #
@@ -702,13 +700,15 @@ endif()
 #
 
 if(ARROW_BUILD_INTEGRATION OR ARROW_BUILD_TESTS)
+  if(ARROW_SIMDJSON_FORCE_HEADER_ONLY)
+    set_source_files_properties(integration/json_integration.cc
+                                integration/json_internal.cc
+                                PROPERTIES COMPILE_DEFINITIONS SIMDJSON_HEADER_ONLY)
+  endif()
   arrow_add_object_library(ARROW_INTEGRATION integration/json_integration.cc
                            integration/json_internal.cc)
   foreach(ARROW_INTEGRATION_TARGET ${ARROW_INTEGRATION_TARGETS})
     target_link_libraries(${ARROW_INTEGRATION_TARGET} PRIVATE simdjson::simdjson)
-    if(ARROW_SIMDJSON_FORCE_HEADER_ONLY)
-      target_compile_definitions(${ARROW_INTEGRATION_TARGET} PRIVATE SIMDJSON_HEADER_ONLY)
-    endif()
   endforeach()
 else()
   set(ARROW_INTEGRATION_TARGET_SHARED)
@@ -1034,7 +1034,8 @@ if(ARROW_JSON)
         if(_configs)
           foreach(CONFIG ${_configs})
             string(TOUPPER "${CONFIG}" CONFIG_UPPER)
-            get_target_property(_loc simdjson::simdjson "IMPORTED_LOCATION_${CONFIG_UPPER}")
+            get_target_property(_loc simdjson::simdjson
+                                "IMPORTED_LOCATION_${CONFIG_UPPER}")
             get_target_property(_imp simdjson::simdjson "IMPORTED_IMPLIB_${CONFIG_UPPER}")
             if(_loc OR _imp)
               set(SIMDJSON_HAS_LIB TRUE)
@@ -1044,7 +1045,12 @@ if(ARROW_JSON)
         endif()
         # Also check common configuration names as fallback
         if(NOT SIMDJSON_HAS_LIB)
-          foreach(CONFIG "" "_DEBUG" "_RELEASE" "_RELWITHDEBINFO" "_MINSIZEREL")
+          foreach(CONFIG
+                  ""
+                  "_DEBUG"
+                  "_RELEASE"
+                  "_RELWITHDEBINFO"
+                  "_MINSIZEREL")
             get_target_property(_loc simdjson::simdjson "IMPORTED_LOCATION${CONFIG}")
             get_target_property(_imp simdjson::simdjson "IMPORTED_IMPLIB${CONFIG}")
             if(_loc OR _imp)
@@ -1063,6 +1069,21 @@ if(ARROW_JSON)
                                   PROPERTIES COMPILE_DEFINITIONS SIMDJSON_IMPLEMENTATION
                                              SKIP_UNITY_BUILD_INCLUSION ON)
     endif()
+    # When forcing header-only mode, all source files using simdjson need the
+    # SIMDJSON_HEADER_ONLY definition so they don't expect external library linkage
+    if(ARROW_SIMDJSON_FORCE_HEADER_ONLY)
+      set(ARROW_JSON_SIMDJSON_SOURCES
+          extension/fixed_shape_tensor.cc
+          extension/opaque.cc
+          json/chunker.cc
+          json/converter.cc
+          json/from_string.cc
+          json/object_parser.cc
+          json/parser.cc
+          json/reader.cc)
+      set_source_files_properties(${ARROW_JSON_SIMDJSON_SOURCES}
+                                  PROPERTIES COMPILE_DEFINITIONS SIMDJSON_HEADER_ONLY)
+    endif()
   endif()
   arrow_add_object_library(ARROW_JSON
                            extension/fixed_shape_tensor.cc
@@ -1079,18 +1100,11 @@ if(ARROW_JSON)
                            ${ARROW_SIMDJSON_IMPL_SRC})
   foreach(ARROW_JSON_TARGET ${ARROW_JSON_TARGETS})
     target_link_libraries(${ARROW_JSON_TARGET} PRIVATE simdjson::simdjson)
-    if(ARROW_SIMDJSON_FORCE_HEADER_ONLY)
-      # When forcing header-only mode on Windows, we need to define SIMDJSON_HEADER_ONLY
-      # so that all source files know not to expect external library linkage
-      target_compile_definitions(${ARROW_JSON_TARGET} PRIVATE SIMDJSON_HEADER_ONLY)
-    endif()
   endforeach()
   list(APPEND ARROW_SHARED_PRIVATE_LINK_LIBS simdjson::simdjson)
-  # Only add to install interface when not bundled; bundled libs go into
-  # arrow_bundled_dependencies instead
-  if(NOT SIMDJSON_VENDORED)
-    list(APPEND ARROW_STATIC_INSTALL_INTERFACE_LIBS simdjson::simdjson)
-  endif()
+  # Note: simdjson is a private dependency linked into libarrow. When bundled,
+  # it goes into arrow_bundled_dependencies. When using a system simdjson,
+  # it's linked into libarrow and doesn't need to be exposed to consumers.
 else()
   set(ARROW_JSON_TARGET_SHARED)
   set(ARROW_JSON_TARGET_STATIC)
@@ -1311,9 +1325,6 @@ if(ARROW_TESTING)
 
   foreach(LIB_TARGET ${ARROW_TESTING_LIBRARIES})
     target_compile_definitions(${LIB_TARGET} PRIVATE ARROW_TESTING_EXPORTING)
-    if(ARROW_SIMDJSON_FORCE_HEADER_ONLY)
-      target_compile_definitions(${LIB_TARGET} PRIVATE SIMDJSON_HEADER_ONLY)
-    endif()
   endforeach()
 endif()
 

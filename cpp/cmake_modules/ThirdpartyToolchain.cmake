@@ -2629,10 +2629,8 @@ if(ARROW_WITH_SIMDJSON)
                      ${ARROW_SIMDJSON_REQUIRED_VERSION}
                      IS_RUNTIME_DEPENDENCY
                      FALSE)
-  if(NOT SIMDJSON_VENDORED)
-    provide_find_module(simdjsonAlt "Arrow")
-    list(APPEND ARROW_SYSTEM_DEPENDENCIES simdjsonAlt)
-  endif()
+  # Note: simdjson is a private dependency - it's linked into libarrow
+  # and doesn't need to be exposed to downstream consumers.
 endif()
 
 macro(build_xsimd)

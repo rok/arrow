@@ -59,7 +59,7 @@
 
 %define have_grpc (%{_rhel} >= 10 || %{is_amazon_linux})
 %define have_orc (%{_rhel} >= 10)
-%define have_simdjson (%{_rhel} != 8)
+%define have_simdjson (%{_rhel} >= 9)
 %define have_thrift (!%{is_amazon_linux})
 %define have_utf8proc (%{_rhel} >= 9 || %{is_amazon_linux})
 
