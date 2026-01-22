@@ -15,6 +15,13 @@
 # specific language governing permissions and limitations
 # under the License.
 
+# ARROW_SIMDJSON_HEADER_ONLY is set in the parent CMakeLists.txt
+if(ARROW_SIMDJSON_HEADER_ONLY)
+  set(ARROW_JSON_TEST_DEFINITIONS SIMDJSON_HEADER_ONLY)
+else()
+  set(ARROW_JSON_TEST_DEFINITIONS "")
+endif()
+
 add_arrow_test(test
                SOURCES
                chunked_builder_test.cc
@@ -26,13 +33,19 @@ add_arrow_test(test
                PREFIX
                "arrow-json"
                EXTRA_LINK_LIBS
-               simdjson::simdjson)
+               simdjson::simdjson
+               DEFINITIONS
+               ${ARROW_JSON_TEST_DEFINITIONS})
 
 add_arrow_benchmark(parser_benchmark
                     PREFIX
                     "arrow-json"
                     EXTRA_LINK_LIBS
                     simdjson::simdjson)
+# Add SIMDJSON_HEADER_ONLY to benchmark if needed (add_benchmark doesn't support DEFINITIONS)
+if(ARROW_SIMDJSON_HEADER_ONLY)
+  target_compile_definitions(arrow-json-parser-benchmark PRIVATE SIMDJSON_HEADER_ONLY)
+endif()
 arrow_install_all_headers("arrow/json")
 
 # pkg-config support

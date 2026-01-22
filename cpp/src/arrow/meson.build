@@ -278,12 +278,14 @@ arrow_testing_srcs = [
 ]
 
 if needs_integration or needs_tests
+    # Integration sources include simdjson headers, so they need SIMDJSON_HEADER_ONLY
     arrow_components += {
         'arrow_integration': {
             'sources': [
                 'integration/json_integration.cc',
                 'integration/json_internal.cc',
             ],
+            'compile_args': ['-DSIMDJSON_HEADER_ONLY'],
         },
     }
 endif
@@ -498,6 +500,21 @@ if needs_ipc
 endif
 
 if needs_json
+    # Use simdjson in header-only mode to avoid linking issues.
+    # This requires SIMDJSON_HEADER_ONLY for all files that include simdjson,
+    # and SIMDJSON_IMPLEMENTATION in exactly one translation unit.
+    #
+    # We create a static library for simdjson_impl.cc with both defines,
+    # then link it into the main arrow library.
+    simdjson_impl_lib = static_library(
+        'simdjson_impl',
+        'json/simdjson_impl.cc',
+        include_directories: include_directories('..'),
+        dependencies: [simdjson_dep],
+        cpp_args: ['-DSIMDJSON_HEADER_ONLY', '-DSIMDJSON_IMPLEMENTATION'],
+    )
+    simdjson_impl_dep = declare_dependency(link_with: simdjson_impl_lib)
+
     arrow_components += {
         'arrow_json': {
             'sources': [
@@ -513,7 +530,8 @@ if needs_json
                 'json/parser.cc',
                 'json/reader.cc',
             ],
-            'dependencies': [simdjson_dep],
+            'dependencies': [simdjson_dep, simdjson_impl_dep],
+            'compile_args': ['-DSIMDJSON_HEADER_ONLY'],
         },
     }
 endif
@@ -522,10 +540,12 @@ arrow_srcs = []
 include_dir = include_directories('..')
 arrow_includes = [include_dir]
 arrow_deps = []
+arrow_compile_args = []
 foreach key, val : arrow_components
     arrow_srcs += val['sources']
     arrow_includes += val.get('include_dirs', [])
     arrow_deps += val.get('dependencies', [])
+    arrow_compile_args += val.get('compile_args', [])
 endforeach
 
 arrow_lib = library(
@@ -535,6 +555,7 @@ arrow_lib = library(
     dependencies: arrow_deps,
     install: true,
     gnu_symbol_visibility: 'inlineshidden',
+    cpp_args: arrow_compile_args,
     cpp_shared_args: ['-DARROW_EXPORTING'],
 )
 
@@ -723,6 +744,11 @@ else
 endif
 
 if needs_testing
+    # arrow_testing includes simdjson via gtest_util.cc, so it needs SIMDJSON_HEADER_ONLY
+    arrow_testing_cpp_args = []
+    if needs_json
+        arrow_testing_cpp_args += ['-DSIMDJSON_HEADER_ONLY']
+    endif
     arrow_testing_lib = static_library(
         'arrow_testing',
         sources: arrow_testing_srcs,
@@ -734,6 +760,7 @@ if needs_testing
             gtest_dep,
             simdjson_dep,
         ],
+        cpp_args: arrow_testing_cpp_args,
     )
 
     arrow_testing_dep = declare_dependency(link_with: [arrow_testing_lib])
