@@ -50,7 +50,6 @@ RUN \
     protobuf-compiler \
     protobuf-devel \
     python3-pip \
-    simdjson-devel \
     re2-devel \
     rpmdevtools \
     snappy-devel \
