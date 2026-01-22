@@ -680,6 +680,10 @@ if(TARGET simdjson::simdjson)
   get_target_property(SIMDJSON_TARGET_TYPE simdjson::simdjson TYPE)
   get_target_property(SIMDJSON_INTERFACE_DEFINITIONS simdjson::simdjson
                       INTERFACE_COMPILE_DEFINITIONS)
+  message(STATUS "simdjson target found:")
+  message(STATUS "  Type: ${SIMDJSON_TARGET_TYPE}")
+  message(STATUS "  Interface definitions: ${SIMDJSON_INTERFACE_DEFINITIONS}")
+  message(STATUS "  ARROW_SIMDJSON_FORCE_HEADER_ONLY: ${ARROW_SIMDJSON_FORCE_HEADER_ONLY}")
 endif()
 
 #
@@ -999,13 +1003,16 @@ if(ARROW_JSON)
     # Check if simdjson is already configured as header-only
     if(SIMDJSON_INTERFACE_DEFINITIONS)
       if("SIMDJSON_HEADER_ONLY" IN_LIST SIMDJSON_INTERFACE_DEFINITIONS)
+        message(STATUS "simdjson: header-only mode detected via interface definitions")
         set(ARROW_SIMDJSON_IMPL_SRC json/simdjson_impl.cc)
       endif()
     endif()
     if(SIMDJSON_TARGET_TYPE STREQUAL "INTERFACE_LIBRARY")
+      message(STATUS "simdjson: header-only mode detected via INTERFACE_LIBRARY type")
       set(ARROW_SIMDJSON_IMPL_SRC json/simdjson_impl.cc)
     elseif(ARROW_SIMDJSON_FORCE_HEADER_ONLY)
       # We're forcing header-only mode (e.g., on Windows)
+      message(STATUS "simdjson: header-only mode forced via ARROW_SIMDJSON_FORCE_HEADER_ONLY")
       set(ARROW_SIMDJSON_IMPL_SRC json/simdjson_impl.cc)
     else()
       # Check if the simdjson target has actual library files to link against
@@ -1051,6 +1058,7 @@ if(ARROW_JSON)
                                   PROPERTIES COMPILE_DEFINITIONS SIMDJSON_IMPLEMENTATION
                                              SKIP_UNITY_BUILD_INCLUSION ON)
     endif()
+    message(STATUS "simdjson: ARROW_SIMDJSON_IMPL_SRC='${ARROW_SIMDJSON_IMPL_SRC}'")
   endif()
   arrow_add_object_library(ARROW_JSON
                            extension/fixed_shape_tensor.cc
