@@ -2631,6 +2631,22 @@ if(ARROW_WITH_SIMDJSON)
                      FALSE)
   # Note: simdjson is a private dependency - it's linked into libarrow
   # and doesn't need to be exposed to downstream consumers.
+
+  # On Windows, force header-only mode for simdjson to avoid linking issues
+  # with vcpkg-provided simdjson. We add SIMDJSON_HEADER_ONLY to the target's
+  # interface compile definitions so all consumers get it automatically.
+  if(WIN32 AND TARGET simdjson::simdjson AND NOT SIMDJSON_VENDORED)
+    get_target_property(_simdjson_type simdjson::simdjson TYPE)
+    # Only modify if it's an imported target (not our bundled version)
+    if(_simdjson_type STREQUAL "SHARED_IMPORTED" OR _simdjson_type STREQUAL "STATIC_IMPORTED"
+       OR _simdjson_type STREQUAL "UNKNOWN_IMPORTED")
+      # Add SIMDJSON_HEADER_ONLY to the interface so all consumers use header-only mode
+      set_property(TARGET simdjson::simdjson
+                   APPEND
+                   PROPERTY INTERFACE_COMPILE_DEFINITIONS SIMDJSON_HEADER_ONLY)
+      set(ARROW_SIMDJSON_FORCE_HEADER_ONLY TRUE CACHE INTERNAL "")
+    endif()
+  endif()
 endif()
 
 macro(build_xsimd)

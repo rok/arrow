@@ -674,21 +674,12 @@ set(ARROW_TESTING_SRCS
     testing/random.cc
     testing/util.cc)
 
-# Detect if simdjson should be used in header-only mode.
-# This must be done early because multiple object libraries use simdjson.
-set(ARROW_SIMDJSON_FORCE_HEADER_ONLY FALSE)
+# ARROW_SIMDJSON_FORCE_HEADER_ONLY is set in ThirdpartyToolchain.cmake
+# when simdjson needs header-only mode (e.g., on Windows with vcpkg).
 if(TARGET simdjson::simdjson)
   get_target_property(SIMDJSON_TARGET_TYPE simdjson::simdjson TYPE)
   get_target_property(SIMDJSON_INTERFACE_DEFINITIONS simdjson::simdjson
                       INTERFACE_COMPILE_DEFINITIONS)
-  if(WIN32)
-    # On Windows, always use header-only mode to avoid linking issues with
-    # vcpkg-provided simdjson. The vcpkg simdjson target may not properly
-    # propagate SIMDJSON_HEADER_ONLY, so we force it ourselves by adding
-    # a global compile definition.
-    set(ARROW_SIMDJSON_FORCE_HEADER_ONLY TRUE)
-    add_compile_definitions(SIMDJSON_HEADER_ONLY)
-  endif()
 endif()
 
 #
