@@ -43,7 +43,8 @@ add_arrow_benchmark(parser_benchmark
                     EXTRA_LINK_LIBS
                     simdjson::simdjson)
 # Add SIMDJSON_HEADER_ONLY to benchmark if needed (add_benchmark doesn't support DEFINITIONS)
-if(ARROW_SIMDJSON_HEADER_ONLY)
+# Only add if the target was actually created (benchmarks may be disabled)
+if(ARROW_SIMDJSON_HEADER_ONLY AND TARGET arrow-json-parser-benchmark)
   target_compile_definitions(arrow-json-parser-benchmark PRIVATE SIMDJSON_HEADER_ONLY)
 endif()
 arrow_install_all_headers("arrow/json")
