@@ -2644,7 +2644,9 @@ if(ARROW_WITH_SIMDJSON)
     set_property(TARGET simdjson::simdjson
                  APPEND
                  PROPERTY INTERFACE_COMPILE_DEFINITIONS SIMDJSON_HEADER_ONLY)
-    set(ARROW_SIMDJSON_FORCE_HEADER_ONLY TRUE CACHE INTERNAL "Force simdjson header-only mode")
+    set(ARROW_SIMDJSON_FORCE_HEADER_ONLY
+        TRUE
+        CACHE INTERNAL "Force simdjson header-only mode")
   endif()
 endif()
 

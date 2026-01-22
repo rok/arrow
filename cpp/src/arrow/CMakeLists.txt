@@ -685,17 +685,20 @@ if(TARGET simdjson::simdjson)
   message(STATUS "simdjson target found:")
   message(STATUS "  Type: ${SIMDJSON_TARGET_TYPE}")
   message(STATUS "  Interface definitions: ${SIMDJSON_INTERFACE_DEFINITIONS}")
-  message(STATUS "  ARROW_SIMDJSON_FORCE_HEADER_ONLY: ${ARROW_SIMDJSON_FORCE_HEADER_ONLY}")
+  message(STATUS "  ARROW_SIMDJSON_FORCE_HEADER_ONLY: ${ARROW_SIMDJSON_FORCE_HEADER_ONLY}"
+  )
 
   # Determine if header-only mode is needed
-  if(SIMDJSON_INTERFACE_DEFINITIONS AND "SIMDJSON_HEADER_ONLY" IN_LIST SIMDJSON_INTERFACE_DEFINITIONS)
+  if(SIMDJSON_INTERFACE_DEFINITIONS AND "SIMDJSON_HEADER_ONLY" IN_LIST
+                                        SIMDJSON_INTERFACE_DEFINITIONS)
     message(STATUS "simdjson: header-only mode detected via interface definitions")
     set(ARROW_SIMDJSON_HEADER_ONLY TRUE)
   elseif(SIMDJSON_TARGET_TYPE STREQUAL "INTERFACE_LIBRARY")
     message(STATUS "simdjson: header-only mode detected via INTERFACE_LIBRARY type")
     set(ARROW_SIMDJSON_HEADER_ONLY TRUE)
   elseif(ARROW_SIMDJSON_FORCE_HEADER_ONLY)
-    message(STATUS "simdjson: header-only mode forced via ARROW_SIMDJSON_FORCE_HEADER_ONLY")
+    message(STATUS "simdjson: header-only mode forced via ARROW_SIMDJSON_FORCE_HEADER_ONLY"
+    )
     set(ARROW_SIMDJSON_HEADER_ONLY TRUE)
   else()
     # Check if the simdjson target has actual library files to link against
@@ -715,7 +718,12 @@ if(TARGET simdjson::simdjson)
         endforeach()
       endif()
       if(NOT SIMDJSON_HAS_LIB)
-        foreach(CONFIG "" "_DEBUG" "_RELEASE" "_RELWITHDEBINFO" "_MINSIZEREL")
+        foreach(CONFIG
+                ""
+                "_DEBUG"
+                "_RELEASE"
+                "_RELWITHDEBINFO"
+                "_MINSIZEREL")
           get_target_property(_loc simdjson::simdjson "IMPORTED_LOCATION${CONFIG}")
           get_target_property(_imp simdjson::simdjson "IMPORTED_IMPLIB${CONFIG}")
           if(_loc OR _imp)

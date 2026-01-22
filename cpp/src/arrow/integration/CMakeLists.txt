@@ -30,8 +30,11 @@ endif()
 
 if(ARROW_BUILD_TESTS)
   add_arrow_test(json_integration_test
-                 EXTRA_LINK_LIBS simdjson::simdjson ${GFLAGS_LIBRARIES}
-                 DEFINITIONS ${ARROW_INTEGRATION_TEST_DEFINITIONS})
+                 EXTRA_LINK_LIBS
+                 simdjson::simdjson
+                 ${GFLAGS_LIBRARIES}
+                 DEFINITIONS
+                 ${ARROW_INTEGRATION_TEST_DEFINITIONS})
   add_dependencies(arrow-integration arrow-json-integration-test)
 elseif(ARROW_BUILD_INTEGRATION)
   add_executable(arrow-json-integration-test json_integration_test.cc)
