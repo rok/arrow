@@ -146,7 +146,7 @@ void WriteCsvNumericCheckQuote(benchmark::State& state) {
   BenchmarkWriteCsv(state, options, *batch);
 }
 
-void NullPercents(benchmark::internal::Benchmark* bench) {
+void NullPercents(::benchmark::Benchmark* bench) {
   std::vector<int> null_percents = {0, 1, 10, 50};
   for (int null_percent : null_percents) {
     bench->Args({null_percent});

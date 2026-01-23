@@ -108,7 +108,7 @@ static void ArrayArrayKernel(benchmark::State& state) {
   state.SetItemsProcessed(state.iterations() * array_size);
 }
 
-void SetArgs(benchmark::internal::Benchmark* bench) {
+void SetArgs(::benchmark::Benchmark* bench) {
   bench->ArgNames({"size", "inverse_null_proportion"});
 
   for (const auto inverse_null_proportion : std::vector<ArgsType>({100, 0})) {

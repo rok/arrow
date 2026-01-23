@@ -51,7 +51,7 @@ static void BatchToTensorSimple(benchmark::State& state) {
   state.SetBytesProcessed(state.iterations() * ty->byte_width() * num_rows * num_cols);
 }
 
-void SetArgs(benchmark::internal::Benchmark* bench) {
+void SetArgs(::benchmark::Benchmark* bench) {
   for (int64_t size : {kL1Size, kL2Size}) {
     for (int64_t num_columns : {3, 30, 300}) {
       bench->Args({size, num_columns});

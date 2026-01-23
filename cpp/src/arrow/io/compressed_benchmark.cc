@@ -171,7 +171,7 @@ static void CompressedInputStreamNonZeroCopyBufferReturnedByCallee(
 }
 
 #ifdef ARROW_WITH_LZ4
-static void CompressedInputArguments(::benchmark::internal::Benchmark* b) {
+static void CompressedInputArguments(::benchmark::Benchmark* b) {
   b->ArgNames({"num_bytes", "batch_size"})
       ->Args({8 * 1024, 8 * 1024})
       ->Args({64 * 1024, 8 * 1024})

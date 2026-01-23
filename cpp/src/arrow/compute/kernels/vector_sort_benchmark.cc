@@ -446,7 +446,7 @@ static void TableSortIndicesInt64Wide(benchmark::State& state) {
 // Sort benchmark declarations
 //
 
-void ArraySortIndicesSetArgs(benchmark::internal::Benchmark* bench) {
+void ArraySortIndicesSetArgs(::benchmark::Benchmark* bench) {
   // 2 benchmark arguments: size, inverse null proportion
   bench->Unit(benchmark::kNanosecond);
   bench->Apply(RegressionSetArgs);
@@ -504,7 +504,7 @@ BENCHMARK(TableSortIndicesInt64Wide)
 // Rank benchmark declarations
 //
 
-void ArrayRankSetArgs(benchmark::internal::Benchmark* bench) {
+void ArrayRankSetArgs(::benchmark::Benchmark* bench) {
   // 3 benchmark arguments: size, inverse null proportion, rank tiebreaker
   bench->Unit(benchmark::kNanosecond);
   bench->ArgNames({"", "", "tiebreaker"});

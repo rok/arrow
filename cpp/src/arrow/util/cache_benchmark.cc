@@ -79,7 +79,7 @@ static void LruCacheLookup(benchmark::State& state) {
   BenchmarkCacheLookups<LruCache<std::string, std::string>>(state, keys, values);
 }
 
-static void SetCacheArgs(benchmark::internal::Benchmark* bench) {
+static void SetCacheArgs(::benchmark::Benchmark* bench) {
   bench->Args({kSmallKeyLength, kSmallValueLength});
   bench->Args({kSmallKeyLength, kLargeValueLength});
   bench->Args({kLargeKeyLength, kSmallValueLength});

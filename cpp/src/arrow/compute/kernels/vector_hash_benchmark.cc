@@ -226,7 +226,7 @@ static void ValueCountsDictionaryChunks(benchmark::State& state) {
       state, HashParams<StringType>{general_bench_cases[state.range(0)], 10});
 }
 
-void HashSetArgs(benchmark::internal::Benchmark* bench) {
+void HashSetArgs(::benchmark::Benchmark* bench) {
   for (int i = 0; i < static_cast<int>(general_bench_cases.size()); ++i) {
     bench->Arg(i);
   }
@@ -239,7 +239,7 @@ BENCHMARK(UniqueInt64)->Apply(HashSetArgs);
 BENCHMARK(UniqueString10bytes)->Apply(HashSetArgs);
 BENCHMARK(UniqueString100bytes)->Apply(HashSetArgs);
 
-void DictionaryChunksHashSetArgs(benchmark::internal::Benchmark* bench) {
+void DictionaryChunksHashSetArgs(::benchmark::Benchmark* bench) {
   for (int i = 0; i < static_cast<int>(general_bench_cases.size()); ++i) {
     bench->Arg(i);
   }
@@ -247,7 +247,7 @@ void DictionaryChunksHashSetArgs(benchmark::internal::Benchmark* bench) {
 
 BENCHMARK(ValueCountsDictionaryChunks)->Apply(DictionaryChunksHashSetArgs);
 
-void UInt8SetArgs(benchmark::internal::Benchmark* bench) {
+void UInt8SetArgs(::benchmark::Benchmark* bench) {
   for (int i = 0; i < static_cast<int>(uint8_bench_cases.size()); ++i) {
     bench->Arg(i);
   }

@@ -200,7 +200,7 @@ static void ThreadedTaskGroup(benchmark::State& state) {  // NOLINT non-const re
 
 static const std::vector<int32_t> kWorkloadSizes = {1000, 10000, 100000};
 
-static void WorkloadCost_Customize(benchmark::internal::Benchmark* b) {
+static void WorkloadCost_Customize(::benchmark::Benchmark* b) {
   for (const int32_t w : kWorkloadSizes) {
     b->Args({w});
   }
@@ -208,7 +208,7 @@ static void WorkloadCost_Customize(benchmark::internal::Benchmark* b) {
   b->UseRealTime();
 }
 
-static void ThreadPoolSpawn_Customize(benchmark::internal::Benchmark* b) {
+static void ThreadPoolSpawn_Customize(::benchmark::Benchmark* b) {
   for (const int32_t w : kWorkloadSizes) {
     for (const int nthreads : {1, 2, 4, 8}) {
       b->Args({nthreads, w});

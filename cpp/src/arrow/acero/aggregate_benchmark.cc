@@ -407,7 +407,7 @@ static void BenchmarkAggregate(
     auto rng = random::RandomArrayGenerator(1923);                   \
     (Impl)();                                                        \
   }                                                                  \
-  BENCHMARK(Name)->Apply([](benchmark::internal::Benchmark* bench) { \
+  BENCHMARK(Name)->Apply([](::benchmark::Benchmark* bench) { \
     BenchmarkSetArgsWithSizes(bench, {1 * 1024 * 1024});             \
   })
 
@@ -607,7 +607,7 @@ static void SumKernel(benchmark::State& state) {
   state.SetItemsProcessed(state.iterations() * array_size);
 }
 
-static void SumKernelArgs(benchmark::internal::Benchmark* bench) {
+static void SumKernelArgs(::benchmark::Benchmark* bench) {
   BenchmarkSetArgsWithSizes(bench, {1 * 1024 * 1024});  // 1M
 }
 
@@ -673,7 +673,7 @@ void ModeKernelWide(benchmark::State& state) {
   ModeKernel<ArrowType>(state, -1234567, 7654321);
 }
 
-static void ModeKernelArgs(benchmark::internal::Benchmark* bench) {
+static void ModeKernelArgs(::benchmark::Benchmark* bench) {
   BenchmarkSetArgsWithSizes(bench, {1 * 1024 * 1024});  // 1M
 }
 
@@ -706,7 +706,7 @@ static void MinMaxKernelBench(benchmark::State& state) {
   state.SetItemsProcessed(state.iterations() * array_size);
 }
 
-static void MinMaxKernelBenchArgs(benchmark::internal::Benchmark* bench) {
+static void MinMaxKernelBenchArgs(::benchmark::Benchmark* bench) {
   BenchmarkSetArgsWithSizes(bench, {1 * 1024 * 1024});  // 1M
 }
 
@@ -760,7 +760,7 @@ void VarianceKernelBench(benchmark::State& state) {
   state.SetItemsProcessed(state.iterations() * array_size);
 }
 
-static void VarianceKernelBenchArgs(benchmark::internal::Benchmark* bench) {
+static void VarianceKernelBenchArgs(::benchmark::Benchmark* bench) {
   BenchmarkSetArgsWithSizes(bench, {1 * 1024 * 1024});
 }
 
@@ -840,7 +840,7 @@ void QuantileKernelCentilesNarrow(benchmark::State& state) {
   QuantileKernel<ArrowType>(state, -30000, 30000, centiles());
 }
 
-static void QuantileKernelArgs(benchmark::internal::Benchmark* bench) {
+static void QuantileKernelArgs(::benchmark::Benchmark* bench) {
   BenchmarkSetArgsWithSizes(bench, {1 * 1024 * 1024});
 }
 

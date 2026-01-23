@@ -99,7 +99,7 @@ static void GrouperWithMultiTypes(benchmark::State& state, const DataTypeVector&
   GrouperBenchmark(state, exec_span, ctx);
 }
 
-void SetArgs(benchmark::internal::Benchmark* bench) {
+void SetArgs(::benchmark::Benchmark* bench) {
   BenchmarkSetArgsWithSizes(bench, {1 << 10, 1 << 12});
 }
 

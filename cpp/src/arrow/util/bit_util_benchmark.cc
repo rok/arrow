@@ -515,7 +515,7 @@ static void ReferenceNaiveBitmapReader(benchmark::State& state) {
 BENCHMARK(ReferenceNaiveBitmapReader)->Arg(kBufferSize);
 #endif
 
-void SetBitRunReaderPercentageArg(benchmark::internal::Benchmark* bench) {
+void SetBitRunReaderPercentageArg(::benchmark::Benchmark* bench) {
   bench->Arg(-1)->Arg(0)->Arg(10)->Arg(25)->Arg(50)->Arg(60)->Arg(75)->Arg(99);
 }
 

@@ -37,13 +37,13 @@ struct BenchmarkArgsType;
 
 // Pattern matching that extracts the vector element type of Benchmark::Args()
 template <typename Values>
-struct BenchmarkArgsType<benchmark::internal::Benchmark* (
-    benchmark::internal::Benchmark::*)(const std::vector<Values>&)> {
+struct BenchmarkArgsType<::benchmark::Benchmark* (
+    ::benchmark::Benchmark::*)(const std::vector<Values>&)> {
   using type = Values;
 };
 
 using ArgsType =
-    typename BenchmarkArgsType<decltype(&benchmark::internal::Benchmark::Args)>::type;
+    typename BenchmarkArgsType<decltype(&::benchmark::Benchmark::Args)>::type;
 
 using internal::CpuInfo;
 
@@ -84,7 +84,7 @@ struct GenericItemsArgs {
   benchmark::State& state_;
 };
 
-void BenchmarkSetArgsWithSizes(benchmark::internal::Benchmark* bench,
+void BenchmarkSetArgsWithSizes(::benchmark::Benchmark* bench,
                                const std::vector<int64_t>& sizes = kMemorySizes) {
   bench->Unit(benchmark::kMicrosecond);
 
@@ -95,11 +95,11 @@ void BenchmarkSetArgsWithSizes(benchmark::internal::Benchmark* bench,
   }
 }
 
-void BenchmarkSetArgs(benchmark::internal::Benchmark* bench) {
+void BenchmarkSetArgs(::benchmark::Benchmark* bench) {
   BenchmarkSetArgsWithSizes(bench, kMemorySizes);
 }
 
-void RegressionSetArgs(benchmark::internal::Benchmark* bench) {
+void RegressionSetArgs(::benchmark::Benchmark* bench) {
   // Regression do not need to account for cache hierarchy, thus optimize for
   // the best case.
   BenchmarkSetArgsWithSizes(bench, {kL1Size});
