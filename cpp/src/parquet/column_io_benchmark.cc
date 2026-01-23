@@ -18,6 +18,7 @@
 #include "benchmark/benchmark.h"
 
 #include "arrow/array.h"
+#include "arrow/util/benchmark_util.h"
 #include "arrow/io/memory.h"
 #include "arrow/testing/random.h"
 #include "arrow/util/config.h"
@@ -223,7 +224,7 @@ static void BM_ReadInt64Column(::benchmark::State& state) {
   BM_ReadInt64Column(state, repetition, codec, encoding);
 }
 
-void ReadColumnSetArgs(::benchmark::internal::Benchmark* bench) {
+void ReadColumnSetArgs(::arrow::BenchmarkType* bench) {
   // Small column, tiny reads
   bench->Args({1024, 16});
   // Small column, full read

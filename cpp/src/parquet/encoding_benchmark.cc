@@ -24,6 +24,7 @@
 #include <random>
 
 #include "arrow/array.h"
+#include "arrow/util/benchmark_util.h"
 #include "arrow/array/builder_binary.h"
 #include "arrow/array/builder_dict.h"
 #include "arrow/testing/gtest_util.h"
@@ -242,7 +243,7 @@ struct BM_SpacedEncodingTraits<BooleanType> {
   using CType = bool;
 };
 
-static void BM_SpacedArgs(benchmark::internal::Benchmark* bench) {
+static void BM_SpacedArgs(arrow::BenchmarkType* bench) {
   constexpr auto kPlainSpacedSize = 32 * 1024;  // 32k
 
   bench->Args({/*size*/ kPlainSpacedSize, /*null_in_ten_thousand*/ 1});
@@ -494,7 +495,7 @@ static void BM_ByteStreamSplitEncode_Double_Scalar(benchmark::State& state) {
       state, ::arrow::util::internal::ByteStreamSplitEncodeScalar<sizeof(double)>);
 }
 
-static void ByteStreamSplitApply(::benchmark::internal::Benchmark* bench) {
+static void ByteStreamSplitApply(::arrow::BenchmarkType* bench) {
   // Reduce the number of variations by only testing the two range ends.
   bench->Arg(MIN_RANGE)->Arg(MAX_RANGE);
 }
@@ -777,7 +778,7 @@ BENCHMARK(BM_DeltaBitPackingDecode_Int64_Narrow)->Range(MIN_RANGE, MAX_RANGE);
 BENCHMARK(BM_DeltaBitPackingDecode_Int32_Wide)->Range(MIN_RANGE, MAX_RANGE);
 BENCHMARK(BM_DeltaBitPackingDecode_Int64_Wide)->Range(MIN_RANGE, MAX_RANGE);
 
-static void ByteArrayCustomArguments(benchmark::internal::Benchmark* b) {
+static void ByteArrayCustomArguments(arrow::BenchmarkType* b) {
   b->ArgsProduct({{8, 64, 1024}, {512, 2048}})
       ->ArgNames({"max-string-length", "batch-size"});
 }
@@ -998,7 +999,7 @@ static void BM_DeltaDecodingByteArray(benchmark::State& state) {
       static_cast<double>(plain_encoded_size) / encoded_size;
 }
 
-static void ByteArrayDeltaCustomArguments(benchmark::internal::Benchmark* b) {
+static void ByteArrayDeltaCustomArguments(arrow::BenchmarkType* b) {
   for (int max_string_length : {8, 64, 1024}) {
     for (int batch_size : {512, 2048}) {
       for (int prefixed_percent : {10, 90, 99}) {
@@ -1618,7 +1619,7 @@ class BM_DecodeArrowBooleanRle : public BenchmarkDecodeArrowBoolean {
   }
 };
 
-static void BooleanWithNullCustomArguments(benchmark::internal::Benchmark* b) {
+static void BooleanWithNullCustomArguments(arrow::BenchmarkType* b) {
   b->ArgsProduct({
                      benchmark::CreateRange(MIN_RANGE, MAX_RANGE, /*multi=*/4),
                      {1, 100, 1000, 5000, 10000},

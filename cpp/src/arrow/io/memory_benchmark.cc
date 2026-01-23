@@ -20,6 +20,7 @@
 #include "arrow/io/memory.h"
 #include "arrow/testing/gtest_util.h"
 #include "arrow/testing/util.h"
+#include "arrow/util/benchmark_util.h"
 #include "arrow/util/cpu_info.h"
 #include "arrow/util/simd.h"
 
@@ -262,7 +263,7 @@ static void MemoryBandwidth(benchmark::State& state) {  // NOLINT non-const refe
 }
 
 #    ifdef ARROW_HAVE_SSE4_2
-static void SetCacheBandwidthArgs(benchmark::internal::Benchmark* bench) {
+static void SetCacheBandwidthArgs(BenchmarkType* bench) {
   auto cache_sizes = {kL1Size, kL2Size, kL3Size};
   for (auto size : cache_sizes) {
     bench->Arg(size / 2);
@@ -276,7 +277,7 @@ static void SetCacheBandwidthArgs(benchmark::internal::Benchmark* bench) {
 BENCHMARK_TEMPLATE(MemoryBandwidth, Read)->Apply(SetCacheBandwidthArgs);
 #    endif  // ARROW_HAVE_SSE4_2
 
-static void SetMemoryBandwidthArgs(benchmark::internal::Benchmark* bench) {
+static void SetMemoryBandwidthArgs(BenchmarkType* bench) {
   // `UseRealTime` is required due to threads, otherwise the cumulative CPU time
   // is used which will skew the results by the number of threads.
   bench->Arg(kMemoryPerCore)->ThreadRange(1, kNumCores)->UseRealTime();

@@ -21,6 +21,7 @@
 #include <benchmark/benchmark.h>
 
 #include "arrow/buffer.h"
+#include "arrow/util/benchmark_util.h"
 #include "arrow/io/memory.h"
 #include "arrow/util/logging.h"
 
@@ -111,7 +112,7 @@ class MetadataBenchmark {
   std::shared_ptr<WriterProperties> writer_properties_;
 };
 
-void WriteMetadataSetArgs(benchmark::internal::Benchmark* bench) {
+void WriteMetadataSetArgs(arrow::BenchmarkType* bench) {
   bench->ArgNames({"num_columns", "num_row_groups"});
 
   for (int num_columns : {1, 10, 100}) {
@@ -127,7 +128,7 @@ void WriteMetadataSetArgs(benchmark::internal::Benchmark* bench) {
   }
 }
 
-void ReadMetadataSetArgs(benchmark::internal::Benchmark* bench) {
+void ReadMetadataSetArgs(arrow::BenchmarkType* bench) {
   WriteMetadataSetArgs(bench);
 }
 

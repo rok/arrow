@@ -18,6 +18,8 @@
 #include "benchmark/benchmark.h"
 
 #include <array>
+
+#include "arrow/util/benchmark_util.h"
 #include <iostream>
 #include <random>
 #include <type_traits>
@@ -500,7 +502,7 @@ static void BenchmarkReadBinaryColumn(::benchmark::State& state,
   BenchmarkReadTable(state, *table, properties, table->num_rows(), total_bytes);
 }
 
-static void SetReadBinaryColumnArgs(benchmark::internal::Benchmark* b) {
+static void SetReadBinaryColumnArgs(arrow::BenchmarkType* b) {
   b->ArgNames({"null_probability", "unique_values"})
       // We vary unique values to trigger the dictionary-encoded (for low-cardinality)
       // and plain (for high-cardinality) code paths.
@@ -515,7 +517,7 @@ static void SetReadBinaryColumnArgs(benchmark::internal::Benchmark* b) {
 }
 
 static void SetReadBinaryColumnArgsWithoutDictEncoding(
-    benchmark::internal::Benchmark* b) {
+    arrow::BenchmarkType* b) {
   b->ArgNames({"null_probability", "unique_values"})
       // Dict-encoding is already tested in the PLAIN benchmarks, so only exercise
       // non-dict-encoding using high cardinality.
@@ -556,7 +558,7 @@ BENCHMARK(BM_ReadBinaryViewColumnDeltaByteArray)
 const std::vector<int64_t> kNestedNullPercents = {0, 1, 50, 99};
 
 // XXX We can use ArgsProduct() starting from Benchmark 1.5.2
-static void NestedReadArguments(::benchmark::internal::Benchmark* b) {
+static void NestedReadArguments(::arrow::BenchmarkType* b) {
   for (const auto null_percentage : kNestedNullPercents) {
     b->Arg(null_percentage);
   }

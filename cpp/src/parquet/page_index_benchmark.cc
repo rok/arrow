@@ -20,6 +20,8 @@
 
 #include "benchmark/benchmark.h"
 
+#include "arrow/util/benchmark_util.h"
+
 #include "parquet/benchmark_util.h"
 #include "parquet/metadata.h"
 #include "parquet/page_index.h"
@@ -29,7 +31,7 @@
 
 namespace parquet::benchmarks {
 
-void PageIndexSetArgs(::benchmark::internal::Benchmark* bench) {
+void PageIndexSetArgs(::arrow::BenchmarkType* bench) {
   bench->ArgNames({"num_pages"});
   bench->Range(8, 1024);
 }
