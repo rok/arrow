@@ -747,6 +747,15 @@ if(TARGET simdjson::simdjson)
       endif()
     endif()
   endif()
+
+  # Final fallback: On Windows with vcpkg, always use header-only mode.
+  # vcpkg's simdjson package provides a stub library that doesn't contain
+  # the actual implementation, so we must compile it ourselves.
+  if(NOT ARROW_SIMDJSON_HEADER_ONLY AND WIN32 AND VCPKG_TARGET_TRIPLET)
+    message(STATUS "simdjson: forcing header-only mode for Windows vcpkg build")
+    set(ARROW_SIMDJSON_HEADER_ONLY TRUE)
+  endif()
+
   message(STATUS "simdjson: ARROW_SIMDJSON_HEADER_ONLY=${ARROW_SIMDJSON_HEADER_ONLY}")
 endif()
 
@@ -1070,20 +1079,15 @@ else()
 endif()
 
 if(ARROW_JSON)
-  # simdjson_impl.cc provides the simdjson implementation when using header-only mode.
-  # The source file itself handles the necessary #defines (SIMDJSON_IMPLEMENTATION,
-  # SIMDJSON_BUILDING_WINDOWS_DYNAMIC_LIBRARY) based on compile-time conditions.
-  # We always include it when ARROW_JSON is built to ensure simdjson symbols are available.
-  # When simdjson is used as a proper library (non-header-only), the guards in the source
-  # file prevent duplicate symbol definitions.
+  # In header-only mode, we need to compile the simdjson implementation ourselves.
+  # Detection of header-only mode was done earlier and stored in ARROW_SIMDJSON_HEADER_ONLY.
   set(ARROW_SIMDJSON_IMPL_SRC "")
-  if(TARGET simdjson::simdjson)
-    # Always compile simdjson_impl.cc to provide implementation symbols
+  if(TARGET simdjson::simdjson AND ARROW_SIMDJSON_HEADER_ONLY)
     set(ARROW_SIMDJSON_IMPL_SRC json/simdjson_impl.cc)
     # Skip unity build for this file to avoid issues with simdjson's implementation macros
     set_source_files_properties(json/simdjson_impl.cc
                                 PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
-    message(STATUS "simdjson: including simdjson_impl.cc (header-only=${ARROW_SIMDJSON_HEADER_ONLY})")
+    message(STATUS "simdjson: including simdjson_impl.cc for header-only mode")
   endif()
   arrow_add_object_library(ARROW_JSON
                            extension/fixed_shape_tensor.cc
