@@ -251,7 +251,7 @@ static void ScanOnlyBench(benchmark::State& state) {
                           GetBytesForSchema());
 }
 
-static void ScanBenchmark_Customize(::benchmark::Benchmark* b) {
+static void ScanBenchmark_Customize(arrow::BenchmarkType* b) {
   for (const int32_t num_batches : {1000}) {
     for (const int batch_size : {10, 100, 1000}) {
       for (const int scan_idx : {kScanIdx, kScanV2Idx}) {

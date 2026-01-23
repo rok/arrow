@@ -129,7 +129,7 @@ static void AsOfJoinOverhead(benchmark::State& state) {
 }
 
 // this generates the set of right hand tables to test on.
-void SetArgs(::benchmark::Benchmark* bench) {
+void SetArgs(arrow::BenchmarkType* bench) {
   bench
       ->ArgNames({"left_freq", "left_cols", "left_ids", "batch_size", "num_right_tables",
                   "right_freq", "right_cols", "right_ids"})

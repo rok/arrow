@@ -551,7 +551,7 @@ static void TakeChunkedFlatInt64FewMonotonicIndices(benchmark::State& state) {
           /*num_chunks=*/100, /*chunk_indices_too=*/false);
 }
 
-void FilterSetArgs(::benchmark::Benchmark* bench) {
+void FilterSetArgs(arrow::BenchmarkType* bench) {
   for (int64_t size : g_data_sizes) {
     for (int i = 0; i < static_cast<int>(g_filter_params.size()); ++i) {
       bench->Args({static_cast<ArgsType>(size), i});
@@ -559,7 +559,7 @@ void FilterSetArgs(::benchmark::Benchmark* bench) {
   }
 }
 
-void FilterFSBSetArgs(::benchmark::Benchmark* bench) {
+void FilterFSBSetArgs(arrow::BenchmarkType* bench) {
   for (int64_t size : g_data_sizes) {
     for (int i = 0; i < static_cast<int>(g_filter_params.size()); ++i) {
       // FixedSizeBinary of primitive sizes (powers of two up to 32)
@@ -580,7 +580,7 @@ BENCHMARK(FilterFSLInt64FilterWithNulls)->Apply(FilterSetArgs);
 BENCHMARK(FilterStringFilterNoNulls)->Apply(FilterSetArgs);
 BENCHMARK(FilterStringFilterWithNulls)->Apply(FilterSetArgs);
 
-void FilterRecordBatchSetArgs(::benchmark::Benchmark* bench) {
+void FilterRecordBatchSetArgs(arrow::BenchmarkType* bench) {
   for (auto num_cols : std::vector<int>({10, 50, 100})) {
     for (int i = 0; i < static_cast<int>(g_filter_params.size()); ++i) {
       bench->Args({num_cols, i});
@@ -590,7 +590,7 @@ void FilterRecordBatchSetArgs(::benchmark::Benchmark* bench) {
 BENCHMARK(FilterRecordBatchNoNulls)->Apply(FilterRecordBatchSetArgs);
 BENCHMARK(FilterRecordBatchWithNulls)->Apply(FilterRecordBatchSetArgs);
 
-void TakeSetArgs(::benchmark::Benchmark* bench) {
+void TakeSetArgs(arrow::BenchmarkType* bench) {
   for (int64_t size : g_data_sizes) {
     for (auto nulls : std::vector<ArgsType>({1000, 10, 2, 1, 0})) {
       bench->Args({static_cast<ArgsType>(size), nulls});
@@ -598,7 +598,7 @@ void TakeSetArgs(::benchmark::Benchmark* bench) {
   }
 }
 
-void TakeFSBSetArgs(::benchmark::Benchmark* bench) {
+void TakeFSBSetArgs(arrow::BenchmarkType* bench) {
   for (int64_t size : g_data_sizes) {
     for (auto nulls : std::vector<ArgsType>({1000, 10, 2, 1, 0})) {
       // FixedSizeBinary of primitive sizes (powers of two up to 32)

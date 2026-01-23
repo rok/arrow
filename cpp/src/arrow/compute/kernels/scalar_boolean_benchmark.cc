@@ -47,7 +47,7 @@ static void ArrayArrayKernel(benchmark::State& state) {
   state.SetItemsProcessed(state.iterations() * array_size);
 }
 
-void SetArgs(::benchmark::Benchmark* bench) {
+void SetArgs(arrow::BenchmarkType* bench) {
   BenchmarkSetArgsWithSizes(bench, {kL1Size, kL2Size});
 }
 

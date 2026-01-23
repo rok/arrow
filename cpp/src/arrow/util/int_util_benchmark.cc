@@ -132,7 +132,7 @@ BENCHMARK(DetectIntWidthNulls);
 
 std::vector<int64_t> g_data_sizes = {kL1Size, kL2Size};
 
-void BoundsCheckSetArgs(::benchmark::Benchmark* bench) {
+void BoundsCheckSetArgs(arrow::BenchmarkType* bench) {
   for (int64_t size : g_data_sizes) {
     for (auto nulls : std::vector<ArgsType>({1000, 10, 2, 1, 0})) {
       bench->Args({static_cast<ArgsType>(size), nulls});

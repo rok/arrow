@@ -109,7 +109,7 @@ arrow::compute::Expression is_true_expression = equal(field_ref("bool"), literal
 arrow::compute::Expression is_not_null_and_true_expression =
     and_(is_not_null_expression, is_true_expression);
 
-void SetArgs(::benchmark::Benchmark* bench) {
+void SetArgs(arrow::BenchmarkType* bench) {
   for (int batch_size = 1000; batch_size <= kTotalBatchSize; batch_size *= 10) {
     bench->ArgNames({"batch_size", "null_prob", "bool_true_prob"})
         ->Args({batch_size, 0, 50})
@@ -117,7 +117,7 @@ void SetArgs(::benchmark::Benchmark* bench) {
   }
 }
 
-void SetSelectivityArgs(::benchmark::Benchmark* bench) {
+void SetSelectivityArgs(arrow::BenchmarkType* bench) {
   for (int batch_size = 1000; batch_size <= kTotalBatchSize; batch_size *= 10) {
     for (double null_prob : {0.1, 0.5, 0.75, 1.0}) {
       bench->ArgNames({"batch_size", "null_prob", "bool_true_prob"})
@@ -127,7 +127,7 @@ void SetSelectivityArgs(::benchmark::Benchmark* bench) {
   }
 }
 
-void SetMultiPassArgs(::benchmark::Benchmark* bench) {
+void SetMultiPassArgs(arrow::BenchmarkType* bench) {
   for (int batch_size = 1000; batch_size <= kTotalBatchSize; batch_size *= 10) {
     for (double null_prob : {0.0, 0.25, 0.5, 0.75}) {
       // we keep the number of selected elements constant for all benchmarks.
