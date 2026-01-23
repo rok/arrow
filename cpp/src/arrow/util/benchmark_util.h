@@ -32,19 +32,19 @@ namespace arrow {
 // and deprecated benchmark::internal::Benchmark. However, the internal version
 // still works in all versions, so we use it with deprecation warnings suppressed.
 #if defined(__GNUC__) || defined(__clang__)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#  pragma GCC diagnostic push
+#  pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 #endif
 #ifdef _MSC_VER
-#pragma warning(push)
-#pragma warning(disable : 4996)  // deprecated declaration
+#  pragma warning(push)
+#  pragma warning(disable : 4996)  // deprecated declaration
 #endif
 using BenchmarkType = benchmark::internal::Benchmark;
 #ifdef _MSC_VER
-#pragma warning(pop)
+#  pragma warning(pop)
 #endif
 #if defined(__GNUC__) || defined(__clang__)
-#pragma GCC diagnostic pop
+#  pragma GCC diagnostic pop
 #endif
 
 // Benchmark changed its parameter type between releases from

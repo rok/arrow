@@ -16,6 +16,7 @@
 // under the License.
 
 #include <benchmark/benchmark.h>
+#include "arrow/util/benchmark_util.h"
 
 #include "arrow/array.h"
 #include "arrow/array/concatenate.h"

@@ -17,6 +17,7 @@
 
 #include <string>
 
+#include "arrow/util/benchmark_util.h"
 #include "benchmark/benchmark.h"
 
 #include "arrow/acero/options.h"

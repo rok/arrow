@@ -16,6 +16,7 @@
 // under the License.
 
 #include "arrow/type.h"
+#include "arrow/util/benchmark_util.h"
 #include "benchmark/benchmark.h"
 
 #include <memory>

@@ -23,6 +23,7 @@
 #include "arrow/util/cpu_info.h"
 #include "arrow/util/simd.h"
 
+#include "arrow/util/benchmark_util.h"
 #include "benchmark/benchmark.h"
 
 namespace arrow {

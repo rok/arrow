@@ -401,14 +401,14 @@ static void BenchmarkAggregate(
   state.SetItemsProcessed(batch->num_rows() * state.iterations());
 }
 
-#define GROUP_BY_BENCHMARK(Name, Impl)                       \
-  static void Name(benchmark::State& state) {                \
-    RegressionArgs args(state, false);                       \
-    auto rng = random::RandomArrayGenerator(1923);           \
-    (Impl)();                                                \
-  }                                                          \
+#define GROUP_BY_BENCHMARK(Name, Impl)                     \
+  static void Name(benchmark::State& state) {              \
+    RegressionArgs args(state, false);                     \
+    auto rng = random::RandomArrayGenerator(1923);         \
+    (Impl)();                                              \
+  }                                                        \
   BENCHMARK(Name)->Apply([](arrow::BenchmarkType* bench) { \
-    BenchmarkSetArgsWithSizes(bench, {1 * 1024 * 1024});     \
+    BenchmarkSetArgsWithSizes(bench, {1 * 1024 * 1024});   \
   })
 
 // Grouped Sum

@@ -15,6 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
+#include "arrow/util/benchmark_util.h"
 #include "benchmark/benchmark.h"
 
 #include <algorithm>
