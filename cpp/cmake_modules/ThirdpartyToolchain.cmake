@@ -2643,8 +2643,18 @@ if(ARROW_WITH_SIMDJSON)
     message(STATUS "  SIMDJSON_VENDORED=${SIMDJSON_VENDORED}")
     get_target_property(_simdjson_type simdjson::simdjson TYPE)
     message(STATUS "  simdjson target type: ${_simdjson_type}")
+
+    # Resolve the actual target if simdjson::simdjson is an alias
+    # (CMake doesn't allow modifying properties on ALIAS targets)
+    set(_simdjson_real_target simdjson::simdjson)
+    get_target_property(_simdjson_aliased simdjson::simdjson ALIASED_TARGET)
+    if(_simdjson_aliased)
+      message(STATUS "  simdjson::simdjson is an alias to: ${_simdjson_aliased}")
+      set(_simdjson_real_target ${_simdjson_aliased})
+    endif()
+
     # Add SIMDJSON_HEADER_ONLY to the interface so all consumers use header-only mode
-    set_property(TARGET simdjson::simdjson
+    set_property(TARGET ${_simdjson_real_target}
                  APPEND
                  PROPERTY INTERFACE_COMPILE_DEFINITIONS SIMDJSON_HEADER_ONLY)
     set(ARROW_SIMDJSON_FORCE_HEADER_ONLY
