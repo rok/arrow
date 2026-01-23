@@ -764,6 +764,12 @@ if(ARROW_BUILD_INTEGRATION OR ARROW_BUILD_TESTS)
       target_compile_definitions(${ARROW_INTEGRATION_TARGET} PRIVATE SIMDJSON_HEADER_ONLY)
     endif()
   endforeach()
+  # On Windows, when building the shared library with simdjson in header-only mode,
+  # we need SIMDJSON_BUILDING_WINDOWS_DYNAMIC_LIBRARY to properly export symbols.
+  if(WIN32 AND ARROW_SIMDJSON_HEADER_ONLY AND ARROW_INTEGRATION_TARGET_SHARED)
+    target_compile_definitions(${ARROW_INTEGRATION_TARGET_SHARED}
+                               PRIVATE SIMDJSON_BUILDING_WINDOWS_DYNAMIC_LIBRARY)
+  endif()
 else()
   set(ARROW_INTEGRATION_TARGET_SHARED)
   set(ARROW_INTEGRATION_TARGET_STATIC)
@@ -1094,6 +1100,12 @@ if(ARROW_JSON)
       target_compile_definitions(${ARROW_JSON_TARGET} PRIVATE SIMDJSON_HEADER_ONLY)
     endif()
   endforeach()
+  # On Windows, when building the shared library with simdjson in header-only mode,
+  # we need SIMDJSON_BUILDING_WINDOWS_DYNAMIC_LIBRARY to properly export symbols.
+  if(WIN32 AND ARROW_SIMDJSON_HEADER_ONLY AND ARROW_JSON_TARGET_SHARED)
+    target_compile_definitions(${ARROW_JSON_TARGET_SHARED}
+                               PRIVATE SIMDJSON_BUILDING_WINDOWS_DYNAMIC_LIBRARY)
+  endif()
   list(APPEND ARROW_SHARED_PRIVATE_LINK_LIBS simdjson::simdjson)
   # Note: simdjson is a private dependency linked into libarrow. When bundled,
   # it goes into arrow_bundled_dependencies. When using a system simdjson,
@@ -1323,6 +1335,12 @@ if(ARROW_TESTING)
       target_compile_definitions(${LIB_TARGET} PRIVATE SIMDJSON_HEADER_ONLY)
     endif()
   endforeach()
+  # On Windows, when building the shared library with simdjson in header-only mode,
+  # we need SIMDJSON_BUILDING_WINDOWS_DYNAMIC_LIBRARY to properly export symbols.
+  if(WIN32 AND ARROW_SIMDJSON_HEADER_ONLY AND TARGET arrow_testing_shared)
+    target_compile_definitions(arrow_testing_shared
+                               PRIVATE SIMDJSON_BUILDING_WINDOWS_DYNAMIC_LIBRARY)
+  endif()
 endif()
 
 arrow_install_all_headers("arrow")

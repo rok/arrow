@@ -308,6 +308,19 @@ add_arrow_lib(parquet
               STATIC_INSTALL_INTERFACE_LIBS
               ${PARQUET_STATIC_INSTALL_INTERFACE_LIBS})
 
+# Add simdjson compile definitions for header-only mode
+if(ARROW_SIMDJSON_HEADER_ONLY)
+  foreach(LIB_TARGET ${PARQUET_LIBRARIES})
+    target_compile_definitions(${LIB_TARGET} PRIVATE SIMDJSON_HEADER_ONLY)
+  endforeach()
+  # On Windows, when building the shared library with simdjson in header-only mode,
+  # we need SIMDJSON_BUILDING_WINDOWS_DYNAMIC_LIBRARY to properly export symbols.
+  if(WIN32 AND TARGET parquet_shared)
+    target_compile_definitions(parquet_shared
+                               PRIVATE SIMDJSON_BUILDING_WINDOWS_DYNAMIC_LIBRARY)
+  endif()
+endif()
+
 if(WIN32 AND NOT (ARROW_TEST_LINKAGE STREQUAL "static"))
   add_library(parquet_test_support STATIC
               "${PARQUET_THRIFT_SOURCE_DIR}/parquet_types.cpp")
