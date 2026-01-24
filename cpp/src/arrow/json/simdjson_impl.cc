@@ -25,6 +25,13 @@
 //
 // This file is always included in the build to handle both cases correctly.
 
+// Debug: Output compilation mode at compile time
+#ifdef SIMDJSON_HEADER_ONLY
+#pragma message("simdjson_impl.cc: SIMDJSON_HEADER_ONLY is DEFINED - skipping implementation")
+#else
+#pragma message("simdjson_impl.cc: SIMDJSON_HEADER_ONLY is NOT defined - compiling implementation")
+#endif
+
 // Check if simdjson is configured for header-only mode (set by simdjson's
 // CMake target or our CMakeLists.txt). If so, all code is inline and we
 // don't need to compile anything here.
@@ -34,11 +41,17 @@
 // ARROW_EXPORTING is defined by CMake for shared library builds.
 #if defined(_WIN32) && defined(ARROW_EXPORTING)
 #define SIMDJSON_BUILDING_WINDOWS_DYNAMIC_LIBRARY 1
+#pragma message("simdjson_impl.cc: SIMDJSON_BUILDING_WINDOWS_DYNAMIC_LIBRARY is DEFINED")
 #endif
 
 // Enable the implementation - this causes simdjson.h to include all .cpp files
 #define SIMDJSON_IMPLEMENTATION 1
 
 #include <simdjson.h>
+
+// Verify symbols are being compiled by taking address of them
+namespace arrow::json::simdjson_verify {
+[[maybe_unused]] static const void* verify_error_codes = &simdjson::internal::error_codes;
+}
 
 #endif  // SIMDJSON_HEADER_ONLY
