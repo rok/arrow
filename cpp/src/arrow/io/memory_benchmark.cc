@@ -27,14 +27,16 @@
 #include "benchmark/benchmark.h"
 
 namespace arrow {
+namespace {
 
+// These are defined locally to avoid conflicts with benchmark_util.h in unity builds
 using internal::CpuInfo;
-static const CpuInfo* cpu_info = CpuInfo::GetInstance();
+const CpuInfo* cpu_info = CpuInfo::GetInstance();
 
-static const int kNumCores = cpu_info->num_cores();
-static const int64_t kL1Size = cpu_info->CacheSize(CpuInfo::CacheLevel::L1);
-static const int64_t kL2Size = cpu_info->CacheSize(CpuInfo::CacheLevel::L2);
-static const int64_t kL3Size = cpu_info->CacheSize(CpuInfo::CacheLevel::L3);
+const int kNumCores = cpu_info->num_cores();
+const int64_t kL1Size = cpu_info->CacheSize(CpuInfo::CacheLevel::L1);
+const int64_t kL2Size = cpu_info->CacheSize(CpuInfo::CacheLevel::L2);
+const int64_t kL3Size = cpu_info->CacheSize(CpuInfo::CacheLevel::L3);
 
 constexpr size_t kMemoryPerCore = 32 * 1024 * 1024;
 using BufferPtr = std::shared_ptr<Buffer>;
@@ -359,4 +361,5 @@ BENCHMARK(BufferOutputStreamTinyWrites)->UseRealTime();
 BENCHMARK(BufferOutputStreamSmallWrites)->UseRealTime();
 BENCHMARK(BufferOutputStreamLargeWrites)->UseRealTime();
 
+}  // namespace
 }  // namespace arrow
