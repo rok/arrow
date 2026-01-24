@@ -748,18 +748,20 @@ if(TARGET simdjson::simdjson)
     endif()
   endif()
 
-  # Note: We no longer force header-only mode on Windows vcpkg.
-  # Instead, simdjson_impl.cc compiles the full implementation and exports
-  # the symbols from arrow.dll. This approach is more reliable than trying
-  # to propagate SIMDJSON_HEADER_ONLY to all OBJECT libraries.
+  # vcpkg's simdjson provides a stub library with no real implementation.
+  # It requires header-only mode, but doesn't propagate SIMDJSON_HEADER_ONLY
+  # via INTERFACE_COMPILE_DEFINITIONS. Force header-only mode for vcpkg.
+  if(VCPKG_TARGET_TRIPLET AND NOT ARROW_SIMDJSON_HEADER_ONLY)
+    message(STATUS "simdjson: vcpkg detected - forcing header-only mode")
+    set(ARROW_SIMDJSON_HEADER_ONLY TRUE)
+  endif()
 
   message(STATUS "simdjson: ARROW_SIMDJSON_HEADER_ONLY=${ARROW_SIMDJSON_HEADER_ONLY}")
 
-  # When header-only mode is detected (e.g., from system simdjson with
-  # SIMDJSON_HEADER_ONLY in its interface), propagate it via add_definitions()
-  # to ensure all translation units get the definition.
-  # Note: For vcpkg builds, we deliberately do NOT use header-only mode.
-  # Instead, simdjson_impl.cc compiles the full implementation.
+  # When header-only mode is needed (vcpkg, interface library, or forced),
+  # propagate SIMDJSON_HEADER_ONLY via add_definitions() to ensure ALL
+  # translation units get the definition. This is critical because simdjson's
+  # internal symbols must be inline in every translation unit that uses them.
   if(ARROW_SIMDJSON_HEADER_ONLY)
     add_definitions(-DSIMDJSON_HEADER_ONLY)
     message(STATUS "simdjson: Using header-only mode via add_definitions()")
