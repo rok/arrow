@@ -22,7 +22,14 @@
 // instantiate the implementation. On Windows DLL builds, we also need
 // SIMDJSON_BUILDING_WINDOWS_DYNAMIC_LIBRARY to export global data symbols.
 
-// Enable the implementation - this file is only compiled in header-only mode
+// The CMake target may define SIMDJSON_HEADER_ONLY, but this file needs to
+// provide the actual implementation (not inline). Undefine it so simdjson
+// will compile the implementation symbols that other files can link against.
+#ifdef SIMDJSON_HEADER_ONLY
+#undef SIMDJSON_HEADER_ONLY
+#endif
+
+// Enable the implementation - this file provides the compiled definitions
 #define SIMDJSON_IMPLEMENTATION 1
 
 // On Windows, when building a DLL, we need to export simdjson's global symbols.

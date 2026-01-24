@@ -773,12 +773,8 @@ if(ARROW_BUILD_INTEGRATION OR ARROW_BUILD_TESTS)
       target_compile_definitions(${ARROW_INTEGRATION_TARGET} PRIVATE SIMDJSON_HEADER_ONLY)
     endif()
   endforeach()
-  # On Windows, when building the shared library with simdjson in header-only mode,
-  # we need SIMDJSON_BUILDING_WINDOWS_DYNAMIC_LIBRARY to properly export symbols.
-  if(WIN32 AND ARROW_SIMDJSON_HEADER_ONLY AND ARROW_INTEGRATION_TARGET_SHARED)
-    target_compile_definitions(${ARROW_INTEGRATION_TARGET_SHARED}
-                               PRIVATE SIMDJSON_BUILDING_WINDOWS_DYNAMIC_LIBRARY)
-  endif()
+  # Note: simdjson symbols are provided by simdjson_impl.cc in ARROW_JSON module.
+  # These files only need SIMDJSON_HEADER_ONLY for inline functions.
 else()
   set(ARROW_INTEGRATION_TARGET_SHARED)
   set(ARROW_INTEGRATION_TARGET_STATIC)
@@ -1109,12 +1105,10 @@ if(ARROW_JSON)
       target_compile_definitions(${ARROW_JSON_TARGET} PRIVATE SIMDJSON_HEADER_ONLY)
     endif()
   endforeach()
-  # On Windows, when building the shared library with simdjson in header-only mode,
-  # we need SIMDJSON_BUILDING_WINDOWS_DYNAMIC_LIBRARY to properly export symbols.
-  if(WIN32 AND ARROW_SIMDJSON_HEADER_ONLY AND ARROW_JSON_TARGET_SHARED)
-    target_compile_definitions(${ARROW_JSON_TARGET_SHARED}
-                               PRIVATE SIMDJSON_BUILDING_WINDOWS_DYNAMIC_LIBRARY)
-  endif()
+  # Note: SIMDJSON_BUILDING_WINDOWS_DYNAMIC_LIBRARY is set directly in simdjson_impl.cc
+  # when ARROW_EXPORTING is defined (shared library build). We don't set it on the
+  # target because only simdjson_impl.cc should export symbols - other files should
+  # link to those symbols without dllimport/dllexport attributes.
   list(APPEND ARROW_SHARED_PRIVATE_LINK_LIBS simdjson::simdjson)
   # Note: simdjson is a private dependency linked into libarrow. When bundled,
   # it goes into arrow_bundled_dependencies. When using a system simdjson,
@@ -1344,12 +1338,8 @@ if(ARROW_TESTING)
       target_compile_definitions(${LIB_TARGET} PRIVATE SIMDJSON_HEADER_ONLY)
     endif()
   endforeach()
-  # On Windows, when building the shared library with simdjson in header-only mode,
-  # we need SIMDJSON_BUILDING_WINDOWS_DYNAMIC_LIBRARY to properly export symbols.
-  if(WIN32 AND ARROW_SIMDJSON_HEADER_ONLY AND TARGET arrow_testing_shared)
-    target_compile_definitions(arrow_testing_shared
-                               PRIVATE SIMDJSON_BUILDING_WINDOWS_DYNAMIC_LIBRARY)
-  endif()
+  # Note: simdjson symbols are provided by simdjson_impl.cc in ARROW_JSON module.
+  # arrow_testing only needs SIMDJSON_HEADER_ONLY for inline functions.
 endif()
 
 arrow_install_all_headers("arrow")
