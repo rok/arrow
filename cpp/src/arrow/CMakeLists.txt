@@ -757,6 +757,14 @@ if(TARGET simdjson::simdjson)
   endif()
 
   message(STATUS "simdjson: ARROW_SIMDJSON_HEADER_ONLY=${ARROW_SIMDJSON_HEADER_ONLY}")
+
+  # When using header-only mode, add the compile definition at the directory level
+  # to ensure all translation units that include simdjson.h get the definition.
+  # This is more robust than relying solely on target_compile_definitions propagation,
+  # which can have issues with OBJECT libraries on some platforms (e.g., Windows MSVC).
+  if(ARROW_SIMDJSON_HEADER_ONLY)
+    add_compile_definitions(SIMDJSON_HEADER_ONLY)
+  endif()
 endif()
 
 #
