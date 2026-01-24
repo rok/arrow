@@ -502,7 +502,7 @@ static void BenchmarkReadBinaryColumn(::benchmark::State& state,
   BenchmarkReadTable(state, *table, properties, table->num_rows(), total_bytes);
 }
 
-static void SetReadBinaryColumnArgs(arrow::BenchmarkType* b) {
+static void SetReadBinaryColumnArgs(::arrow::BenchmarkType* b) {
   b->ArgNames({"null_probability", "unique_values"})
       // We vary unique values to trigger the dictionary-encoded (for low-cardinality)
       // and plain (for high-cardinality) code paths.
@@ -517,7 +517,7 @@ static void SetReadBinaryColumnArgs(arrow::BenchmarkType* b) {
 }
 
 static void SetReadBinaryColumnArgsWithoutDictEncoding(
-    arrow::BenchmarkType* b) {
+    ::arrow::BenchmarkType* b) {
   b->ArgNames({"null_probability", "unique_values"})
       // Dict-encoding is already tested in the PLAIN benchmarks, so only exercise
       // non-dict-encoding using high cardinality.

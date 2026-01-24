@@ -112,7 +112,7 @@ class MetadataBenchmark {
   std::shared_ptr<WriterProperties> writer_properties_;
 };
 
-void WriteMetadataSetArgs(arrow::BenchmarkType* bench) {
+void WriteMetadataSetArgs(::arrow::BenchmarkType* bench) {
   bench->ArgNames({"num_columns", "num_row_groups"});
 
   for (int num_columns : {1, 10, 100}) {
@@ -128,7 +128,7 @@ void WriteMetadataSetArgs(arrow::BenchmarkType* bench) {
   }
 }
 
-void ReadMetadataSetArgs(arrow::BenchmarkType* bench) {
+void ReadMetadataSetArgs(::arrow::BenchmarkType* bench) {
   WriteMetadataSetArgs(bench);
 }
 
