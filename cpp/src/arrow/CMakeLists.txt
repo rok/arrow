@@ -758,12 +758,16 @@ if(TARGET simdjson::simdjson)
 
   message(STATUS "simdjson: ARROW_SIMDJSON_HEADER_ONLY=${ARROW_SIMDJSON_HEADER_ONLY}")
 
-  # When using header-only mode, add the compile definition at the directory level
-  # to ensure all translation units that include simdjson.h get the definition.
-  # This is more robust than relying solely on target_compile_definitions propagation,
-  # which can have issues with OBJECT libraries on some platforms (e.g., Windows MSVC).
+  # When header-only mode is detected (e.g., from system simdjson with
+  # SIMDJSON_HEADER_ONLY in its interface), propagate it via add_definitions()
+  # to ensure all translation units get the definition.
+  # Note: For vcpkg builds, we deliberately do NOT use header-only mode.
+  # Instead, simdjson_impl.cc compiles the full implementation.
   if(ARROW_SIMDJSON_HEADER_ONLY)
-    add_compile_definitions(SIMDJSON_HEADER_ONLY)
+    add_definitions(-DSIMDJSON_HEADER_ONLY)
+    message(STATUS "simdjson: Using header-only mode via add_definitions()")
+  else()
+    message(STATUS "simdjson: Using compiled mode (simdjson_impl.cc provides implementation)")
   endif()
 endif()
 

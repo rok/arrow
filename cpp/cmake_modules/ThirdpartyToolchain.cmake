@@ -2632,34 +2632,23 @@ if(ARROW_WITH_SIMDJSON)
   # Note: simdjson is a private dependency - it's linked into libarrow
   # and doesn't need to be exposed to downstream consumers.
 
-  # When using vcpkg-provided simdjson, force header-only mode to avoid linking
-  # issues. vcpkg's simdjson package provides a stub static library that expects
-  # consumers to use header-only mode. This applies to all platforms, not just
-  # Windows. We detect vcpkg by checking for VCPKG_TARGET_TRIPLET.
-  # We add SIMDJSON_HEADER_ONLY to the target's interface compile definitions
-  # so all consumers get it automatically.
+  # When using vcpkg-provided simdjson, vcpkg provides only headers and a stub
+  # static library (no actual implementation). Arrow compiles the simdjson
+  # implementation itself via simdjson_impl.cc. We do NOT use header-only mode
+  # because the SIMDJSON_HEADER_ONLY compile definition doesn't propagate
+  # correctly to OBJECT libraries on Windows MSVC.
+  #
+  # Instead, simdjson_impl.cc compiles the full simdjson implementation:
+  # - It defines SIMDJSON_IMPLEMENTATION before including simdjson.h
+  # - On Windows DLL builds, it sets SIMDJSON_BUILDING_WINDOWS_DYNAMIC_LIBRARY
+  #   to export the symbols from arrow.dll
+  # - Other source files use extern declarations and link against arrow.dll
   if(VCPKG_TARGET_TRIPLET AND TARGET simdjson::simdjson)
-    message(STATUS "vcpkg detected with simdjson target - forcing header-only mode")
+    message(STATUS "vcpkg detected with simdjson - Arrow will compile simdjson implementation")
     message(STATUS "  SIMDJSON_VENDORED=${SIMDJSON_VENDORED}")
     get_target_property(_simdjson_type simdjson::simdjson TYPE)
     message(STATUS "  simdjson target type: ${_simdjson_type}")
-
-    # Resolve the actual target if simdjson::simdjson is an alias
-    # (CMake doesn't allow modifying properties on ALIAS targets)
-    set(_simdjson_real_target simdjson::simdjson)
-    get_target_property(_simdjson_aliased simdjson::simdjson ALIASED_TARGET)
-    if(_simdjson_aliased)
-      message(STATUS "  simdjson::simdjson is an alias to: ${_simdjson_aliased}")
-      set(_simdjson_real_target ${_simdjson_aliased})
-    endif()
-
-    # Add SIMDJSON_HEADER_ONLY to the interface so all consumers use header-only mode
-    set_property(TARGET ${_simdjson_real_target}
-                 APPEND
-                 PROPERTY INTERFACE_COMPILE_DEFINITIONS SIMDJSON_HEADER_ONLY)
-    set(ARROW_SIMDJSON_FORCE_HEADER_ONLY
-        TRUE
-        CACHE INTERNAL "Force simdjson header-only mode")
+    # Don't set ARROW_SIMDJSON_FORCE_HEADER_ONLY - let simdjson_impl.cc handle it
   endif()
 endif()
 
