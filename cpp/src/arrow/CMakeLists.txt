@@ -768,13 +768,8 @@ if(ARROW_BUILD_INTEGRATION OR ARROW_BUILD_TESTS)
                            integration/json_internal.cc)
   foreach(ARROW_INTEGRATION_TARGET ${ARROW_INTEGRATION_TARGETS})
     target_link_libraries(${ARROW_INTEGRATION_TARGET} PRIVATE simdjson::simdjson)
-    # Add SIMDJSON_HEADER_ONLY when in header-only mode
-    if(ARROW_SIMDJSON_HEADER_ONLY)
-      target_compile_definitions(${ARROW_INTEGRATION_TARGET} PRIVATE SIMDJSON_HEADER_ONLY)
-    endif()
   endforeach()
   # Note: simdjson symbols are provided by simdjson_impl.cc in ARROW_JSON module.
-  # These files only need SIMDJSON_HEADER_ONLY for inline functions.
 else()
   set(ARROW_INTEGRATION_TARGET_SHARED)
   set(ARROW_INTEGRATION_TARGET_STATIC)
@@ -1076,21 +1071,17 @@ endif()
 
 if(ARROW_JSON)
   # Determine if we need to compile simdjson implementation ourselves.
-  # On Windows, always use header-only mode and compile simdjson_impl.cc because
-  # vcpkg's simdjson library configuration is unreliable for DLL builds.
+  # On Windows, always compile simdjson_impl.cc because vcpkg's simdjson
+  # library may not be properly configured for DLL builds.
+  # On other platforms, compile it when simdjson is detected as header-only.
   set(ARROW_SIMDJSON_IMPL_SRC "")
   if(TARGET simdjson::simdjson)
     if(WIN32 OR ARROW_SIMDJSON_HEADER_ONLY)
-      # Force header-only mode on Windows
-      if(WIN32 AND NOT ARROW_SIMDJSON_HEADER_ONLY)
-        message(STATUS "simdjson: forcing header-only mode on Windows")
-        set(ARROW_SIMDJSON_HEADER_ONLY TRUE)
-      endif()
       set(ARROW_SIMDJSON_IMPL_SRC json/simdjson_impl.cc)
       # Skip unity build for this file to avoid issues with simdjson's implementation macros
       set_source_files_properties(json/simdjson_impl.cc
                                   PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
-      message(STATUS "simdjson: including simdjson_impl.cc for header-only mode")
+      message(STATUS "simdjson: including simdjson_impl.cc to compile implementation")
     endif()
   endif()
   arrow_add_object_library(ARROW_JSON
@@ -1108,15 +1099,12 @@ if(ARROW_JSON)
                            ${ARROW_SIMDJSON_IMPL_SRC})
   foreach(ARROW_JSON_TARGET ${ARROW_JSON_TARGETS})
     target_link_libraries(${ARROW_JSON_TARGET} PRIVATE simdjson::simdjson)
-    # Add SIMDJSON_HEADER_ONLY when in header-only mode
-    if(ARROW_SIMDJSON_HEADER_ONLY)
-      target_compile_definitions(${ARROW_JSON_TARGET} PRIVATE SIMDJSON_HEADER_ONLY)
-    endif()
   endforeach()
-  # Note: SIMDJSON_BUILDING_WINDOWS_DYNAMIC_LIBRARY is set directly in simdjson_impl.cc
-  # when ARROW_EXPORTING is defined (shared library build). We don't set it on the
-  # target because only simdjson_impl.cc should export symbols - other files should
-  # link to those symbols without dllimport/dllexport attributes.
+  # Note: We do NOT set SIMDJSON_HEADER_ONLY. Instead, we use simdjson's
+  # "single compilation unit" model where simdjson_impl.cc compiles all the
+  # implementation via SIMDJSON_IMPLEMENTATION. Other files get extern declarations
+  # and link to those symbols.
+  # SIMDJSON_BUILDING_WINDOWS_DYNAMIC_LIBRARY is set in simdjson_impl.cc when needed.
   list(APPEND ARROW_SHARED_PRIVATE_LINK_LIBS simdjson::simdjson)
   # Note: simdjson is a private dependency linked into libarrow. When bundled,
   # it goes into arrow_bundled_dependencies. When using a system simdjson,
@@ -1341,13 +1329,8 @@ if(ARROW_TESTING)
 
   foreach(LIB_TARGET ${ARROW_TESTING_LIBRARIES})
     target_compile_definitions(${LIB_TARGET} PRIVATE ARROW_TESTING_EXPORTING)
-    # Add SIMDJSON_HEADER_ONLY when in header-only mode
-    if(ARROW_SIMDJSON_HEADER_ONLY)
-      target_compile_definitions(${LIB_TARGET} PRIVATE SIMDJSON_HEADER_ONLY)
-    endif()
   endforeach()
   # Note: simdjson symbols are provided by simdjson_impl.cc in ARROW_JSON module.
-  # arrow_testing only needs SIMDJSON_HEADER_ONLY for inline functions.
 endif()
 
 arrow_install_all_headers("arrow")
