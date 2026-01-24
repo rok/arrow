@@ -29,14 +29,9 @@
 namespace arrow {
 namespace {
 
-// These are defined locally to avoid conflicts with benchmark_util.h in unity builds
-using internal::CpuInfo;
-const CpuInfo* cpu_info = CpuInfo::GetInstance();
-
+// cpu_info, kL1Size, kL2Size, kL3Size are already defined in benchmark_util.h
+// We only define kNumCores and kMemoryPerCore which are specific to this benchmark
 const int kNumCores = cpu_info->num_cores();
-const int64_t kL1Size = cpu_info->CacheSize(CpuInfo::CacheLevel::L1);
-const int64_t kL2Size = cpu_info->CacheSize(CpuInfo::CacheLevel::L2);
-const int64_t kL3Size = cpu_info->CacheSize(CpuInfo::CacheLevel::L3);
 
 constexpr size_t kMemoryPerCore = 32 * 1024 * 1024;
 using BufferPtr = std::shared_ptr<Buffer>;
