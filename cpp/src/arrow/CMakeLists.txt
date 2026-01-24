@@ -759,12 +759,20 @@ if(TARGET simdjson::simdjson)
   message(STATUS "simdjson: ARROW_SIMDJSON_HEADER_ONLY=${ARROW_SIMDJSON_HEADER_ONLY}")
 
   # When header-only mode is needed (vcpkg, interface library, or forced),
-  # propagate SIMDJSON_HEADER_ONLY via add_definitions() to ensure ALL
-  # translation units get the definition. This is critical because simdjson's
-  # internal symbols must be inline in every translation unit that uses them.
+  # propagate SIMDJSON_HEADER_ONLY to ALL translation units that use simdjson.
+  # We use multiple mechanisms to ensure the definition reaches all files:
+  # 1. Add to simdjson::simdjson's INTERFACE_COMPILE_DEFINITIONS (propagates via linking)
+  # 2. Add via add_definitions() as a fallback for directory scope
   if(ARROW_SIMDJSON_HEADER_ONLY)
+    # Add SIMDJSON_HEADER_ONLY to the simdjson target's interface so any target
+    # that links to simdjson::simdjson automatically gets the definition.
+    # This is the most reliable way to propagate the definition.
+    set_property(TARGET ${_simdjson_target} APPEND PROPERTY
+                 INTERFACE_COMPILE_DEFINITIONS SIMDJSON_HEADER_ONLY)
+    message(STATUS "simdjson: Added SIMDJSON_HEADER_ONLY to ${_simdjson_target} interface")
+    # Also use add_definitions as a fallback
     add_definitions(-DSIMDJSON_HEADER_ONLY)
-    message(STATUS "simdjson: Using header-only mode via add_definitions()")
+    message(STATUS "simdjson: Using header-only mode")
   else()
     message(STATUS "simdjson: Using compiled mode (simdjson_impl.cc provides implementation)")
   endif()
