@@ -22,6 +22,7 @@
 #include "arrow/acero/benchmark_util.h"
 #include "arrow/acero/options.h"
 #include "arrow/compute/expression.h"
+#include "arrow/util/benchmark_util.h"
 #include "arrow/record_batch.h"
 #include "arrow/testing/random.h"
 
