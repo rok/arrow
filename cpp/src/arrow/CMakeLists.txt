@@ -1075,15 +1075,23 @@ else()
 endif()
 
 if(ARROW_JSON)
-  # In header-only mode, we need to compile the simdjson implementation ourselves.
-  # Detection of header-only mode was done earlier and stored in ARROW_SIMDJSON_HEADER_ONLY.
+  # Determine if we need to compile simdjson implementation ourselves.
+  # On Windows, always use header-only mode and compile simdjson_impl.cc because
+  # vcpkg's simdjson library configuration is unreliable for DLL builds.
   set(ARROW_SIMDJSON_IMPL_SRC "")
-  if(TARGET simdjson::simdjson AND ARROW_SIMDJSON_HEADER_ONLY)
-    set(ARROW_SIMDJSON_IMPL_SRC json/simdjson_impl.cc)
-    # Skip unity build for this file to avoid issues with simdjson's implementation macros
-    set_source_files_properties(json/simdjson_impl.cc
-                                PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
-    message(STATUS "simdjson: including simdjson_impl.cc for header-only mode")
+  if(TARGET simdjson::simdjson)
+    if(WIN32 OR ARROW_SIMDJSON_HEADER_ONLY)
+      # Force header-only mode on Windows
+      if(WIN32 AND NOT ARROW_SIMDJSON_HEADER_ONLY)
+        message(STATUS "simdjson: forcing header-only mode on Windows")
+        set(ARROW_SIMDJSON_HEADER_ONLY TRUE)
+      endif()
+      set(ARROW_SIMDJSON_IMPL_SRC json/simdjson_impl.cc)
+      # Skip unity build for this file to avoid issues with simdjson's implementation macros
+      set_source_files_properties(json/simdjson_impl.cc
+                                  PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
+      message(STATUS "simdjson: including simdjson_impl.cc for header-only mode")
+    endif()
   endif()
   arrow_add_object_library(ARROW_JSON
                            extension/fixed_shape_tensor.cc

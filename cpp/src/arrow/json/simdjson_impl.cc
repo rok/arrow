@@ -16,18 +16,21 @@
 // under the License.
 
 // This file provides simdjson's implementation when the library is header-only.
-// CMake only includes this file in the build when header-only mode is detected.
+// CMake includes this file in the build when header-only mode is detected.
 //
-// SIMDJSON_IMPLEMENTATION must be defined before including simdjson.h to
-// instantiate the implementation. On Windows DLL builds, we also need
-// SIMDJSON_BUILDING_WINDOWS_DYNAMIC_LIBRARY to export global data symbols.
+// When SIMDJSON_HEADER_ONLY is defined by the build system, we need to:
+// 1. Undefine SIMDJSON_HEADER_ONLY so we get non-inline implementations
+// 2. Define SIMDJSON_IMPLEMENTATION to instantiate the implementation
+// 3. On Windows DLL builds, define SIMDJSON_BUILDING_WINDOWS_DYNAMIC_LIBRARY
+//    to export global data symbols
 
-// The CMake target may define SIMDJSON_HEADER_ONLY, but this file needs to
-// provide the actual implementation (not inline). Undefine it so simdjson
-// will compile the implementation symbols that other files can link against.
+// Only compile the implementation if we're in header-only mode.
+// This is detected by CMake and passed as SIMDJSON_HEADER_ONLY.
 #ifdef SIMDJSON_HEADER_ONLY
+
+// Undefine SIMDJSON_HEADER_ONLY so simdjson will compile the actual
+// implementation symbols that other files can link against.
 #undef SIMDJSON_HEADER_ONLY
-#endif
 
 // Enable the implementation - this file provides the compiled definitions
 #define SIMDJSON_IMPLEMENTATION 1
@@ -39,3 +42,5 @@
 #endif
 
 #include <simdjson.h>
+
+#endif  // SIMDJSON_HEADER_ONLY
