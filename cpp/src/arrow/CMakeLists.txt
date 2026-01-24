@@ -748,13 +748,10 @@ if(TARGET simdjson::simdjson)
     endif()
   endif()
 
-  # Final fallback: On Windows with vcpkg, always use header-only mode.
-  # vcpkg's simdjson package provides a stub library that doesn't contain
-  # the actual implementation, so we must compile it ourselves.
-  if(NOT ARROW_SIMDJSON_HEADER_ONLY AND WIN32 AND VCPKG_TARGET_TRIPLET)
-    message(STATUS "simdjson: forcing header-only mode for Windows vcpkg build")
-    set(ARROW_SIMDJSON_HEADER_ONLY TRUE)
-  endif()
+  # Note: We no longer force header-only mode on Windows vcpkg.
+  # Instead, simdjson_impl.cc compiles the full implementation and exports
+  # the symbols from arrow.dll. This approach is more reliable than trying
+  # to propagate SIMDJSON_HEADER_ONLY to all OBJECT libraries.
 
   message(STATUS "simdjson: ARROW_SIMDJSON_HEADER_ONLY=${ARROW_SIMDJSON_HEADER_ONLY}")
 
