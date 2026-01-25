@@ -137,13 +137,16 @@ if(ARROW_DEPENDENCY_SOURCE STREQUAL "CONDA")
   if("${GTest_SOURCE}" STREQUAL "")
     set(GTest_SOURCE "AUTO")
   endif()
-  # simdjson is not commonly available in conda, so we allow auto fallback.
-  if("${simdjson_SOURCE}" STREQUAL "")
-    set(simdjson_SOURCE "AUTO")
-  endif()
   message(STATUS "Using CONDA_PREFIX for ARROW_PACKAGE_PREFIX: ${ARROW_PACKAGE_PREFIX}")
 else()
   set(ARROW_ACTUAL_DEPENDENCY_SOURCE "${ARROW_DEPENDENCY_SOURCE}")
+endif()
+
+# simdjson is not commonly available in system package managers with the
+# required version (3.0.0+), so we allow auto fallback to build from source.
+# This applies to all dependency source modes (SYSTEM, CONDA, etc.)
+if("${simdjson_SOURCE}" STREQUAL "")
+  set(simdjson_SOURCE "AUTO")
 endif()
 
 if(ARROW_PACKAGE_PREFIX)
