@@ -768,7 +768,12 @@ if(TARGET simdjson::simdjson)
   # For static Arrow builds (libarrow.a), consumers would need to also link
   # against libsimdjson.a, which is fragile. Instead, use header-only mode for
   # static builds so all simdjson code is inline.
-  if(VCPKG_TARGET_TRIPLET AND SIMDJSON_TARGET_TYPE STREQUAL "STATIC_LIBRARY")
+  #
+  # Skip this vcpkg-specific handling when using bundled simdjson (SIMDJSON_VENDORED).
+  # With bundled simdjson, we build and use our own copy with correct headers.
+  if(VCPKG_TARGET_TRIPLET
+     AND SIMDJSON_TARGET_TYPE STREQUAL "STATIC_LIBRARY"
+     AND NOT SIMDJSON_VENDORED)
     if(ARROW_BUILD_SHARED AND NOT ARROW_BUILD_STATIC)
       # Building only shared library - use SIMDJSON_USING_LIBRARY
       message(STATUS "simdjson: vcpkg + shared build - using SIMDJSON_USING_LIBRARY")
