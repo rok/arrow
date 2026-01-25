@@ -2628,6 +2628,14 @@ macro(build_simdjson)
 
   set(SIMDJSON_VENDORED TRUE)
 
+  # When using vcpkg, vcpkg's include directory is added globally and may contain
+  # an older simdjson version. We need to ensure our bundled simdjson headers
+  # take precedence by adding them with BEFORE to the global include directories.
+  if(VCPKG_TARGET_TRIPLET)
+    include_directories(BEFORE SYSTEM "${SIMDJSON_INCLUDE_DIR}")
+    message(STATUS "simdjson: Added bundled include dir with BEFORE priority for vcpkg")
+  endif()
+
   list(APPEND ARROW_BUNDLED_STATIC_LIBS simdjson::simdjson)
 endmacro()
 
