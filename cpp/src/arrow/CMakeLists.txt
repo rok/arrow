@@ -753,13 +753,25 @@ if(TARGET simdjson::simdjson)
   # we must define SIMDJSON_USING_LIBRARY so the headers use dllimport/extern
   # declarations instead of inline definitions.
   # See: https://github.com/microsoft/vcpkg/issues/16062
+  #
+  # However, SIMDJSON_USING_LIBRARY only works when building Arrow as a shared
+  # library (DLL/so) because the simdjson symbols get linked into the shared lib.
+  # For static Arrow builds (libarrow.a), consumers would need to also link
+  # against libsimdjson.a, which is fragile. Instead, use header-only mode for
+  # static builds so all simdjson code is inline.
   if(VCPKG_TARGET_TRIPLET AND SIMDJSON_TARGET_TYPE STREQUAL "STATIC_LIBRARY")
-    message(STATUS "simdjson: vcpkg static library detected - using SIMDJSON_USING_LIBRARY")
-    set_property(TARGET ${_simdjson_target} APPEND PROPERTY
-                 INTERFACE_COMPILE_DEFINITIONS SIMDJSON_USING_LIBRARY)
-    add_definitions(-DSIMDJSON_USING_LIBRARY)
-    # Don't use header-only mode - we're linking against the library
-    set(ARROW_SIMDJSON_HEADER_ONLY FALSE)
+    if(ARROW_BUILD_SHARED AND NOT ARROW_BUILD_STATIC)
+      # Building only shared library - use SIMDJSON_USING_LIBRARY
+      message(STATUS "simdjson: vcpkg + shared build - using SIMDJSON_USING_LIBRARY")
+      set_property(TARGET ${_simdjson_target} APPEND PROPERTY
+                   INTERFACE_COMPILE_DEFINITIONS SIMDJSON_USING_LIBRARY)
+      add_definitions(-DSIMDJSON_USING_LIBRARY)
+      set(ARROW_SIMDJSON_HEADER_ONLY FALSE)
+    else()
+      # Building static library (or both) - use header-only mode
+      message(STATUS "simdjson: vcpkg + static build - using header-only mode")
+      set(ARROW_SIMDJSON_HEADER_ONLY TRUE)
+    endif()
   endif()
 
   message(STATUS "simdjson: ARROW_SIMDJSON_HEADER_ONLY=${ARROW_SIMDJSON_HEADER_ONLY}")
