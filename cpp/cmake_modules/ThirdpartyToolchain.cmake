@@ -2625,19 +2625,17 @@ endmacro()
 
 if(ARROW_WITH_SIMDJSON)
   set(ARROW_SIMDJSON_REQUIRED_VERSION "3.0.0")
+  # IS_RUNTIME_DEPENDENCY=TRUE ensures that when system simdjson is used:
+  # 1. FindsimdjsonAlt.cmake is installed for consumers via provide_find_module
+  # 2. simdjsonAlt is added to ARROW_SYSTEM_DEPENDENCIES
+  # This allows consumers to find simdjson via find_dependency(simdjsonAlt)
   resolve_dependency(simdjson
                      HAVE_ALT
                      TRUE
                      REQUIRED_VERSION
                      ${ARROW_SIMDJSON_REQUIRED_VERSION}
                      IS_RUNTIME_DEPENDENCY
-                     FALSE)
-  # For static Arrow builds using system simdjson, consumers need to link
-  # against simdjson. Add it to ARROW_SYSTEM_DEPENDENCIES so ArrowConfig.cmake
-  # calls find_dependency(simdjson) for consumers.
-  if(simdjson_SOURCE STREQUAL "SYSTEM")
-    list(APPEND ARROW_SYSTEM_DEPENDENCIES simdjson)
-  endif()
+                     TRUE)
 
   # When using vcpkg-provided simdjson, vcpkg provides only headers and a stub
   # static library (no actual implementation). The vcpkg simdjson only works
