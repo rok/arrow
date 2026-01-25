@@ -27,11 +27,12 @@
 
 // Debug: Output compilation mode at compile time
 #if defined(SIMDJSON_USING_LIBRARY)
-#pragma message("simdjson_impl.cc: SIMDJSON_USING_LIBRARY - linking against simdjson library")
+#  pragma message( \
+      "simdjson_impl.cc: SIMDJSON_USING_LIBRARY - linking against simdjson library")
 #elif defined(SIMDJSON_HEADER_ONLY)
-#pragma message("simdjson_impl.cc: SIMDJSON_HEADER_ONLY - all code inline")
+#  pragma message("simdjson_impl.cc: SIMDJSON_HEADER_ONLY - all code inline")
 #else
-#pragma message("simdjson_impl.cc: Compiling simdjson implementation")
+#  pragma message("simdjson_impl.cc: Compiling simdjson implementation")
 #endif
 
 // When using simdjson as a library (SIMDJSON_USING_LIBRARY) or in header-only
@@ -41,14 +42,15 @@
 
 // On Windows, when building a DLL, we need to export simdjson's global symbols.
 // ARROW_EXPORTING is defined by CMake for shared library builds.
-#if defined(_WIN32) && defined(ARROW_EXPORTING)
-#define SIMDJSON_BUILDING_WINDOWS_DYNAMIC_LIBRARY 1
-#pragma message("simdjson_impl.cc: SIMDJSON_BUILDING_WINDOWS_DYNAMIC_LIBRARY is DEFINED")
-#endif
+#  if defined(_WIN32) && defined(ARROW_EXPORTING)
+#    define SIMDJSON_BUILDING_WINDOWS_DYNAMIC_LIBRARY 1
+#    pragma message( \
+        "simdjson_impl.cc: SIMDJSON_BUILDING_WINDOWS_DYNAMIC_LIBRARY is DEFINED")
+#  endif
 
 // Enable the implementation - this causes simdjson.h to include all .cpp files
-#define SIMDJSON_IMPLEMENTATION 1
+#  define SIMDJSON_IMPLEMENTATION 1
 
-#include <simdjson.h>
+#  include <simdjson.h>
 
 #endif  // !SIMDJSON_HEADER_ONLY && !SIMDJSON_USING_LIBRARY

@@ -17,11 +17,11 @@
 
 // Debug: Check simdjson mode when compiling parser.cc
 #if defined(SIMDJSON_USING_LIBRARY)
-#pragma message("parser.cc: SIMDJSON_USING_LIBRARY - linking against library")
+#  pragma message("parser.cc: SIMDJSON_USING_LIBRARY - linking against library")
 #elif defined(SIMDJSON_HEADER_ONLY)
-#pragma message("parser.cc: SIMDJSON_HEADER_ONLY - inline mode")
+#  pragma message("parser.cc: SIMDJSON_HEADER_ONLY - inline mode")
 #else
-#pragma message("parser.cc: No simdjson mode defined")
+#  pragma message("parser.cc: No simdjson mode defined")
 #endif
 
 #include "arrow/json/parser.h"

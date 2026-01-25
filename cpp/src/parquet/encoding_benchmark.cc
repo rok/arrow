@@ -24,13 +24,13 @@
 #include <random>
 
 #include "arrow/array.h"
-#include "arrow/util/benchmark_util.h"
 #include "arrow/array/builder_binary.h"
 #include "arrow/array/builder_dict.h"
 #include "arrow/testing/gtest_util.h"
 #include "arrow/testing/random.h"
 #include "arrow/testing/util.h"
 #include "arrow/type.h"
+#include "arrow/util/benchmark_util.h"
 #include "arrow/util/byte_stream_split_internal.h"
 #include "arrow/visit_data_inline.h"
 

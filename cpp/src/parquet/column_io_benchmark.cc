@@ -18,9 +18,9 @@
 #include "benchmark/benchmark.h"
 
 #include "arrow/array.h"
-#include "arrow/util/benchmark_util.h"
 #include "arrow/io/memory.h"
 #include "arrow/testing/random.h"
+#include "arrow/util/benchmark_util.h"
 #include "arrow/util/config.h"
 #include "arrow/util/logging.h"
 

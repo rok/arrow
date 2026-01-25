@@ -19,10 +19,10 @@
 
 #include <array>
 
-#include "arrow/util/benchmark_util.h"
 #include <iostream>
 #include <random>
 #include <type_traits>
+#include "arrow/util/benchmark_util.h"
 
 #include "parquet/arrow/reader.h"
 #include "parquet/arrow/writer.h"
@@ -516,8 +516,7 @@ static void SetReadBinaryColumnArgs(::arrow::BenchmarkType* b) {
       ->Args({99, kInfiniteUniqueValues});
 }
 
-static void SetReadBinaryColumnArgsWithoutDictEncoding(
-    ::arrow::BenchmarkType* b) {
+static void SetReadBinaryColumnArgsWithoutDictEncoding(::arrow::BenchmarkType* b) {
   b->ArgNames({"null_probability", "unique_values"})
       // Dict-encoding is already tested in the PLAIN benchmarks, so only exercise
       // non-dict-encoding using high cardinality.

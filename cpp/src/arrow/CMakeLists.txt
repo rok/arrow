@@ -772,8 +772,9 @@ if(TARGET simdjson::simdjson)
     if(ARROW_BUILD_SHARED AND NOT ARROW_BUILD_STATIC)
       # Building only shared library - use SIMDJSON_USING_LIBRARY
       message(STATUS "simdjson: vcpkg + shared build - using SIMDJSON_USING_LIBRARY")
-      set_property(TARGET ${_simdjson_target} APPEND PROPERTY
-                   INTERFACE_COMPILE_DEFINITIONS SIMDJSON_USING_LIBRARY)
+      set_property(TARGET ${_simdjson_target}
+                   APPEND
+                   PROPERTY INTERFACE_COMPILE_DEFINITIONS SIMDJSON_USING_LIBRARY)
       add_definitions(-DSIMDJSON_USING_LIBRARY)
       set(ARROW_SIMDJSON_HEADER_ONLY FALSE)
     else()
@@ -788,8 +789,9 @@ if(TARGET simdjson::simdjson)
   # When header-only mode is needed (e.g., interface library or forced),
   # propagate SIMDJSON_HEADER_ONLY to all translation units.
   if(ARROW_SIMDJSON_HEADER_ONLY)
-    set_property(TARGET ${_simdjson_target} APPEND PROPERTY
-                 INTERFACE_COMPILE_DEFINITIONS SIMDJSON_HEADER_ONLY)
+    set_property(TARGET ${_simdjson_target}
+                 APPEND
+                 PROPERTY INTERFACE_COMPILE_DEFINITIONS SIMDJSON_HEADER_ONLY)
     add_definitions(-DSIMDJSON_HEADER_ONLY)
     message(STATUS "simdjson: Using header-only mode")
   else()
@@ -1120,7 +1122,8 @@ if(ARROW_JSON)
     # Skip unity build to avoid issues with simdjson's implementation macros
     set_source_files_properties(json/simdjson_impl.cc
                                 PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
-    message(STATUS "simdjson: including simdjson_impl.cc (conditionally compiles based on SIMDJSON_HEADER_ONLY)")
+    message(STATUS "simdjson: including simdjson_impl.cc (conditionally compiles based on SIMDJSON_HEADER_ONLY)"
+    )
   endif()
   arrow_add_object_library(ARROW_JSON
                            extension/fixed_shape_tensor.cc

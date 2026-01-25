@@ -21,8 +21,8 @@
 #include <benchmark/benchmark.h>
 
 #include "arrow/buffer.h"
-#include "arrow/util/benchmark_util.h"
 #include "arrow/io/memory.h"
+#include "arrow/util/benchmark_util.h"
 #include "arrow/util/logging.h"
 
 #include "parquet/column_writer.h"
@@ -128,9 +128,7 @@ void WriteMetadataSetArgs(::arrow::BenchmarkType* bench) {
   }
 }
 
-void ReadMetadataSetArgs(::arrow::BenchmarkType* bench) {
-  WriteMetadataSetArgs(bench);
-}
+void ReadMetadataSetArgs(::arrow::BenchmarkType* bench) { WriteMetadataSetArgs(bench); }
 
 void WriteFileMetadataAndData(benchmark::State& state) {
   MetadataBenchmark benchmark(&state);

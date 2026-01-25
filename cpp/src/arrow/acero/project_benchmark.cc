@@ -23,7 +23,6 @@
 #include "arrow/acero/benchmark_util.h"
 #include "arrow/acero/options.h"
 #include "arrow/acero/task_util.h"
-#include "arrow/util/benchmark_util.h"
 #include "arrow/acero/test_util_internal.h"
 #include "arrow/compute/cast.h"
 #include "arrow/compute/exec.h"
@@ -33,6 +32,7 @@
 #include "arrow/testing/generator.h"
 #include "arrow/testing/gtest_util.h"
 #include "arrow/type.h"
+#include "arrow/util/benchmark_util.h"
 
 namespace arrow {
 
