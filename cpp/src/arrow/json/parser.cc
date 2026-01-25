@@ -15,11 +15,13 @@
 // specific language governing permissions and limitations
 // under the License.
 
-// Debug: Check if SIMDJSON_HEADER_ONLY is defined when compiling parser.cc
-#ifdef SIMDJSON_HEADER_ONLY
-#pragma message("parser.cc: SIMDJSON_HEADER_ONLY is DEFINED")
+// Debug: Check simdjson mode when compiling parser.cc
+#if defined(SIMDJSON_USING_LIBRARY)
+#pragma message("parser.cc: SIMDJSON_USING_LIBRARY - linking against library")
+#elif defined(SIMDJSON_HEADER_ONLY)
+#pragma message("parser.cc: SIMDJSON_HEADER_ONLY - inline mode")
 #else
-#pragma message("parser.cc: SIMDJSON_HEADER_ONLY is NOT defined")
+#pragma message("parser.cc: No simdjson mode defined")
 #endif
 
 #include "arrow/json/parser.h"

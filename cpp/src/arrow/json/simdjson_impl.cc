@@ -26,16 +26,18 @@
 // This file is always included in the build to handle both cases correctly.
 
 // Debug: Output compilation mode at compile time
-#ifdef SIMDJSON_HEADER_ONLY
-#pragma message("simdjson_impl.cc: SIMDJSON_HEADER_ONLY is DEFINED - skipping implementation")
+#if defined(SIMDJSON_USING_LIBRARY)
+#pragma message("simdjson_impl.cc: SIMDJSON_USING_LIBRARY - linking against simdjson library")
+#elif defined(SIMDJSON_HEADER_ONLY)
+#pragma message("simdjson_impl.cc: SIMDJSON_HEADER_ONLY - all code inline")
 #else
-#pragma message("simdjson_impl.cc: SIMDJSON_HEADER_ONLY is NOT defined - compiling implementation")
+#pragma message("simdjson_impl.cc: Compiling simdjson implementation")
 #endif
 
-// Check if simdjson is configured for header-only mode (set by simdjson's
-// CMake target or our CMakeLists.txt). If so, all code is inline and we
-// don't need to compile anything here.
-#ifndef SIMDJSON_HEADER_ONLY
+// When using simdjson as a library (SIMDJSON_USING_LIBRARY) or in header-only
+// mode (SIMDJSON_HEADER_ONLY), this file is a no-op.
+// Only compile the implementation when neither is defined.
+#if !defined(SIMDJSON_HEADER_ONLY) && !defined(SIMDJSON_USING_LIBRARY)
 
 // On Windows, when building a DLL, we need to export simdjson's global symbols.
 // ARROW_EXPORTING is defined by CMake for shared library builds.
@@ -49,9 +51,4 @@
 
 #include <simdjson.h>
 
-// Verify symbols are being compiled by taking address of them
-namespace arrow::json::simdjson_verify {
-[[maybe_unused]] static const void* verify_error_codes = &simdjson::internal::error_codes;
-}
-
-#endif  // SIMDJSON_HEADER_ONLY
+#endif  // !SIMDJSON_HEADER_ONLY && !SIMDJSON_USING_LIBRARY
