@@ -1389,6 +1389,14 @@ install(FILES ${CMAKE_CURRENT_BINARY_DIR}/ArrowOptions.cmake
 install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/arrow-config.cmake
         DESTINATION "${ARROW_CMAKE_DIR}/Arrow")
 
+# Install find modules for system dependencies that consumers need
+# ArrowConfig.cmake sets CMAKE_MODULE_PATH to find these
+if(ARROW_JSON AND simdjson_SOURCE STREQUAL "SYSTEM")
+  install(FILES ${CMAKE_SOURCE_DIR}/cmake_modules/FindsimdjsonAlt.cmake
+          DESTINATION "${ARROW_CMAKE_DIR}/Arrow"
+          RENAME Findsimdjson.cmake)
+endif()
+
 #
 # Unit tests
 #

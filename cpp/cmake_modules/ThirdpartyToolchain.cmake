@@ -2629,8 +2629,12 @@ if(ARROW_WITH_SIMDJSON)
                      ${ARROW_SIMDJSON_REQUIRED_VERSION}
                      IS_RUNTIME_DEPENDENCY
                      FALSE)
-  # Note: simdjson is a private dependency - it's linked into libarrow
-  # and doesn't need to be exposed to downstream consumers.
+  # For static Arrow builds using system simdjson, consumers need to link
+  # against simdjson. Add it to ARROW_SYSTEM_DEPENDENCIES so ArrowConfig.cmake
+  # calls find_dependency(simdjson) for consumers.
+  if(simdjson_SOURCE STREQUAL "SYSTEM")
+    list(APPEND ARROW_SYSTEM_DEPENDENCIES simdjson)
+  endif()
 
   # When using vcpkg-provided simdjson, vcpkg provides only headers and a stub
   # static library (no actual implementation). The vcpkg simdjson only works
