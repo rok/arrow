@@ -126,6 +126,15 @@ if(ARROW_WITH_RE2)
   endif()
 endif()
 
+# simdjson is needed for JSON support. For static Arrow builds, consumers must
+# link against simdjson because even with SIMDJSON_HEADER_ONLY, some symbols
+# (like get_active_implementation) aren't fully inlined.
+if(ARROW_JSON)
+  if(simdjson_SOURCE STREQUAL "SYSTEM")
+    list(APPEND ARROW_STATIC_INSTALL_INTERFACE_LIBS simdjson::simdjson)
+  endif()
+endif()
+
 if(ARROW_PROTOBUF_ARROW_CMAKE_PACKAGE_NAME STREQUAL "Arrow")
   if(Protobuf_SOURCE STREQUAL "SYSTEM")
     list(APPEND ARROW_STATIC_INSTALL_INTERFACE_LIBS ${ARROW_PROTOBUF_LIBPROTOBUF})
