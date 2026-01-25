@@ -21,7 +21,7 @@
 
 #include <simdjson.h>
 
-#include "arrow/json/object_writer.h"
+#include "arrow/json/json_util.h"
 #include "arrow/util/logging_internal.h"
 
 namespace arrow::extension {
@@ -44,10 +44,12 @@ bool OpaqueType::ExtensionEquals(const ExtensionType& other) const {
 }
 
 std::string OpaqueType::Serialize() const {
-  json::internal::ObjectWriter writer;
-  writer.SetString("type_name", type_name_);
-  writer.SetString("vendor_name", vendor_name_);
-  return writer.Serialize();
+  json::JsonWriter writer;
+  writer.StartObject();
+  writer.SetString<"type_name">(type_name_);
+  writer.SetString<"vendor_name">(vendor_name_);
+  writer.EndObject();
+  return std::string(writer.GetString());
 }
 
 Result<std::shared_ptr<DataType>> OpaqueType::Deserialize(

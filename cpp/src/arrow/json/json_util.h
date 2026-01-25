@@ -17,9 +17,9 @@
 
 #pragma once
 
+#include <simdjson.h>
+
 #include <cstdint>
-#include <cstdio>
-#include <sstream>
 #include <string>
 #include <string_view>
 
@@ -32,157 +32,290 @@ namespace json {
 ///
 /// This function properly escapes special characters like quotes, backslashes,
 /// and control characters according to the JSON specification.
+/// Uses simdjson's SIMD-accelerated string escaping.
 ///
 /// \param s The string to escape
 /// \return The escaped string surrounded by double quotes
 inline std::string EscapeJsonString(std::string_view s) {
-  std::ostringstream ss;
-  ss << '"';
-  for (char c : s) {
-    switch (c) {
-      case '"':
-        ss << "\\\"";
-        break;
-      case '\\':
-        ss << "\\\\";
-        break;
-      case '\b':
-        ss << "\\b";
-        break;
-      case '\f':
-        ss << "\\f";
-        break;
-      case '\n':
-        ss << "\\n";
-        break;
-      case '\r':
-        ss << "\\r";
-        break;
-      case '\t':
-        ss << "\\t";
-        break;
-      default:
-        if (static_cast<unsigned char>(c) < 0x20) {
-          // Control character - escape as \u00XX
-          char buf[8];
-          std::snprintf(buf, sizeof(buf), "\\u%04X", static_cast<unsigned char>(c));
-          ss << buf;
-        } else {
-          ss << c;
-        }
-    }
-  }
-  ss << '"';
-  return ss.str();
+  simdjson::builder::string_builder builder;
+  builder.escape_and_append_with_quotes(s);
+  return static_cast<std::string>(builder);
 }
 
 /// \brief JSON writer with automatic comma insertion between elements.
+/// Uses simdjson's builder API for SIMD-accelerated serialization.
+///
+/// Provides both runtime and compile-time key methods. Use compile-time
+/// key methods (e.g., SetString<"key">(value)) for better performance
+/// when keys are string literals.
 class JsonWriter {
  public:
   JsonWriter() = default;
 
   void StartObject() {
     MaybeComma();
-    buffer_ += '{';
+    builder_.start_object();
     needs_comma_ = false;
   }
 
   void EndObject() {
-    buffer_ += '}';
+    builder_.end_object();
     needs_comma_ = true;
   }
 
   void StartArray() {
     MaybeComma();
-    buffer_ += '[';
+    builder_.start_array();
     needs_comma_ = false;
   }
 
   void EndArray() {
-    buffer_ += ']';
+    builder_.end_array();
     needs_comma_ = true;
   }
 
   void Key(std::string_view key) {
     MaybeComma();
-    buffer_ += EscapeJsonString(key);
-    buffer_ += ':';
+    builder_.escape_and_append_with_quotes(key);
+    builder_.append_colon();
     needs_comma_ = false;
   }
 
   void String(std::string_view value) {
     MaybeComma();
-    buffer_ += EscapeJsonString(value);
+    builder_.escape_and_append_with_quotes(value);
     needs_comma_ = true;
   }
 
   void Bool(bool value) {
     MaybeComma();
-    buffer_ += value ? "true" : "false";
+    builder_.append(value);
     needs_comma_ = true;
   }
 
   void Int(int32_t value) {
     MaybeComma();
-    buffer_ += std::to_string(value);
+    builder_.append(value);
     needs_comma_ = true;
   }
 
   void Int64(int64_t value) {
     MaybeComma();
-    buffer_ += std::to_string(value);
+    builder_.append(value);
     needs_comma_ = true;
   }
 
   void Uint(uint32_t value) {
     MaybeComma();
-    buffer_ += std::to_string(value);
+    builder_.append(value);
     needs_comma_ = true;
   }
 
   void Uint64(uint64_t value) {
     MaybeComma();
-    buffer_ += std::to_string(value);
+    builder_.append(value);
     needs_comma_ = true;
   }
 
   void Double(double value) {
     MaybeComma();
-    char buf[32];
-    int len = std::snprintf(buf, sizeof(buf), "%.17g", value);
-    buffer_.append(buf, len);
+    builder_.append(value);
     needs_comma_ = true;
   }
 
   void Null() {
     MaybeComma();
-    buffer_ += "null";
+    builder_.append_null();
     needs_comma_ = true;
   }
 
+  /// \brief Serialize a container (vector, array, etc.) directly as a JSON array.
+  ///
+  /// Uses simdjson's builder for efficient serialization of STL containers.
+  /// Supported types include std::vector, std::array, and other iterable containers
+  /// with numeric, boolean, or string element types.
+  ///
+  /// Example:
+  ///   std::vector<int64_t> shape = {2, 3, 4};
+  ///   writer.Key("shape");
+  ///   writer.Value(shape);  // writes [2,3,4]
+  template <typename Container>
+  void Value(const Container& container) {
+    MaybeComma();
+    builder_.append(container);
+    needs_comma_ = true;
+  }
+
+  /// @name Compile-time key methods
+  /// These use simdjson's compile-time string optimization for better performance
+  /// when keys are string literals.
+  ///
+  /// Example:
+  ///   writer.SetString<"name">(name_value);
+  ///   writer.SetBool<"enabled">(true);
+  /// @{
+
+  template <simdjson::constevalutil::fixed_string Key>
+  void SetString(std::string_view value) {
+    MaybeComma();
+    builder_.append_key_value<Key>(value);
+    needs_comma_ = true;
+  }
+
+  template <simdjson::constevalutil::fixed_string Key>
+  void SetBool(bool value) {
+    MaybeComma();
+    builder_.append_key_value<Key>(value);
+    needs_comma_ = true;
+  }
+
+  template <simdjson::constevalutil::fixed_string Key>
+  void SetInt(int32_t value) {
+    MaybeComma();
+    builder_.append_key_value<Key>(value);
+    needs_comma_ = true;
+  }
+
+  template <simdjson::constevalutil::fixed_string Key>
+  void SetInt64(int64_t value) {
+    MaybeComma();
+    builder_.append_key_value<Key>(value);
+    needs_comma_ = true;
+  }
+
+  template <simdjson::constevalutil::fixed_string Key>
+  void SetUint(uint32_t value) {
+    MaybeComma();
+    builder_.append_key_value<Key>(value);
+    needs_comma_ = true;
+  }
+
+  template <simdjson::constevalutil::fixed_string Key>
+  void SetUint64(uint64_t value) {
+    MaybeComma();
+    builder_.append_key_value<Key>(value);
+    needs_comma_ = true;
+  }
+
+  template <simdjson::constevalutil::fixed_string Key>
+  void SetDouble(double value) {
+    MaybeComma();
+    builder_.append_key_value<Key>(value);
+    needs_comma_ = true;
+  }
+
+  template <simdjson::constevalutil::fixed_string Key>
+  void SetNull() {
+    MaybeComma();
+    builder_.append_key_value<Key>(nullptr);
+    needs_comma_ = true;
+  }
+
+  template <simdjson::constevalutil::fixed_string Key, typename Container>
+  void SetValue(const Container& container) {
+    MaybeComma();
+    builder_.append_key_value<Key>(container);
+    needs_comma_ = true;
+  }
+
+  /// @}
+
+  /// @name Runtime key methods
+  /// These accept runtime string keys. Use compile-time methods when keys
+  /// are string literals for better performance.
+  /// @{
+
+  void SetString(std::string_view key, std::string_view value) {
+    Key(key);
+    String(value);
+  }
+
+  void SetBool(std::string_view key, bool value) {
+    Key(key);
+    Bool(value);
+  }
+
+  void SetInt(std::string_view key, int32_t value) {
+    Key(key);
+    Int(value);
+  }
+
+  void SetInt64(std::string_view key, int64_t value) {
+    Key(key);
+    Int64(value);
+  }
+
+  void SetUint(std::string_view key, uint32_t value) {
+    Key(key);
+    Uint(value);
+  }
+
+  void SetUint64(std::string_view key, uint64_t value) {
+    Key(key);
+    Uint64(value);
+  }
+
+  void SetDouble(std::string_view key, double value) {
+    Key(key);
+    Double(value);
+  }
+
+  void SetNull(std::string_view key) {
+    Key(key);
+    Null();
+  }
+
+  template <typename Container>
+  void SetValue(std::string_view key, const Container& container) {
+    Key(key);
+    Value(container);
+  }
+
+  /// @}
+
   /// Write a raw character (for unquoted values like decimal numbers)
-  void RawChar(char c) { buffer_ += c; }
+  void RawChar(char c) { builder_.append(c); }
 
   /// Mark that a raw value was written (for comma tracking)
   void MarkValueWritten() { needs_comma_ = true; }
 
-  std::string_view GetString() const { return buffer_; }
+  /// Direct access to underlying builder for advanced use cases
+  simdjson::builder::string_builder& builder() { return builder_; }
+
+  std::string_view GetString() const { return builder_.view().value(); }
 
   void Clear() {
-    buffer_.clear();
+    builder_.clear();
     needs_comma_ = false;
   }
 
  private:
   void MaybeComma() {
     if (needs_comma_) {
-      buffer_ += ',';
+      builder_.append_comma();
     }
   }
 
-  std::string buffer_;
+  simdjson::builder::string_builder builder_;
   bool needs_comma_ = false;
 };
+
+/// \brief Convert a JSON string to a pretty-printed (human-readable) format.
+///
+/// Uses simdjson's prettify for formatting. Returns the original string
+/// if parsing fails.
+///
+/// \param json_str The JSON string to pretty-print
+/// \return The pretty-printed JSON string
+inline std::string PrettyPrintJson(std::string_view json_str) {
+  simdjson::dom::parser parser;
+  simdjson::padded_string padded(json_str);
+  auto result = parser.parse(padded);
+  if (result.error()) {
+    return std::string(json_str);
+  }
+  return simdjson::prettify(result.value());
+}
 
 }  // namespace json
 }  // namespace arrow

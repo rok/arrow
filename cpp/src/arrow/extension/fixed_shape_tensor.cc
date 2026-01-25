@@ -125,29 +125,14 @@ std::string FixedShapeTensorType::Serialize() const {
   json::JsonWriter writer;
   writer.StartObject();
 
-  writer.Key("shape");
-  writer.StartArray();
-  for (auto v : shape_) {
-    writer.Int64(v);
-  }
-  writer.EndArray();
+  writer.SetValue<"shape">(shape_);
 
   if (!permutation_.empty()) {
-    writer.Key("permutation");
-    writer.StartArray();
-    for (auto v : permutation_) {
-      writer.Int64(v);
-    }
-    writer.EndArray();
+    writer.SetValue<"permutation">(permutation_);
   }
 
   if (!dim_names_.empty()) {
-    writer.Key("dim_names");
-    writer.StartArray();
-    for (const auto& name : dim_names_) {
-      writer.String(name);
-    }
-    writer.EndArray();
+    writer.SetValue<"dim_names">(dim_names_);
   }
 
   writer.EndObject();

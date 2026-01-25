@@ -162,13 +162,8 @@ class SchemaWriter {
 
   void WriteKeyValue(const std::string& key, const std::string& value) {
     writer_->StartObject();
-
-    writer_->Key("key");
-    writer_->String(key);
-
-    writer_->Key("value");
-    writer_->String(value);
-
+    writer_->SetString<"key">(key);
+    writer_->SetString<"value">(value);
     writer_->EndObject();
   }
 
@@ -177,16 +172,14 @@ class SchemaWriter {
 
     // Emulate DictionaryEncoding from Schema.fbs
     writer_->StartObject();
-    writer_->Key("id");
-    writer_->Int64(id);
+    writer_->SetInt64<"id">(id);
     writer_->Key("indexType");
 
     writer_->StartObject();
     RETURN_NOT_OK(VisitType(*type.index_type()));
     writer_->EndObject();
 
-    writer_->Key("isOrdered");
-    writer_->Bool(type.ordered());
+    writer_->SetBool<"isOrdered">(type.ordered());
     writer_->EndObject();
 
     return Status::OK();
@@ -194,12 +187,8 @@ class SchemaWriter {
 
   Status VisitField(const std::shared_ptr<Field>& field, FieldPosition field_pos) {
     writer_->StartObject();
-
-    writer_->Key("name");
-    writer_->String(field->name());
-
-    writer_->Key("nullable");
-    writer_->Bool(field->nullable());
+    writer_->SetString<"name">(field->name());
+    writer_->SetBool<"nullable">(field->nullable());
 
     const DataType* type = field->type().get();
     std::vector<std::pair<std::string, std::string>> additional_metadata;
@@ -244,20 +233,16 @@ class SchemaWriter {
   WriteTypeMetadata(const T& type) {}
 
   void WriteTypeMetadata(const MapType& type) {
-    writer_->Key("keysSorted");
-    writer_->Bool(type.keys_sorted());
+    writer_->SetBool<"keysSorted">(type.keys_sorted());
   }
 
   void WriteTypeMetadata(const IntegerType& type) {
-    writer_->Key("bitWidth");
-    writer_->Int64(type.bit_width());
-    writer_->Key("isSigned");
-    writer_->Bool(type.is_signed());
+    writer_->SetInt64<"bitWidth">(type.bit_width());
+    writer_->SetBool<"isSigned">(type.is_signed());
   }
 
   void WriteTypeMetadata(const FloatingPointType& type) {
-    writer_->Key("precision");
-    writer_->String(GetFloatingPrecisionName(type.precision()));
+    writer_->SetString<"precision">(GetFloatingPrecisionName(type.precision()));
   }
 
   void WriteTypeMetadata(const IntervalType& type) {
@@ -276,24 +261,19 @@ class SchemaWriter {
   }
 
   void WriteTypeMetadata(const TimestampType& type) {
-    writer_->Key("unit");
-    writer_->String(GetTimeUnitName(type.unit()));
+    writer_->SetString<"unit">(GetTimeUnitName(type.unit()));
     if (type.timezone().size() > 0) {
-      writer_->Key("timezone");
-      writer_->String(type.timezone());
+      writer_->SetString<"timezone">(type.timezone());
     }
   }
 
   void WriteTypeMetadata(const DurationType& type) {
-    writer_->Key("unit");
-    writer_->String(GetTimeUnitName(type.unit()));
+    writer_->SetString<"unit">(GetTimeUnitName(type.unit()));
   }
 
   void WriteTypeMetadata(const TimeType& type) {
-    writer_->Key("unit");
-    writer_->String(GetTimeUnitName(type.unit()));
-    writer_->Key("bitWidth");
-    writer_->Int64(type.bit_width());
+    writer_->SetString<"unit">(GetTimeUnitName(type.unit()));
+    writer_->SetInt64<"bitWidth">(type.bit_width());
   }
 
   void WriteTypeMetadata(const DateType& type) {
@@ -309,20 +289,16 @@ class SchemaWriter {
   }
 
   void WriteTypeMetadata(const FixedSizeBinaryType& type) {
-    writer_->Key("byteWidth");
-    writer_->Int64(type.byte_width());
+    writer_->SetInt64<"byteWidth">(type.byte_width());
   }
 
   void WriteTypeMetadata(const FixedSizeListType& type) {
-    writer_->Key("listSize");
-    writer_->Int64(type.list_size());
+    writer_->SetInt64<"listSize">(type.list_size());
   }
 
   void WriteTypeMetadata(const DecimalType& type) {
-    writer_->Key("precision");
-    writer_->Int64(type.precision());
-    writer_->Key("scale");
-    writer_->Int64(type.scale());
+    writer_->SetInt64<"precision">(type.precision());
+    writer_->SetInt64<"scale">(type.scale());
   }
 
   void WriteTypeMetadata(const UnionType& type) {
@@ -349,8 +325,7 @@ class SchemaWriter {
 
   template <typename T>
   void WriteName(const std::string& typeclass, const T& type) {
-    writer_->Key("name");
-    writer_->String(typeclass);
+    writer_->SetString<"name">(typeclass);
     WriteTypeMetadata(type);
   }
 
@@ -483,9 +458,7 @@ class ArrayWriter {
     writer_->StartObject();
     writer_->Key("name");
     writer_->String(name);
-
-    writer_->Key("count");
-    writer_->Int64(arr.length());
+    writer_->SetInt64<"count">(arr.length());
 
     RETURN_NOT_OK(VisitArrayValues(arr));
 
@@ -668,25 +641,21 @@ class ArrayWriter {
     for (int64_t i = 0; i < array.length(); ++i) {
       auto s = array.raw_values()[i];
       writer_->StartObject();
-      writer_->Key("SIZE");
-      writer_->Int64(s.size());
+      writer_->SetInt64<"SIZE">(s.size());
       if (s.is_inline()) {
-        writer_->Key("INLINED");
         if constexpr (ArrayType::TypeClass::is_utf8) {
-          writer_->String(
+          writer_->SetString<"INLINED">(
               std::string(reinterpret_cast<const char*>(s.inline_data()), s.size()));
         } else {
-          writer_->String(HexEncode(s.inline_data(), s.size()));
+          writer_->SetString<"INLINED">(HexEncode(s.inline_data(), s.size()));
         }
       } else {
         // Prefix is always 4 bytes so it may not be utf-8 even if the whole
         // string view is
-        writer_->Key("PREFIX_HEX");
-        writer_->String(HexEncode(s.inline_data(), BinaryViewType::kPrefixSize));
-        writer_->Key("BUFFER_INDEX");
-        writer_->Int64(s.ref.buffer_index);
-        writer_->Key("OFFSET");
-        writer_->Int64(s.ref.offset);
+        writer_->SetString<"PREFIX_HEX">(
+            HexEncode(s.inline_data(), BinaryViewType::kPrefixSize));
+        writer_->SetInt64<"BUFFER_INDEX">(s.ref.buffer_index);
+        writer_->SetInt64<"OFFSET">(s.ref.offset);
       }
       writer_->EndObject();
     }
@@ -2192,8 +2161,7 @@ Status WriteSchema(const Schema& schema, const DictionaryFieldMapper& mapper,
 Status WriteDictionary(int64_t id, const std::shared_ptr<Array>& dictionary,
                        JsonWriter* writer) {
   writer->StartObject();
-  writer->Key("id");
-  writer->Int(static_cast<int32_t>(id));
+  writer->SetInt<"id">(static_cast<int32_t>(id));
   writer->Key("data");
 
   // Make a dummy record batch. A bit tedious as we have to make a schema
@@ -2206,9 +2174,7 @@ Status WriteDictionary(int64_t id, const std::shared_ptr<Array>& dictionary,
 
 Status WriteRecordBatch(const RecordBatch& batch, JsonWriter* writer) {
   writer->StartObject();
-  writer->Key("count");
-  writer->Int(static_cast<int32_t>(batch.num_rows()));
-
+  writer->SetInt<"count">(static_cast<int32_t>(batch.num_rows()));
   writer->Key("columns");
   writer->StartArray();
 

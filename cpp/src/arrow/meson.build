@@ -526,7 +526,6 @@ if needs_json
                 'json/converter.cc',
                 'json/from_string.cc',
                 'json/object_parser.cc',
-                'json/object_writer.cc',
                 'json/parser.cc',
                 'json/reader.cc',
             ],
