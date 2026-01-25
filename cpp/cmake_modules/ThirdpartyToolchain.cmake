@@ -2624,7 +2624,8 @@ macro(build_simdjson)
 endmacro()
 
 if(ARROW_WITH_SIMDJSON)
-  set(ARROW_SIMDJSON_REQUIRED_VERSION "3.0.0")
+  # Requires 4.0.0+ for simdjson::builder API used in json_util.h
+  set(ARROW_SIMDJSON_REQUIRED_VERSION "4.0.0")
   # IS_RUNTIME_DEPENDENCY=TRUE ensures that when system simdjson is used:
   # 1. FindsimdjsonAlt.cmake is installed for consumers via provide_find_module
   # 2. simdjsonAlt is added to ARROW_SYSTEM_DEPENDENCIES

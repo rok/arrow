@@ -91,7 +91,6 @@ RUN apt-get update -y -q && \
         python3-dev \
         python3-pip \
         python3-venv \
-        libsimdjson-dev \
         rsync \
         tzdata \
         zlib1g-dev && \
