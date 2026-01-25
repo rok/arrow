@@ -17,12 +17,7 @@
 
 #include "arrow/json/object_writer.h"
 
-#include <sstream>
-#include <utility>
-#include <variant>
-#include <vector>
-
-#include "arrow/json/json_util.h"
+#include <simdjson.h>
 
 namespace arrow {
 namespace json {
@@ -30,43 +25,33 @@ namespace internal {
 
 class ObjectWriter::Impl {
  public:
-  using Value = std::variant<std::string, bool>;
-
   void SetString(std::string_view key, std::string_view value) {
-    members_.emplace_back(std::string(key), std::string(value));
+    if (!first_) {
+      builder_.append_comma();
+    }
+    first_ = false;
+    builder_.append_key_value(key, value);
   }
 
   void SetBool(std::string_view key, bool value) {
-    members_.emplace_back(std::string(key), value);
+    if (!first_) {
+      builder_.append_comma();
+    }
+    first_ = false;
+    builder_.append_key_value(key, value);
   }
 
   std::string Serialize() {
-    std::ostringstream out;
-    out << '{';
-
-    bool first = true;
-    for (const auto& [key, value] : members_) {
-      if (!first) {
-        out << ',';
-      }
-      first = false;
-
-      out << ::arrow::json::EscapeJsonString(key);
-      out << ':';
-
-      if (std::holds_alternative<std::string>(value)) {
-        out << ::arrow::json::EscapeJsonString(std::get<std::string>(value));
-      } else {
-        out << (std::get<bool>(value) ? "true" : "false");
-      }
-    }
-
-    out << '}';
-    return out.str();
+    simdjson::builder::string_builder result;
+    result.start_object();
+    result.append_raw(builder_.view().value());
+    result.end_object();
+    return static_cast<std::string>(result);
   }
 
  private:
-  std::vector<std::pair<std::string, Value>> members_;
+  simdjson::builder::string_builder builder_;
+  bool first_ = true;
 };
 
 ObjectWriter::ObjectWriter() : impl_(new ObjectWriter::Impl()) {}
