@@ -15,7 +15,14 @@
 # specific language governing permissions and limitations
 # under the License.
 
-if(SimdjsonAlt_FOUND)
+# Use the package name from find_package() call (supports both SimdjsonAlt and simdjson)
+if(CMAKE_FIND_PACKAGE_NAME)
+  set(_simdjson_pkg_name ${CMAKE_FIND_PACKAGE_NAME})
+else()
+  set(_simdjson_pkg_name SimdjsonAlt)
+endif()
+
+if(${_simdjson_pkg_name}_FOUND)
   return()
 endif()
 
@@ -53,11 +60,11 @@ if(SIMDJSON_INCLUDE_DIR AND SIMDJSON_LIBRARY)
   endif()
 
   find_package_handle_standard_args(
-    SimdjsonAlt
+    ${_simdjson_pkg_name}
     REQUIRED_VARS SIMDJSON_INCLUDE_DIR SIMDJSON_LIBRARY
     VERSION_VAR SIMDJSON_VERSION)
 
-  if(SimdjsonAlt_FOUND)
+  if(${_simdjson_pkg_name}_FOUND)
     if(WIN32 AND "${SIMDJSON_INCLUDE_DIR}" MATCHES "^/")
       # MSYS2
       execute_process(COMMAND "cygpath" "--windows" "${SIMDJSON_INCLUDE_DIR}"
@@ -81,15 +88,15 @@ endif()
 
 # Manual search failed, try CMake config mode
 set(find_package_args)
-if(SimdjsonAlt_FIND_VERSION)
-  list(APPEND find_package_args ${SimdjsonAlt_FIND_VERSION})
+if(${_simdjson_pkg_name}_FIND_VERSION)
+  list(APPEND find_package_args ${${_simdjson_pkg_name}_FIND_VERSION})
 endif()
-if(SimdjsonAlt_FIND_QUIETLY)
+if(${_simdjson_pkg_name}_FIND_QUIETLY)
   list(APPEND find_package_args QUIET)
 endif()
 find_package(simdjson ${find_package_args} CONFIG)
 if(simdjson_FOUND)
-  set(SimdjsonAlt_FOUND TRUE)
+  set(${_simdjson_pkg_name}_FOUND TRUE)
   if(NOT TARGET simdjson::simdjson)
     # simdjson's CMake config should create this target, but create it if missing
     if(TARGET simdjson)
