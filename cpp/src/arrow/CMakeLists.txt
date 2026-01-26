@@ -789,6 +789,13 @@ if(TARGET simdjson::simdjson)
     endif()
   endif()
 
+  # When using bundled simdjson with vcpkg, use header-only mode to avoid
+  # symbol export/import issues between Arrow DLLs and the bundled static library.
+  if(SIMDJSON_VENDORED AND VCPKG_TARGET_TRIPLET)
+    message(STATUS "simdjson: bundled + vcpkg - using header-only mode")
+    set(ARROW_SIMDJSON_HEADER_ONLY TRUE)
+  endif()
+
   message(STATUS "simdjson: ARROW_SIMDJSON_HEADER_ONLY=${ARROW_SIMDJSON_HEADER_ONLY}")
 
   # When header-only mode is needed (e.g., interface library or forced),
