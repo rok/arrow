@@ -112,6 +112,10 @@ add_library(arrow_odbc_spi_impl
             util.cc
             util.h)
 target_compile_definitions(arrow_odbc_spi_impl PUBLIC UNICODE)
+# Propagate SIMDJSON_HEADER_ONLY when using header-only simdjson mode
+if(ARROW_SIMDJSON_HEADER_ONLY)
+  target_compile_definitions(arrow_odbc_spi_impl PRIVATE SIMDJSON_HEADER_ONLY)
+endif()
 target_include_directories(arrow_odbc_spi_impl PUBLIC include include/odbc_impl)
 target_include_directories(arrow_odbc_spi_impl PUBLIC ${CMAKE_CURRENT_LIST_DIR})
 
