@@ -112,9 +112,12 @@ add_library(arrow_odbc_spi_impl
             util.cc
             util.h)
 target_compile_definitions(arrow_odbc_spi_impl PUBLIC UNICODE)
-# Propagate SIMDJSON_HEADER_ONLY when using header-only simdjson mode
-if(ARROW_SIMDJSON_HEADER_ONLY)
+# When using bundled simdjson, always use header-only mode to avoid linker errors.
+# SIMDJSON_VENDORED is set in ThirdpartyToolchain.cmake when bundled simdjson is built.
+# ARROW_SIMDJSON_HEADER_ONLY may also be set but can have scope issues in nested directories.
+if(SIMDJSON_VENDORED OR ARROW_SIMDJSON_HEADER_ONLY)
   target_compile_definitions(arrow_odbc_spi_impl PRIVATE SIMDJSON_HEADER_ONLY)
+  message(STATUS "arrow_odbc_spi_impl: using SIMDJSON_HEADER_ONLY (SIMDJSON_VENDORED=${SIMDJSON_VENDORED}, ARROW_SIMDJSON_HEADER_ONLY=${ARROW_SIMDJSON_HEADER_ONLY})")
 endif()
 target_include_directories(arrow_odbc_spi_impl PUBLIC include include/odbc_impl)
 target_include_directories(arrow_odbc_spi_impl PUBLIC ${CMAKE_CURRENT_LIST_DIR})
