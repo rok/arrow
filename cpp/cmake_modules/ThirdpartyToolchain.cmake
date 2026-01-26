@@ -2623,6 +2623,14 @@ macro(build_simdjson)
 
   set(SIMDJSON_VENDORED TRUE)
 
+  # When using bundled simdjson, always use header-only mode. This:
+  # 1. Avoids symbol export/import issues between Arrow DLLs and the static library
+  # 2. Eliminates the need for consumers to link against simdjson
+  # 3. Ensures ODBC and other subdirectories have access to this variable
+  # Setting it here in ThirdpartyToolchain.cmake makes it visible globally.
+  set(ARROW_SIMDJSON_HEADER_ONLY TRUE)
+  message(STATUS "simdjson: bundled - ARROW_SIMDJSON_HEADER_ONLY=TRUE (set globally)")
+
   # When using vcpkg, vcpkg's include directory is added globally and may contain
   # an older simdjson version. We need to ensure our bundled simdjson headers
   # take precedence by adding them with BEFORE to the global include directories.
