@@ -142,19 +142,14 @@ else()
   set(ARROW_ACTUAL_DEPENDENCY_SOURCE "${ARROW_DEPENDENCY_SOURCE}")
 endif()
 
-# simdjson 4.0.0+ is required for the builder API used in json_util.h.
-# Most package managers (including vcpkg as of Jan 2026) have older versions,
-# so we need special handling:
-# - VCPKG: Force BUNDLED because vcpkg only has 3.12.x
-# - Others: Use AUTO to fallback to bundled if system version is too old
+# simdjson 4.2.0+ is required for the builder API and constevalutil used in json_util.h.
+# We always use bundled simdjson because:
+# 1. Most package managers have older versions (vcpkg has 3.12.x, Debian has < 4.2.0)
+# 2. Using bundled in header-only mode eliminates consumer dependencies on simdjson
+# 3. This provides consistent behavior across all builds
 if("${simdjson_SOURCE}" STREQUAL "")
-  if(ARROW_DEPENDENCY_SOURCE STREQUAL "VCPKG")
-    # vcpkg's simdjson is 3.12.x which doesn't have the builder API (requires 4.0.0+)
-    set(simdjson_SOURCE "BUNDLED")
-    message(STATUS "simdjson: Forcing BUNDLED for vcpkg (vcpkg has 3.12.x, need 4.0.0+)")
-  else()
-    set(simdjson_SOURCE "AUTO")
-  endif()
+  set(simdjson_SOURCE "BUNDLED")
+  message(STATUS "simdjson: Using BUNDLED (required version 4.2.0+ not widely available)")
 endif()
 
 if(ARROW_PACKAGE_PREFIX)
