@@ -15,9 +15,6 @@
 # specific language governing permissions and limitations
 # under the License.
 
-# SIMDJSON_HEADER_ONLY is set on simdjson::simdjson INTERFACE_COMPILE_DEFINITIONS
-# and automatically propagates to targets linking to it.
-
 add_arrow_test(test
                SOURCES
                chunked_builder_test.cc
@@ -29,13 +26,20 @@ add_arrow_test(test
                PREFIX
                "arrow-json"
                EXTRA_LINK_LIBS
-               simdjson::simdjson)
+               simdjson::simdjson
+               DEFINITIONS
+               SIMDJSON_HEADER_ONLY)
 
 add_arrow_benchmark(parser_benchmark
                     PREFIX
                     "arrow-json"
                     EXTRA_LINK_LIBS
                     simdjson::simdjson)
+
+# Add SIMDJSON_HEADER_ONLY to benchmark (add_benchmark doesn't support DEFINITIONS)
+if(TARGET arrow-json-parser-benchmark)
+  target_compile_definitions(arrow-json-parser-benchmark PRIVATE SIMDJSON_HEADER_ONLY)
+endif()
 arrow_install_all_headers("arrow/json")
 
 # pkg-config support

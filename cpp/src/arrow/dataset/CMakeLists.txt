@@ -186,8 +186,12 @@ if(ARROW_CSV)
 endif()
 
 if(ARROW_JSON)
-  add_arrow_dataset_test(file_json_test EXTRA_LINK_LIBS ${ARROW_DATASET_TEST_LINK_LIBS}
-                         simdjson::simdjson)
+  add_arrow_dataset_test(file_json_test
+                         EXTRA_LINK_LIBS
+                         ${ARROW_DATASET_TEST_LINK_LIBS}
+                         simdjson::simdjson
+                         DEFINITIONS
+                         SIMDJSON_HEADER_ONLY)
 endif()
 
 if(ARROW_ORC)
