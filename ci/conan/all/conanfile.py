@@ -186,7 +186,7 @@ class ArrowConan(ConanFile):
         if self.options.with_grpc:
             self.requires("grpc/1.50.0")
         if self._requires_simdjson():
-            self.requires("simdjson/3.12.3")
+            self.requires("simdjson/4.2.2")
         if self.options.with_llvm:
             self.requires("llvm-core/13.0.0")
         if self.options.with_openssl:
