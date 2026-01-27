@@ -2583,92 +2583,41 @@ if(ARROW_BUILD_BENCHMARKS)
 endif()
 
 macro(build_simdjson)
-  message(STATUS "Building simdjson from source")
+  message(STATUS "simdjson: Building from source (header-only mode)")
   set(SIMDJSON_PREFIX "${CMAKE_CURRENT_BINARY_DIR}/simdjson_ep/src/simdjson_ep-install")
   set(SIMDJSON_INCLUDE_DIR "${SIMDJSON_PREFIX}/include")
-  set(SIMDJSON_LIB_DIR "${SIMDJSON_PREFIX}/lib")
 
   set(SIMDJSON_CMAKE_ARGS
       ${EP_COMMON_CMAKE_ARGS}
-      -DSIMDJSON_BUILD_STATIC_LIB=ON
       -DSIMDJSON_DEVELOPER_MODE=OFF
-      -DSIMDJSON_ENABLE_THREADS=ON
-      -DBUILD_SHARED_LIBS=OFF
       "-DCMAKE_INSTALL_PREFIX=${SIMDJSON_PREFIX}")
-
-  set(SIMDJSON_STATIC_LIB
-      "${SIMDJSON_LIB_DIR}/${CMAKE_STATIC_LIBRARY_PREFIX}simdjson${CMAKE_STATIC_LIBRARY_SUFFIX}"
-  )
 
   externalproject_add(simdjson_ep
                       ${EP_COMMON_OPTIONS}
                       PREFIX "${CMAKE_BINARY_DIR}"
                       URL ${SIMDJSON_SOURCE_URL}
                       URL_HASH "SHA256=${ARROW_SIMDJSON_BUILD_SHA256_CHECKSUM}"
-                      CMAKE_ARGS ${SIMDJSON_CMAKE_ARGS}
-                      BUILD_BYPRODUCTS "${SIMDJSON_STATIC_LIB}")
+                      CMAKE_ARGS ${SIMDJSON_CMAKE_ARGS})
 
-  # The include directory must exist before it is referenced by a target.
   file(MAKE_DIRECTORY "${SIMDJSON_INCLUDE_DIR}")
 
-  # Check if target already exists (may have been created by find_package with incompatible version)
   if(NOT TARGET simdjson::simdjson)
-    add_library(simdjson::simdjson STATIC IMPORTED)
+    add_library(simdjson::simdjson INTERFACE IMPORTED)
   endif()
-  set_target_properties(simdjson::simdjson
-                        PROPERTIES IMPORTED_LOCATION "${SIMDJSON_STATIC_LIB}"
-                                   INTERFACE_INCLUDE_DIRECTORIES
-                                   "${SIMDJSON_INCLUDE_DIR}")
+  target_include_directories(simdjson::simdjson INTERFACE "${SIMDJSON_INCLUDE_DIR}")
   add_dependencies(simdjson::simdjson simdjson_ep)
 
-  set(SIMDJSON_VENDORED TRUE)
-
-  # When using bundled simdjson, always use header-only mode. This:
-  # 1. Avoids symbol export/import issues between Arrow DLLs and the static library
-  # 2. Eliminates the need for consumers to link against simdjson
-  # 3. Ensures ODBC and other subdirectories have access to this variable
-  # Setting it here in ThirdpartyToolchain.cmake makes it visible globally.
   set(ARROW_SIMDJSON_HEADER_ONLY TRUE)
-  message(STATUS "simdjson: bundled - ARROW_SIMDJSON_HEADER_ONLY=TRUE (set globally)")
 
-  # When using vcpkg, vcpkg's include directory is added globally and may contain
-  # an older simdjson version. We need to ensure our bundled simdjson headers
-  # take precedence by adding them with BEFORE to the global include directories.
+  # Ensure bundled headers take precedence over vcpkg's older version
   if(VCPKG_TARGET_TRIPLET)
     include_directories(BEFORE SYSTEM "${SIMDJSON_INCLUDE_DIR}")
-    message(STATUS "simdjson: Added bundled include dir with BEFORE priority for vcpkg")
   endif()
-
-  list(APPEND ARROW_BUNDLED_STATIC_LIBS simdjson::simdjson)
 endmacro()
 
 if(ARROW_WITH_SIMDJSON)
-  # Requires 4.2.0+ for simdjson::builder API and simdjson::constevalutil::fixed_string
-  # used in json_util.h for compile-time key methods.
-  set(ARROW_SIMDJSON_REQUIRED_VERSION "4.2.0")
-  # IS_RUNTIME_DEPENDENCY=TRUE ensures that when system simdjson is used:
-  # 1. FindsimdjsonAlt.cmake is installed for consumers via provide_find_module
-  # 2. simdjsonAlt is added to ARROW_SYSTEM_DEPENDENCIES
-  # This allows consumers to find simdjson via find_dependency(simdjsonAlt)
-  resolve_dependency(simdjson
-                     HAVE_ALT
-                     TRUE
-                     REQUIRED_VERSION
-                     ${ARROW_SIMDJSON_REQUIRED_VERSION}
-                     IS_RUNTIME_DEPENDENCY
-                     TRUE)
-
-  # When using vcpkg-provided simdjson, vcpkg provides only headers and a stub
-  # static library (no actual implementation). The vcpkg simdjson only works
-  # in header-only mode, but doesn't propagate SIMDJSON_HEADER_ONLY via CMake
-  # interface definitions. The detection in CMakeLists.txt handles this by
-  # checking for VCPKG_TARGET_TRIPLET and forcing header-only mode.
-  if(VCPKG_TARGET_TRIPLET AND TARGET simdjson::simdjson)
-    message(STATUS "vcpkg detected with simdjson - will use header-only mode")
-    message(STATUS "  SIMDJSON_VENDORED=${SIMDJSON_VENDORED}")
-    get_target_property(_simdjson_type simdjson::simdjson TYPE)
-    message(STATUS "  simdjson target type: ${_simdjson_type}")
-  endif()
+  # Always use bundled simdjson 4.2.0+ (required for builder API and constevalutil)
+  resolve_dependency(simdjson)
 endif()
 
 macro(build_xsimd)

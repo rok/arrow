@@ -21,12 +21,8 @@ arrow_install_all_headers("arrow/integration")
 # - an executable that can be called to answer integration test requests
 # - a self-(unit)test for the C++ side of integration testing
 
-# ARROW_SIMDJSON_HEADER_ONLY is set in the parent CMakeLists.txt
-if(ARROW_SIMDJSON_HEADER_ONLY)
-  set(ARROW_INTEGRATION_TEST_DEFINITIONS SIMDJSON_HEADER_ONLY)
-else()
-  set(ARROW_INTEGRATION_TEST_DEFINITIONS "")
-endif()
+# Always use header-only mode (bundled simdjson)
+set(ARROW_INTEGRATION_TEST_DEFINITIONS SIMDJSON_HEADER_ONLY)
 
 if(ARROW_BUILD_TESTS)
   add_arrow_test(json_integration_test
@@ -43,10 +39,7 @@ elseif(ARROW_BUILD_INTEGRATION)
                         ${ARROW_TEST_LINK_LIBS}
                         ${GFLAGS_LIBRARIES}
                         ${ARROW_GTEST_GTEST})
-  if(ARROW_SIMDJSON_HEADER_ONLY)
-    target_compile_definitions(arrow-json-integration-test PRIVATE SIMDJSON_HEADER_ONLY)
-  endif()
-
+  target_compile_definitions(arrow-json-integration-test PRIVATE SIMDJSON_HEADER_ONLY)
   add_dependencies(arrow-json-integration-test arrow arrow_testing)
   add_dependencies(arrow-integration arrow-json-integration-test)
 
