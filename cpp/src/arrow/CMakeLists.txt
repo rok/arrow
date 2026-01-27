@@ -675,12 +675,8 @@ set(ARROW_TESTING_SRCS
     testing/util.cc)
 
 # Simdjson: Always uses bundled header-only mode (set in ThirdpartyToolchain.cmake).
-# SIMDJSON_HEADER_ONLY is set on simdjson::simdjson INTERFACE_COMPILE_DEFINITIONS
-# and automatically propagates to all targets linking to it. Add global definition
-# as fallback for any code that includes simdjson.h without linking to the target.
-if(ARROW_SIMDJSON_HEADER_ONLY)
-  add_definitions(-DSIMDJSON_HEADER_ONLY)
-endif()
+# SIMDJSON_HEADER_ONLY is defined globally in ThirdpartyToolchain.cmake and on
+# simdjson::simdjson INTERFACE_COMPILE_DEFINITIONS.
 
 #
 # Configure the base Arrow libraries

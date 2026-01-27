@@ -24,9 +24,7 @@ arrow_install_all_headers("arrow/integration")
 # and automatically propagates to targets linking to it.
 
 if(ARROW_BUILD_TESTS)
-  add_arrow_test(json_integration_test
-                 EXTRA_LINK_LIBS
-                 simdjson::simdjson
+  add_arrow_test(json_integration_test EXTRA_LINK_LIBS simdjson::simdjson
                  ${GFLAGS_LIBRARIES})
   add_dependencies(arrow-integration arrow-json-integration-test)
 elseif(ARROW_BUILD_INTEGRATION)
