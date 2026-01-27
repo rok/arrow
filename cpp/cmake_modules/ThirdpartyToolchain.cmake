@@ -2619,11 +2619,14 @@ if(ARROW_WITH_SIMDJSON)
   # Always use bundled simdjson 4.2.0+ (required for builder API and constevalutil)
   resolve_dependency(simdjson)
 
-  # Add SIMDJSON_HEADER_ONLY to CMAKE_CXX_FLAGS to ensure ALL translation units
-  # use header-only mode. This is more forceful than add_definitions() which
-  # may not propagate correctly in all cases (e.g., conda builds with Docker).
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DSIMDJSON_HEADER_ONLY")
-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DSIMDJSON_HEADER_ONLY")
+  # CRITICAL: Add bundled simdjson include path and SIMDJSON_HEADER_ONLY to the
+  # BEGINNING of CMAKE_CXX_FLAGS. This ensures:
+  # 1. Bundled simdjson headers are found BEFORE conda/system headers
+  # 2. SIMDJSON_HEADER_ONLY is defined for ALL compilations
+  # This is necessary because conda environments add -isystem to CMAKE_CXX_FLAGS
+  # which would otherwise take precedence over our include_directories().
+  set(CMAKE_CXX_FLAGS "-isystem ${SIMDJSON_INCLUDE_DIR} -DSIMDJSON_HEADER_ONLY ${CMAKE_CXX_FLAGS}")
+  set(CMAKE_C_FLAGS "-isystem ${SIMDJSON_INCLUDE_DIR} -DSIMDJSON_HEADER_ONLY ${CMAKE_C_FLAGS}")
 endif()
 
 macro(build_xsimd)
