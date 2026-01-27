@@ -2608,8 +2608,7 @@ macro(build_simdjson)
 
   set(ARROW_SIMDJSON_HEADER_ONLY TRUE)
 
-  # Add global definition to ensure ALL translation units use header-only mode,
-  # even those that don't link to simdjson::simdjson directly
+  # Also use add_definitions as a backup
   add_definitions(-DSIMDJSON_HEADER_ONLY)
 
   # Ensure bundled headers take precedence over system/conda/vcpkg versions
@@ -2619,6 +2618,12 @@ endmacro()
 if(ARROW_WITH_SIMDJSON)
   # Always use bundled simdjson 4.2.0+ (required for builder API and constevalutil)
   resolve_dependency(simdjson)
+
+  # Add SIMDJSON_HEADER_ONLY to CMAKE_CXX_FLAGS to ensure ALL translation units
+  # use header-only mode. This is more forceful than add_definitions() which
+  # may not propagate correctly in all cases (e.g., conda builds with Docker).
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DSIMDJSON_HEADER_ONLY")
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DSIMDJSON_HEADER_ONLY")
 endif()
 
 macro(build_xsimd)
