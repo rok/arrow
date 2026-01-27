@@ -501,6 +501,7 @@ endif
 
 if needs_json
     # Bundled simdjson uses header-only mode (all code inline)
+    # simdjson_impl.cc is kept for compatibility but is empty in header-only mode
     arrow_components += {
         'arrow_json': {
             'sources': [
@@ -514,6 +515,7 @@ if needs_json
                 'json/object_parser.cc',
                 'json/parser.cc',
                 'json/reader.cc',
+                'json/simdjson_impl.cc',
             ],
             'dependencies': [simdjson_dep],
             'compile_args': ['-DSIMDJSON_HEADER_ONLY'],

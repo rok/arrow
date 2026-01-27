@@ -143,14 +143,12 @@ else()
 endif()
 
 # simdjson 4.2.0+ is required for the builder API and constevalutil used in json_util.h.
-# We always use bundled simdjson because:
-# 1. Most package managers have older versions (vcpkg has 3.12.x, Debian has < 4.2.0)
+# Always use bundled simdjson because:
+# 1. Most package managers have older versions (vcpkg 3.12.x, conda, Debian < 4.2.0)
 # 2. Using bundled in header-only mode eliminates consumer dependencies on simdjson
 # 3. This provides consistent behavior across all builds
-if("${simdjson_SOURCE}" STREQUAL "")
-  set(simdjson_SOURCE "BUNDLED")
-  message(STATUS "simdjson: Using BUNDLED (required version 4.2.0+ not widely available)")
-endif()
+set(simdjson_SOURCE "BUNDLED")
+message(STATUS "simdjson: Using BUNDLED (required version 4.2.0+ not widely available)")
 
 if(ARROW_PACKAGE_PREFIX)
   message(STATUS "Setting (unset) dependency *_ROOT variables: ${ARROW_PACKAGE_PREFIX}")
@@ -2587,10 +2585,8 @@ macro(build_simdjson)
   set(SIMDJSON_PREFIX "${CMAKE_CURRENT_BINARY_DIR}/simdjson_ep/src/simdjson_ep-install")
   set(SIMDJSON_INCLUDE_DIR "${SIMDJSON_PREFIX}/include")
 
-  set(SIMDJSON_CMAKE_ARGS
-      ${EP_COMMON_CMAKE_ARGS}
-      -DSIMDJSON_DEVELOPER_MODE=OFF
-      "-DCMAKE_INSTALL_PREFIX=${SIMDJSON_PREFIX}")
+  set(SIMDJSON_CMAKE_ARGS ${EP_COMMON_CMAKE_ARGS} -DSIMDJSON_DEVELOPER_MODE=OFF
+                          "-DCMAKE_INSTALL_PREFIX=${SIMDJSON_PREFIX}")
 
   externalproject_add(simdjson_ep
                       ${EP_COMMON_OPTIONS}

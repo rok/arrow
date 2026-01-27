@@ -996,6 +996,7 @@ endif()
 if(ARROW_JSON)
   # Bundled simdjson uses header-only mode (all code inline).
   # simdjson::simdjson provides include directories via INTERFACE_INCLUDE_DIRECTORIES.
+  # simdjson_impl.cc is kept for compatibility but is empty in header-only mode.
   arrow_add_object_library(ARROW_JSON
                            extension/fixed_shape_tensor.cc
                            extension/opaque.cc
@@ -1006,7 +1007,8 @@ if(ARROW_JSON)
                            json/from_string.cc
                            json/object_parser.cc
                            json/parser.cc
-                           json/reader.cc)
+                           json/reader.cc
+                           json/simdjson_impl.cc)
   foreach(ARROW_JSON_TARGET ${ARROW_JSON_TARGETS})
     target_link_libraries(${ARROW_JSON_TARGET} PRIVATE simdjson::simdjson)
     target_compile_definitions(${ARROW_JSON_TARGET} PRIVATE SIMDJSON_HEADER_ONLY)
@@ -1245,7 +1247,6 @@ install(FILES ${CMAKE_CURRENT_BINARY_DIR}/ArrowOptions.cmake
 # For backward compatibility for find_package(arrow)
 install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/arrow-config.cmake
         DESTINATION "${ARROW_CMAKE_DIR}/Arrow")
-
 
 #
 # Unit tests
