@@ -2612,10 +2612,8 @@ macro(build_simdjson)
   # even those that don't link to simdjson::simdjson directly
   add_definitions(-DSIMDJSON_HEADER_ONLY)
 
-  # Ensure bundled headers take precedence over vcpkg's older version
-  if(VCPKG_TARGET_TRIPLET)
-    include_directories(BEFORE SYSTEM "${SIMDJSON_INCLUDE_DIR}")
-  endif()
+  # Ensure bundled headers take precedence over system/conda/vcpkg versions
+  include_directories(BEFORE SYSTEM "${SIMDJSON_INCLUDE_DIR}")
 endmacro()
 
 if(ARROW_WITH_SIMDJSON)
