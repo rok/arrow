@@ -19,6 +19,10 @@
 
 #include <sstream>
 
+// Ensure simdjson is used in header-only mode
+#ifndef SIMDJSON_HEADER_ONLY
+#define SIMDJSON_HEADER_ONLY
+#endif
 #include <simdjson.h>
 
 #include "arrow/json/json_util.h"

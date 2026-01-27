@@ -15,6 +15,11 @@
 // specific language governing permissions and limitations
 // under the License.
 
+// Ensure simdjson is used in header-only mode
+#ifndef SIMDJSON_HEADER_ONLY
+#define SIMDJSON_HEADER_ONLY
+#endif
+
 // Debug: Check simdjson mode when compiling parser.cc
 #if defined(SIMDJSON_USING_LIBRARY)
 #  pragma message("parser.cc: SIMDJSON_USING_LIBRARY - linking against library")
