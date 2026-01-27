@@ -20,17 +20,14 @@ arrow_install_all_headers("arrow/integration")
 # json_integration_test is two things at the same time:
 # - an executable that can be called to answer integration test requests
 # - a self-(unit)test for the C++ side of integration testing
-
-# Always use header-only mode (bundled simdjson)
-set(ARROW_INTEGRATION_TEST_DEFINITIONS SIMDJSON_HEADER_ONLY)
+# SIMDJSON_HEADER_ONLY is set on simdjson::simdjson INTERFACE_COMPILE_DEFINITIONS
+# and automatically propagates to targets linking to it.
 
 if(ARROW_BUILD_TESTS)
   add_arrow_test(json_integration_test
                  EXTRA_LINK_LIBS
                  simdjson::simdjson
-                 ${GFLAGS_LIBRARIES}
-                 DEFINITIONS
-                 ${ARROW_INTEGRATION_TEST_DEFINITIONS})
+                 ${GFLAGS_LIBRARIES})
   add_dependencies(arrow-integration arrow-json-integration-test)
 elseif(ARROW_BUILD_INTEGRATION)
   add_executable(arrow-json-integration-test json_integration_test.cc)
@@ -39,7 +36,6 @@ elseif(ARROW_BUILD_INTEGRATION)
                         ${ARROW_TEST_LINK_LIBS}
                         ${GFLAGS_LIBRARIES}
                         ${ARROW_GTEST_GTEST})
-  target_compile_definitions(arrow-json-integration-test PRIVATE SIMDJSON_HEADER_ONLY)
   add_dependencies(arrow-json-integration-test arrow arrow_testing)
   add_dependencies(arrow-integration arrow-json-integration-test)
 

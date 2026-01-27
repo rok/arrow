@@ -2601,6 +2601,9 @@ macro(build_simdjson)
     add_library(simdjson::simdjson INTERFACE IMPORTED)
   endif()
   target_include_directories(simdjson::simdjson INTERFACE "${SIMDJSON_INCLUDE_DIR}")
+  # Set SIMDJSON_HEADER_ONLY on the target interface so all consumers get it automatically
+  set_property(TARGET simdjson::simdjson
+               PROPERTY INTERFACE_COMPILE_DEFINITIONS SIMDJSON_HEADER_ONLY)
   add_dependencies(simdjson::simdjson simdjson_ep)
 
   set(ARROW_SIMDJSON_HEADER_ONLY TRUE)

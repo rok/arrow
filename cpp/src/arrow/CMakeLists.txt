@@ -675,11 +675,10 @@ set(ARROW_TESTING_SRCS
     testing/util.cc)
 
 # Simdjson: Always uses bundled header-only mode (set in ThirdpartyToolchain.cmake).
-# Propagate SIMDJSON_HEADER_ONLY to all translation units.
-if(TARGET simdjson::simdjson)
-  set_property(TARGET simdjson::simdjson
-               APPEND
-               PROPERTY INTERFACE_COMPILE_DEFINITIONS SIMDJSON_HEADER_ONLY)
+# SIMDJSON_HEADER_ONLY is set on simdjson::simdjson INTERFACE_COMPILE_DEFINITIONS
+# and automatically propagates to all targets linking to it. Add global definition
+# as fallback for any code that includes simdjson.h without linking to the target.
+if(ARROW_SIMDJSON_HEADER_ONLY)
   add_definitions(-DSIMDJSON_HEADER_ONLY)
 endif()
 
@@ -692,7 +691,6 @@ if(ARROW_BUILD_INTEGRATION OR ARROW_BUILD_TESTS)
                            integration/json_internal.cc)
   foreach(ARROW_INTEGRATION_TARGET ${ARROW_INTEGRATION_TARGETS})
     target_link_libraries(${ARROW_INTEGRATION_TARGET} PRIVATE simdjson::simdjson)
-    target_compile_definitions(${ARROW_INTEGRATION_TARGET} PRIVATE SIMDJSON_HEADER_ONLY)
   endforeach()
 else()
   set(ARROW_INTEGRATION_TARGET_SHARED)
@@ -1011,7 +1009,6 @@ if(ARROW_JSON)
                            json/simdjson_impl.cc)
   foreach(ARROW_JSON_TARGET ${ARROW_JSON_TARGETS})
     target_link_libraries(${ARROW_JSON_TARGET} PRIVATE simdjson::simdjson)
-    target_compile_definitions(${ARROW_JSON_TARGET} PRIVATE SIMDJSON_HEADER_ONLY)
   endforeach()
   list(APPEND ARROW_SHARED_PRIVATE_LINK_LIBS simdjson::simdjson)
 else()
@@ -1233,8 +1230,7 @@ if(ARROW_TESTING)
   endif()
 
   foreach(LIB_TARGET ${ARROW_TESTING_LIBRARIES})
-    target_compile_definitions(${LIB_TARGET} PRIVATE ARROW_TESTING_EXPORTING
-                                                     SIMDJSON_HEADER_ONLY)
+    target_compile_definitions(${LIB_TARGET} PRIVATE ARROW_TESTING_EXPORTING)
   endforeach()
 endif()
 
