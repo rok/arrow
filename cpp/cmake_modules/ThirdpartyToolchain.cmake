@@ -2581,11 +2581,14 @@ if(ARROW_BUILD_BENCHMARKS)
 endif()
 
 macro(build_simdjson)
-  message(STATUS "simdjson: Building from source (header-only mode)")
+  message(STATUS "simdjson: Building from source")
   set(SIMDJSON_PREFIX "${CMAKE_CURRENT_BINARY_DIR}/simdjson_ep/src/simdjson_ep-install")
   set(SIMDJSON_INCLUDE_DIR "${SIMDJSON_PREFIX}/include")
+  set(SIMDJSON_STATIC_LIB "${SIMDJSON_PREFIX}/lib/${CMAKE_STATIC_LIBRARY_PREFIX}simdjson${CMAKE_STATIC_LIBRARY_SUFFIX}")
 
-  set(SIMDJSON_CMAKE_ARGS ${EP_COMMON_CMAKE_ARGS} -DSIMDJSON_DEVELOPER_MODE=OFF
+  set(SIMDJSON_CMAKE_ARGS ${EP_COMMON_CMAKE_ARGS}
+                          -DSIMDJSON_DEVELOPER_MODE=OFF
+                          -DSIMDJSON_BUILD_STATIC_LIB=ON
                           "-DCMAKE_INSTALL_PREFIX=${SIMDJSON_PREFIX}")
 
   externalproject_add(simdjson_ep
@@ -2593,23 +2596,17 @@ macro(build_simdjson)
                       PREFIX "${CMAKE_BINARY_DIR}"
                       URL ${SIMDJSON_SOURCE_URL}
                       URL_HASH "SHA256=${ARROW_SIMDJSON_BUILD_SHA256_CHECKSUM}"
+                      BUILD_BYPRODUCTS "${SIMDJSON_STATIC_LIB}"
                       CMAKE_ARGS ${SIMDJSON_CMAKE_ARGS})
 
   file(MAKE_DIRECTORY "${SIMDJSON_INCLUDE_DIR}")
 
   if(NOT TARGET simdjson::simdjson)
-    add_library(simdjson::simdjson INTERFACE IMPORTED)
+    add_library(simdjson::simdjson STATIC IMPORTED)
   endif()
+  set_target_properties(simdjson::simdjson PROPERTIES IMPORTED_LOCATION "${SIMDJSON_STATIC_LIB}")
   target_include_directories(simdjson::simdjson INTERFACE "${SIMDJSON_INCLUDE_DIR}")
-  # Set SIMDJSON_HEADER_ONLY on the target interface so all consumers get it automatically
-  set_property(TARGET simdjson::simdjson PROPERTY INTERFACE_COMPILE_DEFINITIONS
-                                                  SIMDJSON_HEADER_ONLY)
   add_dependencies(simdjson::simdjson simdjson_ep)
-
-  set(ARROW_SIMDJSON_HEADER_ONLY TRUE)
-
-  # Also use add_definitions as a backup
-  add_definitions(-DSIMDJSON_HEADER_ONLY)
 
   # Ensure bundled headers take precedence over system/conda/vcpkg versions
   include_directories(BEFORE SYSTEM "${SIMDJSON_INCLUDE_DIR}")
@@ -2619,14 +2616,12 @@ if(ARROW_WITH_SIMDJSON)
   # Always use bundled simdjson 4.2.0+ (required for builder API and constevalutil)
   resolve_dependency(simdjson)
 
-  # CRITICAL: Add bundled simdjson include path and SIMDJSON_HEADER_ONLY to the
-  # BEGINNING of CMAKE_CXX_FLAGS. This ensures:
-  # 1. Bundled simdjson headers are found BEFORE conda/system headers
-  # 2. SIMDJSON_HEADER_ONLY is defined for ALL compilations
-  # This is necessary because conda environments add -isystem to CMAKE_CXX_FLAGS
+  # Add bundled simdjson include path to the BEGINNING of CMAKE_CXX_FLAGS.
+  # This ensures bundled simdjson headers are found BEFORE conda/system headers,
+  # which is necessary because conda environments add -isystem to CMAKE_CXX_FLAGS
   # which would otherwise take precedence over our include_directories().
-  set(CMAKE_CXX_FLAGS "-isystem ${SIMDJSON_INCLUDE_DIR} -DSIMDJSON_HEADER_ONLY ${CMAKE_CXX_FLAGS}")
-  set(CMAKE_C_FLAGS "-isystem ${SIMDJSON_INCLUDE_DIR} -DSIMDJSON_HEADER_ONLY ${CMAKE_C_FLAGS}")
+  set(CMAKE_CXX_FLAGS "-isystem ${SIMDJSON_INCLUDE_DIR} ${CMAKE_CXX_FLAGS}")
+  set(CMAKE_C_FLAGS "-isystem ${SIMDJSON_INCLUDE_DIR} ${CMAKE_C_FLAGS}")
 endif()
 
 macro(build_xsimd)
