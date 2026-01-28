@@ -19,10 +19,6 @@
 
 #include <string>
 
-// Ensure simdjson is used in header-only mode
-#ifndef SIMDJSON_HEADER_ONLY
-#define SIMDJSON_HEADER_ONLY
-#endif
 #include <simdjson.h>
 
 #include "arrow/extension_type.h"

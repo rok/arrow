@@ -17,10 +17,6 @@
 
 #include "arrow/integration/json_integration.h"
 
-// Ensure simdjson is used in header-only mode
-#ifndef SIMDJSON_HEADER_ONLY
-#define SIMDJSON_HEADER_ONLY
-#endif
 #include <simdjson.h>
 
 #include <cstddef>

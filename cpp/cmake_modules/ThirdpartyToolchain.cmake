@@ -2584,12 +2584,13 @@ macro(build_simdjson)
   message(STATUS "simdjson: Building from source")
   set(SIMDJSON_PREFIX "${CMAKE_CURRENT_BINARY_DIR}/simdjson_ep/src/simdjson_ep-install")
   set(SIMDJSON_INCLUDE_DIR "${SIMDJSON_PREFIX}/include")
-  set(SIMDJSON_STATIC_LIB "${SIMDJSON_PREFIX}/lib/${CMAKE_STATIC_LIBRARY_PREFIX}simdjson${CMAKE_STATIC_LIBRARY_SUFFIX}")
+  set(SIMDJSON_STATIC_LIB
+      "${SIMDJSON_PREFIX}/lib/${CMAKE_STATIC_LIBRARY_PREFIX}simdjson${CMAKE_STATIC_LIBRARY_SUFFIX}"
+  )
 
-  set(SIMDJSON_CMAKE_ARGS ${EP_COMMON_CMAKE_ARGS}
-                          -DSIMDJSON_DEVELOPER_MODE=OFF
-                          -DSIMDJSON_BUILD_STATIC_LIB=ON
-                          "-DCMAKE_INSTALL_PREFIX=${SIMDJSON_PREFIX}")
+  set(SIMDJSON_CMAKE_ARGS
+      ${EP_COMMON_CMAKE_ARGS} -DSIMDJSON_DEVELOPER_MODE=OFF
+      -DSIMDJSON_BUILD_STATIC_LIB=ON "-DCMAKE_INSTALL_PREFIX=${SIMDJSON_PREFIX}")
 
   externalproject_add(simdjson_ep
                       ${EP_COMMON_OPTIONS}
@@ -2604,7 +2605,8 @@ macro(build_simdjson)
   if(NOT TARGET simdjson::simdjson)
     add_library(simdjson::simdjson STATIC IMPORTED)
   endif()
-  set_target_properties(simdjson::simdjson PROPERTIES IMPORTED_LOCATION "${SIMDJSON_STATIC_LIB}")
+  set_target_properties(simdjson::simdjson PROPERTIES IMPORTED_LOCATION
+                                                      "${SIMDJSON_STATIC_LIB}")
   target_include_directories(simdjson::simdjson INTERFACE "${SIMDJSON_INCLUDE_DIR}")
   add_dependencies(simdjson::simdjson simdjson_ep)
 
@@ -2620,8 +2622,14 @@ if(ARROW_WITH_SIMDJSON)
   # This ensures bundled simdjson headers are found BEFORE conda/system headers,
   # which is necessary because conda environments add -isystem to CMAKE_CXX_FLAGS
   # which would otherwise take precedence over our include_directories().
-  set(CMAKE_CXX_FLAGS "-isystem ${SIMDJSON_INCLUDE_DIR} ${CMAKE_CXX_FLAGS}")
-  set(CMAKE_C_FLAGS "-isystem ${SIMDJSON_INCLUDE_DIR} ${CMAKE_C_FLAGS}")
+  if(MSVC)
+    # MSVC uses /external:I for system include directories
+    set(CMAKE_CXX_FLAGS "/external:I ${SIMDJSON_INCLUDE_DIR} ${CMAKE_CXX_FLAGS}")
+    set(CMAKE_C_FLAGS "/external:I ${SIMDJSON_INCLUDE_DIR} ${CMAKE_C_FLAGS}")
+  else()
+    set(CMAKE_CXX_FLAGS "-isystem ${SIMDJSON_INCLUDE_DIR} ${CMAKE_CXX_FLAGS}")
+    set(CMAKE_C_FLAGS "-isystem ${SIMDJSON_INCLUDE_DIR} ${CMAKE_C_FLAGS}")
+  endif()
 endif()
 
 macro(build_xsimd)
