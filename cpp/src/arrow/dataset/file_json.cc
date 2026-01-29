@@ -53,6 +53,18 @@ namespace {
 
 using ReaderPtr = std::shared_ptr<json::StreamingReader>;
 
+// Strip UTF-8 BOM from the beginning of data if present
+std::string_view StripBOM(std::string_view data) {
+  // UTF-8 BOM is 0xEF 0xBB 0xBF
+  if (data.size() >= 3) {
+    const auto* bytes = reinterpret_cast<const uint8_t*>(data.data());
+    if (bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF) {
+      return data.substr(3);
+    }
+  }
+  return data;
+}
+
 struct JsonInspectedFragment : public InspectedFragment {
   JsonInspectedFragment() : InspectedFragment({}) {}
   JsonInspectedFragment(std::vector<std::string> column_names,
@@ -137,6 +149,8 @@ json::ParseOptions GetInitialParseOptions(json::ParseOptions options) {
 
 Result<std::shared_ptr<StructType>> ParseToStructType(
     std::string_view data, const json::ParseOptions& parse_options, MemoryPool* pool) {
+  // Strip UTF-8 BOM if present
+  data = StripBOM(data);
   auto full_buffer = std::make_shared<Buffer>(data);
   std::shared_ptr<Buffer> buffer, partial;
   auto chunker = json::MakeChunker(parse_options);

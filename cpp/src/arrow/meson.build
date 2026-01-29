@@ -278,12 +278,14 @@ arrow_testing_srcs = [
 ]
 
 if needs_integration or needs_tests
+    # Integration sources include simdjson headers, so they need SIMDJSON_HEADER_ONLY
     arrow_components += {
         'arrow_integration': {
             'sources': [
                 'integration/json_integration.cc',
                 'integration/json_internal.cc',
             ],
+            'compile_args': ['-DSIMDJSON_HEADER_ONLY'],
         },
     }
 endif
@@ -308,12 +310,9 @@ if needs_csv
 endif
 
 if needs_json or needs_integration
-    rapidjson_dep = dependency(
-        'RapidJSON',
-        fallback: ['rapidjson', 'rapidjson_dep'],
-    )
+    simdjson_dep = dependency('simdjson', fallback: ['simdjson', 'simdjson_dep'])
 else
-    rapidjson_dep = disabler()
+    simdjson_dep = disabler()
 endif
 
 azure_dep = disabler()
@@ -501,6 +500,8 @@ if needs_ipc
 endif
 
 if needs_json
+    # Bundled simdjson uses header-only mode (all code inline)
+    # simdjson_impl.cc is kept for compatibility but is empty in header-only mode
     arrow_components += {
         'arrow_json': {
             'sources': [
@@ -512,11 +513,12 @@ if needs_json
                 'json/converter.cc',
                 'json/from_string.cc',
                 'json/object_parser.cc',
-                'json/object_writer.cc',
                 'json/parser.cc',
                 'json/reader.cc',
+                'json/simdjson_impl.cc',
             ],
-            'dependencies': [rapidjson_dep],
+            'dependencies': [simdjson_dep],
+            'compile_args': ['-DSIMDJSON_HEADER_ONLY'],
         },
     }
 endif
@@ -525,10 +527,12 @@ arrow_srcs = []
 include_dir = include_directories('..')
 arrow_includes = [include_dir]
 arrow_deps = []
+arrow_compile_args = []
 foreach key, val : arrow_components
     arrow_srcs += val['sources']
     arrow_includes += val.get('include_dirs', [])
     arrow_deps += val.get('dependencies', [])
+    arrow_compile_args += val.get('compile_args', [])
 endforeach
 
 arrow_lib = library(
@@ -538,6 +542,7 @@ arrow_lib = library(
     dependencies: arrow_deps,
     install: true,
     gnu_symbol_visibility: 'inlineshidden',
+    cpp_args: arrow_compile_args,
     cpp_shared_args: ['-DARROW_EXPORTING'],
 )
 
@@ -726,6 +731,11 @@ else
 endif
 
 if needs_testing
+    # arrow_testing includes simdjson via gtest_util.cc, so it needs SIMDJSON_HEADER_ONLY
+    arrow_testing_cpp_args = []
+    if needs_json
+        arrow_testing_cpp_args += ['-DSIMDJSON_HEADER_ONLY']
+    endif
     arrow_testing_lib = static_library(
         'arrow_testing',
         sources: arrow_testing_srcs,
@@ -735,7 +745,9 @@ if needs_testing
             filesystem_dep,
             gmock_dep,
             gtest_dep,
+            simdjson_dep,
         ],
+        cpp_args: arrow_testing_cpp_args,
     )
 
     arrow_testing_dep = declare_dependency(link_with: [arrow_testing_lib])

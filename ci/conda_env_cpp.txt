@@ -43,7 +43,7 @@ nodejs>=16
 orc<2.1.0
 pkg-config
 python
-rapidjson
+simdjson
 re2
 snappy
 thrift-cpp>=0.11.0

@@ -37,7 +37,7 @@ class ApacheArrow < Formula
   depends_on "boost" => :build
   depends_on "cmake" => :build
   depends_on "gflags" => :build
-  depends_on "rapidjson" => :build
+  depends_on "simdjson" => :build
   depends_on "xsimd" => :build
   depends_on "abseil"
   depends_on "aws-crt-cpp"

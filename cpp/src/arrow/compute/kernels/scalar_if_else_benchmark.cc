@@ -16,6 +16,7 @@
 // under the License.
 
 #include <benchmark/benchmark.h>
+#include "arrow/util/benchmark_util.h"
 
 #include "arrow/array.h"
 #include "arrow/array/concatenate.h"
@@ -563,12 +564,12 @@ BENCHMARK(CaseWhenBenchString)->Args({kFewItems, 99});
 BENCHMARK(CaseWhenBenchStringContiguous)->Args({kFewItems, 0});
 BENCHMARK(CaseWhenBenchStringContiguous)->Args({kFewItems, 99});
 
-void CoalesceSetArgs(benchmark::internal::Benchmark* bench) {
+void CoalesceSetArgs(arrow::BenchmarkType* bench) {
   for (size_t i = 0; i < g_coalesce_params.size(); i++) {
     bench->Args({static_cast<int64_t>(i)});
   }
 }
-void CoalesceSetBinaryArgs(benchmark::internal::Benchmark* bench) {
+void CoalesceSetBinaryArgs(arrow::BenchmarkType* bench) {
   for (size_t i = 0; i < g_coalesce_params.size(); i++) {
     if (g_coalesce_params[i].num_arguments == 2) {
       bench->Args({static_cast<int64_t>(i)});

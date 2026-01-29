@@ -19,12 +19,10 @@
 
 #include <sstream>
 
-#include "arrow/json/rapidjson_defs.h"  // IWYU pragma: keep
-#include "arrow/util/logging_internal.h"
+#include <simdjson.h>
 
-#include <rapidjson/document.h>
-#include <rapidjson/error/en.h>
-#include <rapidjson/writer.h>
+#include "arrow/json/json_util.h"
+#include "arrow/util/logging_internal.h"
 
 namespace arrow::extension {
 
@@ -46,51 +44,54 @@ bool OpaqueType::ExtensionEquals(const ExtensionType& other) const {
 }
 
 std::string OpaqueType::Serialize() const {
-  rapidjson::Document document;
-  document.SetObject();
-  rapidjson::Document::AllocatorType& allocator = document.GetAllocator();
-
-  rapidjson::Value type_name(rapidjson::StringRef(type_name_));
-  document.AddMember(rapidjson::Value("type_name", allocator), type_name, allocator);
-  rapidjson::Value vendor_name(rapidjson::StringRef(vendor_name_));
-  document.AddMember(rapidjson::Value("vendor_name", allocator), vendor_name, allocator);
-
-  rapidjson::StringBuffer buffer;
-  rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
-  document.Accept(writer);
-  return buffer.GetString();
+  json::JsonWriter writer;
+  writer.StartObject();
+  writer.SetString<"type_name">(type_name_);
+  writer.SetString<"vendor_name">(vendor_name_);
+  writer.EndObject();
+  return std::string(writer.GetString());
 }
 
 Result<std::shared_ptr<DataType>> OpaqueType::Deserialize(
     std::shared_ptr<DataType> storage_type, const std::string& serialized_data) const {
-  rapidjson::Document document;
-  const auto& parsed = document.Parse(serialized_data.data(), serialized_data.length());
-  if (parsed.HasParseError()) {
+  simdjson::dom::parser parser;
+  simdjson::padded_string padded_json(serialized_data);
+  auto result = parser.parse(padded_json);
+  if (result.error()) {
     return Status::Invalid("Invalid serialized JSON data for OpaqueType: ",
-                           rapidjson::GetParseError_En(parsed.GetParseError()), ": ",
+                           simdjson::error_message(result.error()), ": ",
                            serialized_data);
-  } else if (!document.IsObject()) {
+  }
+  auto document = result.value();
+  if (!document.is_object()) {
     return Status::Invalid("Invalid serialized JSON data for OpaqueType: not an object");
   }
-  if (!document.HasMember("type_name")) {
+
+  auto obj = document.get_object().value();
+  auto type_name_field = obj["type_name"];
+  auto vendor_name_field = obj["vendor_name"];
+
+  if (type_name_field.error()) {
     return Status::Invalid(
         "Invalid serialized JSON data for OpaqueType: missing type_name");
-  } else if (!document.HasMember("vendor_name")) {
+  }
+  if (vendor_name_field.error()) {
     return Status::Invalid(
         "Invalid serialized JSON data for OpaqueType: missing vendor_name");
   }
 
-  const auto& type_name = document["type_name"];
-  const auto& vendor_name = document["vendor_name"];
-  if (!type_name.IsString()) {
+  if (!type_name_field.is_string()) {
     return Status::Invalid(
         "Invalid serialized JSON data for OpaqueType: type_name is not a string");
-  } else if (!vendor_name.IsString()) {
+  }
+  if (!vendor_name_field.is_string()) {
     return Status::Invalid(
         "Invalid serialized JSON data for OpaqueType: vendor_name is not a string");
   }
 
-  return opaque(std::move(storage_type), type_name.GetString(), vendor_name.GetString());
+  return opaque(std::move(storage_type),
+                std::string(type_name_field.get_string().value()),
+                std::string(vendor_name_field.get_string().value()));
 }
 
 std::shared_ptr<Array> OpaqueType::MakeArray(std::shared_ptr<ArrayData> data) const {

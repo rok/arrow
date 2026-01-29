@@ -20,20 +20,18 @@
 #include "arrow/io/memory.h"
 #include "arrow/testing/gtest_util.h"
 #include "arrow/testing/util.h"
+#include "arrow/util/benchmark_util.h"
 #include "arrow/util/cpu_info.h"
 #include "arrow/util/simd.h"
 
 #include "benchmark/benchmark.h"
 
 namespace arrow {
+namespace {
 
-using internal::CpuInfo;
-static const CpuInfo* cpu_info = CpuInfo::GetInstance();
-
-static const int kNumCores = cpu_info->num_cores();
-static const int64_t kL1Size = cpu_info->CacheSize(CpuInfo::CacheLevel::L1);
-static const int64_t kL2Size = cpu_info->CacheSize(CpuInfo::CacheLevel::L2);
-static const int64_t kL3Size = cpu_info->CacheSize(CpuInfo::CacheLevel::L3);
+// cpu_info, kL1Size, kL2Size, kL3Size are already defined in benchmark_util.h
+// We only define kNumCores and kMemoryPerCore which are specific to this benchmark
+const int kNumCores = cpu_info->num_cores();
 
 constexpr size_t kMemoryPerCore = 32 * 1024 * 1024;
 using BufferPtr = std::shared_ptr<Buffer>;
@@ -262,7 +260,7 @@ static void MemoryBandwidth(benchmark::State& state) {  // NOLINT non-const refe
 }
 
 #    ifdef ARROW_HAVE_SSE4_2
-static void SetCacheBandwidthArgs(benchmark::internal::Benchmark* bench) {
+static void SetCacheBandwidthArgs(BenchmarkType* bench) {
   auto cache_sizes = {kL1Size, kL2Size, kL3Size};
   for (auto size : cache_sizes) {
     bench->Arg(size / 2);
@@ -276,7 +274,7 @@ static void SetCacheBandwidthArgs(benchmark::internal::Benchmark* bench) {
 BENCHMARK_TEMPLATE(MemoryBandwidth, Read)->Apply(SetCacheBandwidthArgs);
 #    endif  // ARROW_HAVE_SSE4_2
 
-static void SetMemoryBandwidthArgs(benchmark::internal::Benchmark* bench) {
+static void SetMemoryBandwidthArgs(BenchmarkType* bench) {
   // `UseRealTime` is required due to threads, otherwise the cumulative CPU time
   // is used which will skew the results by the number of threads.
   bench->Arg(kMemoryPerCore)->ThreadRange(1, kNumCores)->UseRealTime();
@@ -358,4 +356,5 @@ BENCHMARK(BufferOutputStreamTinyWrites)->UseRealTime();
 BENCHMARK(BufferOutputStreamSmallWrites)->UseRealTime();
 BENCHMARK(BufferOutputStreamLargeWrites)->UseRealTime();
 
+}  // namespace
 }  // namespace arrow

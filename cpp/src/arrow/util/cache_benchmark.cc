@@ -15,6 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
+#include "arrow/util/benchmark_util.h"
 #include "benchmark/benchmark.h"
 
 #include <cstdint>
@@ -79,7 +80,7 @@ static void LruCacheLookup(benchmark::State& state) {
   BenchmarkCacheLookups<LruCache<std::string, std::string>>(state, keys, values);
 }
 
-static void SetCacheArgs(benchmark::internal::Benchmark* bench) {
+static void SetCacheArgs(arrow::BenchmarkType* bench) {
   bench->Args({kSmallKeyLength, kSmallValueLength});
   bench->Args({kSmallKeyLength, kLargeValueLength});
   bench->Args({kLargeKeyLength, kSmallValueLength});

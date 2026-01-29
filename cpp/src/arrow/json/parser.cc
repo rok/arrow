@@ -15,7 +15,18 @@
 // specific language governing permissions and limitations
 // under the License.
 
+// Debug: Check simdjson mode when compiling parser.cc
+#if defined(SIMDJSON_USING_LIBRARY)
+#  pragma message("parser.cc: SIMDJSON_USING_LIBRARY - linking against library")
+#elif defined(SIMDJSON_HEADER_ONLY)
+#  pragma message("parser.cc: SIMDJSON_HEADER_ONLY - inline mode")
+#else
+#  pragma message("parser.cc: No simdjson mode defined")
+#endif
+
 #include "arrow/json/parser.h"
+
+#include <simdjson.h>
 
 #include <functional>
 #include <limits>
@@ -26,10 +37,6 @@
 #include <unordered_set>
 #include <utility>
 #include <vector>
-
-#include "arrow/json/rapidjson_defs.h"
-#include "rapidjson/error/en.h"
-#include "rapidjson/reader.h"
 
 #include "arrow/array.h"
 #include "arrow/array/builder_binary.h"
@@ -48,11 +55,39 @@ using internal::checked_cast;
 
 namespace json {
 
-namespace rj = arrow::rapidjson;
-
 template <typename... T>
 static Status ParseError(T&&... t) {
   return Status::Invalid("JSON parse error: ", std::forward<T>(t)...);
+}
+
+// Convert simdjson error codes to user-friendly messages
+static const char* SimdjsonErrorMessage(simdjson::error_code error) {
+  switch (error) {
+    case simdjson::TAPE_ERROR:
+    case simdjson::INCOMPLETE_ARRAY_OR_OBJECT:
+      return "Invalid value";
+    case simdjson::STRING_ERROR:
+    case simdjson::UNCLOSED_STRING:
+    case simdjson::UNESCAPED_CHARS:
+      return "Invalid string";
+    case simdjson::NUMBER_ERROR:
+    case simdjson::NUMBER_OUT_OF_RANGE:
+      return "Invalid number";
+    case simdjson::T_ATOM_ERROR:
+      return "Invalid value starting with 't' (expected 'true')";
+    case simdjson::F_ATOM_ERROR:
+      return "Invalid value starting with 'f' (expected 'false')";
+    case simdjson::N_ATOM_ERROR:
+      return "Invalid value starting with 'n' (expected 'null')";
+    case simdjson::UTF8_ERROR:
+      return "Invalid UTF-8 encoding";
+    case simdjson::EMPTY:
+      return "The document is empty";
+    case simdjson::DEPTH_ERROR:
+      return "Document exceeds maximum nesting depth";
+    default:
+      return simdjson::error_message(error);
+  }
 }
 
 const std::string& Kind::Name(Kind::type kind) {
@@ -646,9 +681,11 @@ class RawBuilderSet {
 
 /// Three implementations are provided for BlockParser, one for each
 /// UnexpectedFieldBehavior. However most of the logic is identical in each
-/// case, so the majority of the implementation is in this base class
-class HandlerBase : public BlockParser,
-                    public rj::BaseReaderHandler<rj::UTF8<>, HandlerBase> {
+/// case, so the majority of the implementation is in this base class.
+///
+/// This implementation uses simdjson's On-Demand API for parsing, which is
+/// a forward-only, lazy parsing approach that provides excellent performance.
+class HandlerBase : public BlockParser {
  public:
   explicit HandlerBase(MemoryPool* pool)
       : BlockParser(pool),
@@ -661,71 +698,6 @@ class HandlerBase : public BlockParser,
   enable_if_t<kind != Kind::kNull, RawArrayBuilder<kind>*> Cast(BuilderPtr builder) {
     return builder_set_.Cast<kind>(builder);
   }
-
-  /// Accessor for a stored error Status
-  Status Error() { return status_; }
-
-  /// \defgroup rapidjson-handler-interface functions expected by rj::Reader
-  ///
-  /// bool Key(const char* data, rj::SizeType size, ...) is omitted since
-  /// the behavior varies greatly between UnexpectedFieldBehaviors
-  ///
-  /// @{
-  bool Null() {
-    status_ = builder_set_.AppendNull(builder_stack_.back(), field_index_, builder_);
-    return status_.ok();
-  }
-
-  bool Bool(bool value) {
-    constexpr auto kind = Kind::kBoolean;
-    if (ARROW_PREDICT_FALSE(builder_.kind != kind)) {
-      status_ = IllegallyChangedTo(kind);
-      return status_.ok();
-    }
-    status_ = Cast<kind>(builder_)->Append(value);
-    return status_.ok();
-  }
-
-  bool RawNumber(const char* data, rj::SizeType size, ...) {
-    if (builder_.kind == Kind::kNumberOrString) {
-      status_ =
-          AppendScalar<Kind::kNumberOrString>(builder_, std::string_view(data, size));
-    } else {
-      status_ = AppendScalar<Kind::kNumber>(builder_, std::string_view(data, size));
-    }
-    return status_.ok();
-  }
-
-  bool String(const char* data, rj::SizeType size, ...) {
-    if (builder_.kind == Kind::kNumberOrString) {
-      status_ =
-          AppendScalar<Kind::kNumberOrString>(builder_, std::string_view(data, size));
-    } else {
-      status_ = AppendScalar<Kind::kString>(builder_, std::string_view(data, size));
-    }
-    return status_.ok();
-  }
-
-  bool StartObject() {
-    status_ = StartObjectImpl();
-    return status_.ok();
-  }
-
-  bool EndObject(...) {
-    status_ = EndObjectImpl();
-    return status_.ok();
-  }
-
-  bool StartArray() {
-    status_ = StartArrayImpl();
-    return status_.ok();
-  }
-
-  bool EndArray(rj::SizeType size) {
-    status_ = EndArrayImpl(size);
-    return status_.ok();
-  }
-  /// @}
 
   /// \brief Set up builders using an expected Schema
   Status Initialize(const std::shared_ptr<Schema>& s) {
@@ -762,47 +734,40 @@ class HandlerBase : public BlockParser,
   }
 
  protected:
-  template <typename Handler, typename Stream>
-  Status DoParse(Handler& handler, Stream&& json, size_t json_size) {
-    constexpr auto parse_flags = rj::kParseIterativeFlag | rj::kParseNanAndInfFlag |
-                                 rj::kParseStopWhenDoneFlag |
-                                 rj::kParseNumbersAsStringsFlag;
+  /// \defgroup value-visitor-methods visitor methods for JSON values
+  /// @{
 
-    rj::Reader reader;
-    // ensure that the loop can exit when the block too large.
-    for (; num_rows_ < std::numeric_limits<int32_t>::max(); ++num_rows_) {
-      auto ok = reader.Parse<parse_flags>(json, handler);
-      switch (ok.Code()) {
-        case rj::kParseErrorNone:
-          // parse the next object
-          continue;
-        case rj::kParseErrorDocumentEmpty:
-          if (json.Tell() < json_size) {
-            return ParseError(rj::GetParseError_En(ok.Code()));
-          }
-          // parsed all objects, finish
-          return Status::OK();
-        case rj::kParseErrorTermination:
-          // handler emitted an error
-          return handler.Error();
-        default:
-          // rj emitted an error
-          return ParseError(rj::GetParseError_En(ok.Code()), " in row ", num_rows_);
-      }
+  Status VisitNull() {
+    return builder_set_.AppendNull(builder_stack_.back(), field_index_, builder_);
+  }
+
+  Status VisitBool(bool value) {
+    constexpr auto kind = Kind::kBoolean;
+    if (ARROW_PREDICT_FALSE(builder_.kind != kind)) {
+      return IllegallyChangedTo(kind);
     }
-    return Status::Invalid("Row count overflowed int32_t");
+    return Cast<kind>(builder_)->Append(value);
   }
 
-  template <typename Handler>
-  Status DoParse(Handler& handler, const std::shared_ptr<Buffer>& json) {
-    RETURN_NOT_OK(ReserveScalarStorage(json->size()));
-    rj::MemoryStream ms(reinterpret_cast<const char*>(json->data()), json->size());
-    using InputStream = rj::EncodedInputStream<rj::UTF8<>, rj::MemoryStream>;
-    return DoParse(handler, InputStream(ms), static_cast<size_t>(json->size()));
+  Status VisitNumber(std::string_view raw_number) {
+    if (builder_.kind == Kind::kNumberOrString) {
+      return AppendScalar<Kind::kNumberOrString>(builder_, raw_number);
+    } else {
+      return AppendScalar<Kind::kNumber>(builder_, raw_number);
+    }
   }
+
+  Status VisitString(std::string_view str) {
+    if (builder_.kind == Kind::kNumberOrString) {
+      return AppendScalar<Kind::kNumberOrString>(builder_, str);
+    } else {
+      return AppendScalar<Kind::kString>(builder_, str);
+    }
+  }
+
+  /// @}
 
   /// \defgroup handlerbase-append-methods append non-nested values
-  ///
   /// @{
 
   template <Kind::type kind>
@@ -887,11 +852,11 @@ class HandlerBase : public BlockParser,
     return Status::OK();
   }
 
-  Status EndArrayImpl(rj::SizeType size) {
+  Status EndArrayImpl(uint64_t size) {
     EndNested();
     // append to list_builder here
     auto list_builder = Cast<Kind::kArray>(builder_);
-    return list_builder->Append(size);
+    return list_builder->Append(static_cast<int32_t>(size));
   }
 
   /// helper method for StartArray and StartObject
@@ -941,231 +906,667 @@ class HandlerBase : public BlockParser,
   // top of this stack == field_index_
   std::vector<int> field_index_stack_;
   StringBuilder scalar_values_builder_;
+  // simdjson parser instance (reusable across calls)
+  simdjson::ondemand::parser parser_;
 };
 
 template <UnexpectedFieldBehavior>
 class Handler;
 
+/// \brief Handler for UnexpectedFieldBehavior::Error
+///
+/// If an unexpected field is encountered, emit a parse error and bail.
 template <>
 class Handler<UnexpectedFieldBehavior::Error> : public HandlerBase {
  public:
   using HandlerBase::HandlerBase;
 
   Status Parse(const std::shared_ptr<Buffer>& json) override {
-    return DoParse(*this, json);
+    RETURN_NOT_OK(ReserveScalarStorage(json->size()));
+
+    // simdjson requires padding, so we copy to a padded string
+    simdjson::padded_string padded_json(reinterpret_cast<const char*>(json->data()),
+                                        json->size());
+
+    // Use iterate_many for NDJSON (newline-delimited JSON)
+    simdjson::ondemand::document_stream docs;
+    auto error = parser_.iterate_many(padded_json).get(docs);
+    if (error) {
+      return ParseError(SimdjsonErrorMessage(error));
+    }
+
+    try {
+      for (auto doc : docs) {
+        if (num_rows_ >= std::numeric_limits<int32_t>::max()) {
+          return Status::Invalid("Row count overflowed int32_t");
+        }
+
+        RETURN_NOT_OK(VisitDocument(doc));
+        ++num_rows_;
+      }
+    } catch (const simdjson::simdjson_error& e) {
+      return ParseError(SimdjsonErrorMessage(e.error()));
+    }
+
+    // Check for truncated/incomplete JSON at the end of the stream
+    // Skip this check for empty input (json->size() == 0)
+    if (json->size() > 0 && docs.truncated_bytes() > 0) {
+      if (num_rows_ == 0) {
+        return ParseError("The document is empty or invalid");
+      }
+      return ParseError("The JSON document has incomplete content at the end");
+    }
+    return Status::OK();
   }
 
-  /// \ingroup rapidjson-handler-interface
-  ///
-  /// if an unexpected field is encountered, emit a parse error and bail
-  bool Key(const char* key, rj::SizeType len, ...) {
+ protected:
+  Status VisitDocument(
+      simdjson::simdjson_result<simdjson::ondemand::document_reference> doc_result) {
+    simdjson::ondemand::document_reference doc;
+    auto error = std::move(doc_result).get(doc);
+    if (error) {
+      return ParseError(SimdjsonErrorMessage(error), " in row ", num_rows_);
+    }
+
+    simdjson::ondemand::json_type type;
+    error = doc.type().get(type);
+    if (error) {
+      return ParseError(SimdjsonErrorMessage(error), " in row ", num_rows_);
+    }
+
+    switch (type) {
+      case simdjson::ondemand::json_type::null: {
+        // is_null() returns bool directly; type already confirmed via switch
+        (void)doc.is_null();
+        return VisitNull();
+      }
+      case simdjson::ondemand::json_type::boolean: {
+        bool b;
+        error = doc.get_bool().get(b);
+        if (error) {
+          return ParseError(SimdjsonErrorMessage(error));
+        }
+        return VisitBool(b);
+      }
+      case simdjson::ondemand::json_type::number: {
+        // Use raw_json_token to get the unparsed number string
+        // simdjson's raw_json_token may include trailing whitespace, so trim it
+        std::string_view raw = doc.raw_json_token();
+        while (!raw.empty() && (raw.back() == ' ' || raw.back() == '\t' ||
+                                raw.back() == '\n' || raw.back() == '\r')) {
+          raw.remove_suffix(1);
+        }
+        return VisitNumber(raw);
+      }
+      case simdjson::ondemand::json_type::string: {
+        std::string_view str;
+        error = doc.get_string().get(str);
+        if (error) {
+          return ParseError(SimdjsonErrorMessage(error));
+        }
+        return VisitString(str);
+      }
+      case simdjson::ondemand::json_type::object: {
+        simdjson::ondemand::object obj;
+        error = doc.get_object().get(obj);
+        if (error) {
+          return ParseError(SimdjsonErrorMessage(error));
+        }
+        return VisitObject(obj);
+      }
+      case simdjson::ondemand::json_type::array: {
+        simdjson::ondemand::array arr;
+        error = doc.get_array().get(arr);
+        if (error) {
+          return ParseError(SimdjsonErrorMessage(error));
+        }
+        return VisitArray(arr);
+      }
+      default:
+        return ParseError("Invalid value");
+    }
+  }
+
+  Status VisitValue(simdjson::ondemand::value val) {
+    simdjson::ondemand::json_type type;
+    auto error = val.type().get(type);
+    if (error) {
+      return ParseError(SimdjsonErrorMessage(error));
+    }
+
+    switch (type) {
+      case simdjson::ondemand::json_type::null: {
+        // is_null() returns bool directly; type already confirmed via switch
+        (void)val.is_null();
+        return VisitNull();
+      }
+      case simdjson::ondemand::json_type::boolean: {
+        bool b;
+        error = val.get_bool().get(b);
+        if (error) {
+          return ParseError(SimdjsonErrorMessage(error));
+        }
+        return VisitBool(b);
+      }
+      case simdjson::ondemand::json_type::number: {
+        // Use raw_json_token to get the unparsed number string
+        // simdjson's raw_json_token may include trailing whitespace, so trim it
+        std::string_view raw = val.raw_json_token();
+        while (!raw.empty() && (raw.back() == ' ' || raw.back() == '\t' ||
+                                raw.back() == '\n' || raw.back() == '\r')) {
+          raw.remove_suffix(1);
+        }
+        return VisitNumber(raw);
+      }
+      case simdjson::ondemand::json_type::string: {
+        std::string_view str;
+        error = val.get_string().get(str);
+        if (error) {
+          return ParseError(SimdjsonErrorMessage(error));
+        }
+        return VisitString(str);
+      }
+      case simdjson::ondemand::json_type::object: {
+        simdjson::ondemand::object obj;
+        error = val.get_object().get(obj);
+        if (error) {
+          return ParseError(SimdjsonErrorMessage(error));
+        }
+        return VisitObject(obj);
+      }
+      case simdjson::ondemand::json_type::array: {
+        simdjson::ondemand::array arr;
+        error = val.get_array().get(arr);
+        if (error) {
+          return ParseError(SimdjsonErrorMessage(error));
+        }
+        return VisitArray(arr);
+      }
+      default:
+        return ParseError("Invalid value");
+    }
+  }
+
+  Status VisitObject(simdjson::ondemand::object obj) {
+    RETURN_NOT_OK(StartObjectImpl());
+
+    for (auto field : obj) {
+      std::string_view key = field.unescaped_key();
+
+      RETURN_NOT_OK(HandleKey(key));
+      RETURN_NOT_OK(VisitValue(field.value()));
+    }
+
+    return EndObjectImpl();
+  }
+
+  Status HandleKey(std::string_view key) {
     bool duplicate_keys = false;
-    if (ARROW_PREDICT_FALSE(
-            SetFieldBuilder(std::string_view(key, len), &duplicate_keys))) {
-      return true;
+    if (ARROW_PREDICT_FALSE(SetFieldBuilder(key, &duplicate_keys))) {
+      return Status::OK();
     }
-    if (!duplicate_keys) {
-      status_ = ParseError("unexpected field");
+    if (duplicate_keys) {
+      return status_;  // SetFieldBuilder set the error
     }
-    return false;
+    return ParseError("unexpected field");
+  }
+
+  Status VisitArray(simdjson::ondemand::array arr) {
+    RETURN_NOT_OK(StartArrayImpl());
+
+    uint64_t count = 0;
+    for (auto elem : arr) {
+      RETURN_NOT_OK(VisitValue(elem.value()));
+      ++count;
+    }
+
+    return EndArrayImpl(count);
   }
 };
 
+/// \brief Handler for UnexpectedFieldBehavior::Ignore
+///
+/// If an unexpected field is encountered, skip it entirely.
 template <>
 class Handler<UnexpectedFieldBehavior::Ignore> : public HandlerBase {
  public:
   using HandlerBase::HandlerBase;
 
   Status Parse(const std::shared_ptr<Buffer>& json) override {
-    return DoParse(*this, json);
+    RETURN_NOT_OK(ReserveScalarStorage(json->size()));
+
+    simdjson::padded_string padded_json(reinterpret_cast<const char*>(json->data()),
+                                        json->size());
+
+    simdjson::ondemand::document_stream docs;
+    auto error = parser_.iterate_many(padded_json).get(docs);
+    if (error) {
+      return ParseError(SimdjsonErrorMessage(error));
+    }
+
+    try {
+      for (auto doc : docs) {
+        if (num_rows_ >= std::numeric_limits<int32_t>::max()) {
+          return Status::Invalid("Row count overflowed int32_t");
+        }
+
+        RETURN_NOT_OK(VisitDocument(doc));
+        ++num_rows_;
+      }
+    } catch (const simdjson::simdjson_error& e) {
+      return ParseError(SimdjsonErrorMessage(e.error()));
+    }
+
+    // Check for truncated/incomplete JSON at the end of the stream
+    // Skip this check for empty input (json->size() == 0)
+    if (json->size() > 0 && docs.truncated_bytes() > 0) {
+      if (num_rows_ == 0) {
+        return ParseError("The document is empty or invalid");
+      }
+      return ParseError("The JSON document has incomplete content at the end");
+    }
+    return Status::OK();
   }
 
-  bool Null() {
-    if (Skipping()) {
-      return true;
+ protected:
+  Status VisitDocument(
+      simdjson::simdjson_result<simdjson::ondemand::document_reference> doc_result) {
+    simdjson::ondemand::document_reference doc;
+    auto error = std::move(doc_result).get(doc);
+    if (error) {
+      return ParseError(SimdjsonErrorMessage(error), " in row ", num_rows_);
     }
-    return HandlerBase::Null();
-  }
 
-  bool Bool(bool value) {
-    if (Skipping()) {
-      return true;
+    simdjson::ondemand::json_type type;
+    error = doc.type().get(type);
+    if (error) {
+      return ParseError(SimdjsonErrorMessage(error), " in row ", num_rows_);
     }
-    return HandlerBase::Bool(value);
-  }
 
-  bool RawNumber(const char* data, rj::SizeType size, ...) {
-    if (Skipping()) {
-      return true;
-    }
-    return HandlerBase::RawNumber(data, size);
-  }
-
-  bool String(const char* data, rj::SizeType size, ...) {
-    if (Skipping()) {
-      return true;
-    }
-    return HandlerBase::String(data, size);
-  }
-
-  bool StartObject() {
-    ++depth_;
-    if (Skipping()) {
-      return true;
-    }
-    return HandlerBase::StartObject();
-  }
-
-  /// \ingroup rapidjson-handler-interface
-  ///
-  /// if an unexpected field is encountered, skip until its value has been consumed
-  bool Key(const char* key, rj::SizeType len, ...) {
-    MaybeStopSkipping();
-    if (Skipping()) {
-      return true;
-    }
-    bool duplicate_keys = false;
-    if (ARROW_PREDICT_TRUE(
-            SetFieldBuilder(std::string_view(key, len), &duplicate_keys))) {
-      return true;
-    }
-    if (ARROW_PREDICT_FALSE(duplicate_keys)) {
-      return false;
-    }
-    skip_depth_ = depth_;
-    return true;
-  }
-
-  bool EndObject(...) {
-    MaybeStopSkipping();
-    --depth_;
-    if (Skipping()) {
-      return true;
-    }
-    return HandlerBase::EndObject();
-  }
-
-  bool StartArray() {
-    if (Skipping()) {
-      return true;
-    }
-    return HandlerBase::StartArray();
-  }
-
-  bool EndArray(rj::SizeType size) {
-    if (Skipping()) {
-      return true;
-    }
-    return HandlerBase::EndArray(size);
-  }
-
- private:
-  bool Skipping() { return depth_ >= skip_depth_; }
-
-  void MaybeStopSkipping() {
-    if (skip_depth_ == depth_) {
-      skip_depth_ = std::numeric_limits<int>::max();
+    switch (type) {
+      case simdjson::ondemand::json_type::null: {
+        // is_null() returns bool directly; type already confirmed via switch
+        (void)doc.is_null();
+        return VisitNull();
+      }
+      case simdjson::ondemand::json_type::boolean: {
+        bool b;
+        error = doc.get_bool().get(b);
+        if (error) {
+          return ParseError(SimdjsonErrorMessage(error));
+        }
+        return VisitBool(b);
+      }
+      case simdjson::ondemand::json_type::number: {
+        // simdjson's raw_json_token may include trailing whitespace, so trim it
+        std::string_view raw = doc.raw_json_token();
+        while (!raw.empty() && (raw.back() == ' ' || raw.back() == '\t' ||
+                                raw.back() == '\n' || raw.back() == '\r')) {
+          raw.remove_suffix(1);
+        }
+        return VisitNumber(raw);
+      }
+      case simdjson::ondemand::json_type::string: {
+        std::string_view str;
+        error = doc.get_string().get(str);
+        if (error) {
+          return ParseError(SimdjsonErrorMessage(error));
+        }
+        return VisitString(str);
+      }
+      case simdjson::ondemand::json_type::object: {
+        simdjson::ondemand::object obj;
+        error = doc.get_object().get(obj);
+        if (error) {
+          return ParseError(SimdjsonErrorMessage(error));
+        }
+        return VisitObject(obj);
+      }
+      case simdjson::ondemand::json_type::array: {
+        simdjson::ondemand::array arr;
+        error = doc.get_array().get(arr);
+        if (error) {
+          return ParseError(SimdjsonErrorMessage(error));
+        }
+        return VisitArray(arr);
+      }
+      default:
+        return ParseError("Invalid value");
     }
   }
 
-  int depth_ = 0;
-  int skip_depth_ = std::numeric_limits<int>::max();
+  Status VisitValue(simdjson::ondemand::value val) {
+    simdjson::ondemand::json_type type;
+    auto error = val.type().get(type);
+    if (error) {
+      return ParseError(SimdjsonErrorMessage(error));
+    }
+
+    switch (type) {
+      case simdjson::ondemand::json_type::null: {
+        // is_null() returns bool directly; type already confirmed via switch
+        (void)val.is_null();
+        return VisitNull();
+      }
+      case simdjson::ondemand::json_type::boolean: {
+        bool b;
+        error = val.get_bool().get(b);
+        if (error) {
+          return ParseError(SimdjsonErrorMessage(error));
+        }
+        return VisitBool(b);
+      }
+      case simdjson::ondemand::json_type::number: {
+        // simdjson's raw_json_token may include trailing whitespace, so trim it
+        std::string_view raw = val.raw_json_token();
+        while (!raw.empty() && (raw.back() == ' ' || raw.back() == '\t' ||
+                                raw.back() == '\n' || raw.back() == '\r')) {
+          raw.remove_suffix(1);
+        }
+        return VisitNumber(raw);
+      }
+      case simdjson::ondemand::json_type::string: {
+        std::string_view str;
+        error = val.get_string().get(str);
+        if (error) {
+          return ParseError(SimdjsonErrorMessage(error));
+        }
+        return VisitString(str);
+      }
+      case simdjson::ondemand::json_type::object: {
+        simdjson::ondemand::object obj;
+        error = val.get_object().get(obj);
+        if (error) {
+          return ParseError(SimdjsonErrorMessage(error));
+        }
+        return VisitObject(obj);
+      }
+      case simdjson::ondemand::json_type::array: {
+        simdjson::ondemand::array arr;
+        error = val.get_array().get(arr);
+        if (error) {
+          return ParseError(SimdjsonErrorMessage(error));
+        }
+        return VisitArray(arr);
+      }
+      default:
+        return ParseError("Invalid value");
+    }
+  }
+
+  Status VisitObject(simdjson::ondemand::object obj) {
+    RETURN_NOT_OK(StartObjectImpl());
+
+    for (auto field : obj) {
+      std::string_view key = field.unescaped_key();
+
+      bool duplicate_keys = false;
+      if (ARROW_PREDICT_TRUE(SetFieldBuilder(key, &duplicate_keys))) {
+        // Known field - visit its value
+        RETURN_NOT_OK(VisitValue(field.value()));
+      } else if (ARROW_PREDICT_FALSE(duplicate_keys)) {
+        return status_;  // SetFieldBuilder set the error
+      }
+      // else: unknown field - skip it (do nothing, simdjson will move on)
+    }
+
+    return EndObjectImpl();
+  }
+
+  Status VisitArray(simdjson::ondemand::array arr) {
+    RETURN_NOT_OK(StartArrayImpl());
+
+    uint64_t count = 0;
+    for (auto elem : arr) {
+      RETURN_NOT_OK(VisitValue(elem.value()));
+      ++count;
+    }
+
+    return EndArrayImpl(count);
+  }
 };
 
+/// \brief Handler for UnexpectedFieldBehavior::InferType
+///
+/// If an unexpected field is encountered, add a new builder to
+/// the current parent builder. It is added as a NullBuilder with
+/// (parent.length - 1) leading nulls. The next value parsed
+/// will probably trigger promotion of this field from null.
 template <>
 class Handler<UnexpectedFieldBehavior::InferType> : public HandlerBase {
  public:
   using HandlerBase::HandlerBase;
 
   Status Parse(const std::shared_ptr<Buffer>& json) override {
-    return DoParse(*this, json);
+    RETURN_NOT_OK(ReserveScalarStorage(json->size()));
+
+    simdjson::padded_string padded_json(reinterpret_cast<const char*>(json->data()),
+                                        json->size());
+
+    simdjson::ondemand::document_stream docs;
+    auto error = parser_.iterate_many(padded_json).get(docs);
+    if (error) {
+      return ParseError(SimdjsonErrorMessage(error));
+    }
+
+    try {
+      for (auto doc : docs) {
+        if (num_rows_ >= std::numeric_limits<int32_t>::max()) {
+          return Status::Invalid("Row count overflowed int32_t");
+        }
+
+        RETURN_NOT_OK(VisitDocument(doc));
+        ++num_rows_;
+      }
+    } catch (const simdjson::simdjson_error& e) {
+      return ParseError(SimdjsonErrorMessage(e.error()));
+    }
+
+    // Check for truncated/incomplete JSON at the end of the stream
+    // Skip this check for empty input (json->size() == 0)
+    if (json->size() > 0 && docs.truncated_bytes() > 0) {
+      if (num_rows_ == 0) {
+        return ParseError("The document is empty or invalid");
+      }
+      return ParseError("The JSON document has incomplete content at the end");
+    }
+    return Status::OK();
   }
 
-  bool Bool(bool value) {
-    if (ARROW_PREDICT_FALSE(MaybePromoteFromNull<Kind::kBoolean>())) {
-      return false;
+ protected:
+  Status VisitDocument(
+      simdjson::simdjson_result<simdjson::ondemand::document_reference> doc_result) {
+    simdjson::ondemand::document_reference doc;
+    auto error = std::move(doc_result).get(doc);
+    if (error) {
+      return ParseError(SimdjsonErrorMessage(error), " in row ", num_rows_);
     }
-    return HandlerBase::Bool(value);
+
+    simdjson::ondemand::json_type type;
+    error = doc.type().get(type);
+    if (error) {
+      return ParseError(SimdjsonErrorMessage(error), " in row ", num_rows_);
+    }
+
+    switch (type) {
+      case simdjson::ondemand::json_type::null: {
+        // is_null() returns bool directly; type already confirmed via switch
+        (void)doc.is_null();
+        return VisitNull();
+      }
+      case simdjson::ondemand::json_type::boolean: {
+        bool b;
+        error = doc.get_bool().get(b);
+        if (error) {
+          return ParseError(SimdjsonErrorMessage(error));
+        }
+        RETURN_NOT_OK(MaybePromoteFromNull<Kind::kBoolean>());
+        return VisitBool(b);
+      }
+      case simdjson::ondemand::json_type::number: {
+        // simdjson's raw_json_token may include trailing whitespace, so trim it
+        std::string_view raw = doc.raw_json_token();
+        while (!raw.empty() && (raw.back() == ' ' || raw.back() == '\t' ||
+                                raw.back() == '\n' || raw.back() == '\r')) {
+          raw.remove_suffix(1);
+        }
+        RETURN_NOT_OK(MaybePromoteFromNull<Kind::kNumber>());
+        return VisitNumber(raw);
+      }
+      case simdjson::ondemand::json_type::string: {
+        std::string_view str;
+        error = doc.get_string().get(str);
+        if (error) {
+          return ParseError(SimdjsonErrorMessage(error));
+        }
+        RETURN_NOT_OK(MaybePromoteFromNull<Kind::kString>());
+        return VisitString(str);
+      }
+      case simdjson::ondemand::json_type::object: {
+        simdjson::ondemand::object obj;
+        error = doc.get_object().get(obj);
+        if (error) {
+          return ParseError(SimdjsonErrorMessage(error));
+        }
+        RETURN_NOT_OK(MaybePromoteFromNull<Kind::kObject>());
+        return VisitObject(obj);
+      }
+      case simdjson::ondemand::json_type::array: {
+        simdjson::ondemand::array arr;
+        error = doc.get_array().get(arr);
+        if (error) {
+          return ParseError(SimdjsonErrorMessage(error));
+        }
+        RETURN_NOT_OK(MaybePromoteFromNull<Kind::kArray>());
+        return VisitArray(arr);
+      }
+      default:
+        return ParseError("Invalid value");
+    }
   }
 
-  bool RawNumber(const char* data, rj::SizeType size, ...) {
-    if (ARROW_PREDICT_FALSE(MaybePromoteFromNull<Kind::kNumber>())) {
-      return false;
+  Status VisitValue(simdjson::ondemand::value val) {
+    simdjson::ondemand::json_type type;
+    auto error = val.type().get(type);
+    if (error) {
+      return ParseError(SimdjsonErrorMessage(error));
     }
-    return HandlerBase::RawNumber(data, size);
+
+    switch (type) {
+      case simdjson::ondemand::json_type::null: {
+        // is_null() returns bool directly; type already confirmed via switch
+        (void)val.is_null();
+        return VisitNull();
+      }
+      case simdjson::ondemand::json_type::boolean: {
+        bool b;
+        error = val.get_bool().get(b);
+        if (error) {
+          return ParseError(SimdjsonErrorMessage(error));
+        }
+        RETURN_NOT_OK(MaybePromoteFromNull<Kind::kBoolean>());
+        return VisitBool(b);
+      }
+      case simdjson::ondemand::json_type::number: {
+        // simdjson's raw_json_token may include trailing whitespace, so trim it
+        std::string_view raw = val.raw_json_token();
+        while (!raw.empty() && (raw.back() == ' ' || raw.back() == '\t' ||
+                                raw.back() == '\n' || raw.back() == '\r')) {
+          raw.remove_suffix(1);
+        }
+        RETURN_NOT_OK(MaybePromoteFromNull<Kind::kNumber>());
+        return VisitNumber(raw);
+      }
+      case simdjson::ondemand::json_type::string: {
+        std::string_view str;
+        error = val.get_string().get(str);
+        if (error) {
+          return ParseError(SimdjsonErrorMessage(error));
+        }
+        RETURN_NOT_OK(MaybePromoteFromNull<Kind::kString>());
+        return VisitString(str);
+      }
+      case simdjson::ondemand::json_type::object: {
+        simdjson::ondemand::object obj;
+        error = val.get_object().get(obj);
+        if (error) {
+          return ParseError(SimdjsonErrorMessage(error));
+        }
+        RETURN_NOT_OK(MaybePromoteFromNull<Kind::kObject>());
+        return VisitObject(obj);
+      }
+      case simdjson::ondemand::json_type::array: {
+        simdjson::ondemand::array arr;
+        error = val.get_array().get(arr);
+        if (error) {
+          return ParseError(SimdjsonErrorMessage(error));
+        }
+        RETURN_NOT_OK(MaybePromoteFromNull<Kind::kArray>());
+        return VisitArray(arr);
+      }
+      default:
+        return ParseError("Invalid value");
+    }
   }
 
-  bool String(const char* data, rj::SizeType size, ...) {
-    if (ARROW_PREDICT_FALSE(MaybePromoteFromNull<Kind::kString>())) {
-      return false;
+  Status VisitObject(simdjson::ondemand::object obj) {
+    RETURN_NOT_OK(StartObjectImpl());
+
+    for (auto field : obj) {
+      std::string_view key = field.unescaped_key();
+
+      bool duplicate_keys = false;
+      if (ARROW_PREDICT_TRUE(SetFieldBuilder(key, &duplicate_keys))) {
+        // Known field
+        RETURN_NOT_OK(VisitValue(field.value()));
+      } else if (ARROW_PREDICT_FALSE(duplicate_keys)) {
+        return status_;  // SetFieldBuilder set the error
+      } else {
+        // New field - add it with leading nulls
+        auto struct_builder = Cast<Kind::kObject>(builder_stack_.back());
+        auto leading_nulls = static_cast<uint32_t>(struct_builder->length() - 1);
+        builder_ = BuilderPtr(Kind::kNull, leading_nulls, true);
+        field_index_ = struct_builder->AddField(key, builder_);
+        RETURN_NOT_OK(VisitValue(field.value()));
+      }
     }
-    return HandlerBase::String(data, size);
+
+    return EndObjectImpl();
   }
 
-  bool StartObject() {
-    if (ARROW_PREDICT_FALSE(MaybePromoteFromNull<Kind::kObject>())) {
-      return false;
-    }
-    return HandlerBase::StartObject();
-  }
+  Status VisitArray(simdjson::ondemand::array arr) {
+    RETURN_NOT_OK(StartArrayImpl());
 
-  /// \ingroup rapidjson-handler-interface
-  ///
-  /// If an unexpected field is encountered, add a new builder to
-  /// the current parent builder. It is added as a NullBuilder with
-  /// (parent.length - 1) leading nulls. The next value parsed
-  /// will probably trigger promotion of this field from null
-  bool Key(const char* key, rj::SizeType len, ...) {
-    bool duplicate_keys = false;
-    if (ARROW_PREDICT_TRUE(
-            SetFieldBuilder(std::string_view(key, len), &duplicate_keys))) {
-      return true;
+    uint64_t count = 0;
+    for (auto elem : arr) {
+      RETURN_NOT_OK(VisitValue(elem.value()));
+      ++count;
     }
-    if (ARROW_PREDICT_FALSE(duplicate_keys)) {
-      return false;
-    }
-    auto struct_builder = Cast<Kind::kObject>(builder_stack_.back());
-    auto leading_nulls = static_cast<uint32_t>(struct_builder->length() - 1);
-    builder_ = BuilderPtr(Kind::kNull, leading_nulls, true);
-    field_index_ = struct_builder->AddField(std::string_view(key, len), builder_);
-    return true;
-  }
 
-  bool StartArray() {
-    if (ARROW_PREDICT_FALSE(MaybePromoteFromNull<Kind::kArray>())) {
-      return false;
-    }
-    return HandlerBase::StartArray();
+    return EndArrayImpl(count);
   }
 
  private:
-  // return true if a terminal error was encountered
   template <Kind::type kind>
-  bool MaybePromoteFromNull() {
+  Status MaybePromoteFromNull() {
     if (ARROW_PREDICT_TRUE(builder_.kind != Kind::kNull)) {
-      return false;
+      return Status::OK();
     }
     auto parent = builder_stack_.back();
     if (parent.kind == Kind::kArray) {
       auto list_builder = Cast<Kind::kArray>(parent);
       DCHECK_EQ(list_builder->value_builder(), builder_);
-      status_ = builder_set_.MakeBuilder<kind>(builder_.index, &builder_);
-      if (ARROW_PREDICT_FALSE(!status_.ok())) {
-        return true;
-      }
+      RETURN_NOT_OK(builder_set_.MakeBuilder<kind>(builder_.index, &builder_));
       list_builder = Cast<Kind::kArray>(parent);
       list_builder->value_builder(builder_);
     } else {
       auto struct_builder = Cast<Kind::kObject>(parent);
       DCHECK_EQ(struct_builder->field_builder(field_index_), builder_);
-      status_ = builder_set_.MakeBuilder<kind>(builder_.index, &builder_);
-      if (ARROW_PREDICT_FALSE(!status_.ok())) {
-        return true;
-      }
+      RETURN_NOT_OK(builder_set_.MakeBuilder<kind>(builder_.index, &builder_));
       struct_builder = Cast<Kind::kObject>(parent);
       struct_builder->field_builder(field_index_, builder_);
     }
-    return false;
+    return Status::OK();
   }
 };
 

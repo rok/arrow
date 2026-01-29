@@ -15,29 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-// Include this file before including any RapidJSON headers.
-
-#pragma once
-
-#define RAPIDJSON_HAS_STDSTRING 1
-#define RAPIDJSON_HAS_CXX11_RVALUE_REFS 1
-#define RAPIDJSON_HAS_CXX11_RANGE_FOR 1
-
-// rapidjson will be defined in namespace arrow::rapidjson
-#define RAPIDJSON_NAMESPACE arrow::rapidjson
-#define RAPIDJSON_NAMESPACE_BEGIN \
-  namespace arrow {               \
-  namespace rapidjson {
-#define RAPIDJSON_NAMESPACE_END \
-  }                             \
-  }
-
-// enable SIMD whitespace skipping, if available
-#if defined(ARROW_HAVE_SSE4_2)
-#  define RAPIDJSON_SSE2 1
-#  define RAPIDJSON_SSE42 1
-#endif
-
-#if defined(ARROW_HAVE_NEON)
-#  define RAPIDJSON_NEON 1
-#endif
+// This file is intentionally empty.
+// When using bundled simdjson in header-only mode (SIMDJSON_HEADER_ONLY),
+// all simdjson code is inline and no implementation file is needed.
+// This file exists for compatibility with build systems that expect it.

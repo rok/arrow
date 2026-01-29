@@ -112,6 +112,10 @@ add_library(arrow_odbc_spi_impl
             util.cc
             util.h)
 target_compile_definitions(arrow_odbc_spi_impl PUBLIC UNICODE)
+# Use header-only mode when ARROW_SIMDJSON_HEADER_ONLY is set (bundled simdjson)
+if(ARROW_SIMDJSON_HEADER_ONLY)
+  target_compile_definitions(arrow_odbc_spi_impl PRIVATE SIMDJSON_HEADER_ONLY)
+endif()
 target_include_directories(arrow_odbc_spi_impl PUBLIC include include/odbc_impl)
 target_include_directories(arrow_odbc_spi_impl PUBLIC ${CMAKE_CURRENT_LIST_DIR})
 
@@ -132,7 +136,8 @@ endif()
 
 target_link_libraries(arrow_odbc_spi_impl
                       PUBLIC arrow_flight_sql_shared arrow_compute_shared Boost::locale
-                             ${ODBCINST})
+                             ${ODBCINST}
+                      PRIVATE simdjson::simdjson)
 
 set_target_properties(arrow_odbc_spi_impl
                       PROPERTIES ARCHIVE_OUTPUT_DIRECTORY

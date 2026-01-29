@@ -58,7 +58,7 @@ RUN dnf update -y && \
         python \
         python-devel \
         python-pip \
-        rapidjson-devel \
+        simdjson-devel \
         re2-devel \
         snappy-devel \
         thrift-devel \

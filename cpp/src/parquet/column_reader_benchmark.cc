@@ -16,7 +16,11 @@
 // under the License.
 
 #include <type_traits>
+
 #include "benchmark/benchmark.h"
+
+#include "arrow/util/benchmark_util.h"
+
 #include "parquet/column_page.h"
 #include "parquet/column_reader.h"
 #include "parquet/schema.h"
@@ -354,7 +358,7 @@ static void ReadLevels_BitPack(::benchmark::State& state) {
                level_repeat_count, state);
 }
 
-static void ReadLevelsArguments(::benchmark::internal::Benchmark* b) {
+static void ReadLevelsArguments(::arrow::BenchmarkType* b) {
   b->ArgNames({"MaxLevel", "NumLevels", "BatchSize", "LevelRepeatCount"})
       ->Args({1, 8096, 1024, 1})
       ->Args({1, 8096, 1024, 7})

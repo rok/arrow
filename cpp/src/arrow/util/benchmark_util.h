@@ -28,6 +28,25 @@
 
 namespace arrow {
 
+// Google Benchmark 1.8.0+ moved Benchmark class to ::benchmark::Benchmark
+// and deprecated benchmark::internal::Benchmark. However, the internal version
+// still works in all versions, so we use it with deprecation warnings suppressed.
+#if defined(__GNUC__) || defined(__clang__)
+#  pragma GCC diagnostic push
+#  pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#endif
+#ifdef _MSC_VER
+#  pragma warning(push)
+#  pragma warning(disable : 4996)  // deprecated declaration
+#endif
+using BenchmarkType = benchmark::internal::Benchmark;
+#ifdef _MSC_VER
+#  pragma warning(pop)
+#endif
+#if defined(__GNUC__) || defined(__clang__)
+#  pragma GCC diagnostic pop
+#endif
+
 // Benchmark changed its parameter type between releases from
 // int to int64_t. As it doesn't have version macros, we need
 // to apply C++ template magic.
@@ -37,13 +56,11 @@ struct BenchmarkArgsType;
 
 // Pattern matching that extracts the vector element type of Benchmark::Args()
 template <typename Values>
-struct BenchmarkArgsType<benchmark::internal::Benchmark* (
-    benchmark::internal::Benchmark::*)(const std::vector<Values>&)> {
+struct BenchmarkArgsType<BenchmarkType* (BenchmarkType::*)(const std::vector<Values>&)> {
   using type = Values;
 };
 
-using ArgsType =
-    typename BenchmarkArgsType<decltype(&benchmark::internal::Benchmark::Args)>::type;
+using ArgsType = typename BenchmarkArgsType<decltype(&BenchmarkType::Args)>::type;
 
 using internal::CpuInfo;
 
@@ -84,7 +101,7 @@ struct GenericItemsArgs {
   benchmark::State& state_;
 };
 
-void BenchmarkSetArgsWithSizes(benchmark::internal::Benchmark* bench,
+void BenchmarkSetArgsWithSizes(BenchmarkType* bench,
                                const std::vector<int64_t>& sizes = kMemorySizes) {
   bench->Unit(benchmark::kMicrosecond);
 
@@ -95,11 +112,11 @@ void BenchmarkSetArgsWithSizes(benchmark::internal::Benchmark* bench,
   }
 }
 
-void BenchmarkSetArgs(benchmark::internal::Benchmark* bench) {
+void BenchmarkSetArgs(BenchmarkType* bench) {
   BenchmarkSetArgsWithSizes(bench, kMemorySizes);
 }
 
-void RegressionSetArgs(benchmark::internal::Benchmark* bench) {
+void RegressionSetArgs(BenchmarkType* bench) {
   // Regression do not need to account for cache hierarchy, thus optimize for
   // the best case.
   BenchmarkSetArgsWithSizes(bench, {kL1Size});

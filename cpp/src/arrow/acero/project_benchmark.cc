@@ -32,6 +32,7 @@
 #include "arrow/testing/generator.h"
 #include "arrow/testing/gtest_util.h"
 #include "arrow/type.h"
+#include "arrow/util/benchmark_util.h"
 
 namespace arrow {
 
@@ -72,7 +73,7 @@ arrow::compute::Expression zero_copy_expression = call(
     "cast", {field_ref("i64")}, compute::CastOptions::Safe(timestamp(TimeUnit::NANO)));
 arrow::compute::Expression ref_only_expression = field_ref("i64");
 
-void SetArgs(benchmark::internal::Benchmark* bench) {
+void SetArgs(arrow::BenchmarkType* bench) {
   bench->ArgNames({"batch_size"})
       ->RangeMultiplier(10)
       ->Range(1000, kTotalBatchSize)

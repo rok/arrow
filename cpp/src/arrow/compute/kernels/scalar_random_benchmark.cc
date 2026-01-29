@@ -43,7 +43,7 @@ static void RandomKernelSeed(benchmark::State& state) {
   RandomKernel(state, /*is_seed=*/true);
 }
 
-void SetArgs(benchmark::internal::Benchmark* bench) {
+void SetArgs(arrow::BenchmarkType* bench) {
   for (int64_t length : {1, 64, 1024, 65536}) {
     bench->Arg(length);
   }

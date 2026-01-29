@@ -182,6 +182,18 @@ class ChunkingTransformer {
   }
 
  private:
+  // Strip UTF-8 BOM from the beginning of the first buffer if present
+  static std::shared_ptr<Buffer> StripBOM(std::shared_ptr<Buffer> buffer) {
+    // UTF-8 BOM is 0xEF 0xBB 0xBF
+    if (buffer && buffer->size() >= 3) {
+      const uint8_t* data = buffer->data();
+      if (data[0] == 0xEF && data[1] == 0xBB && data[2] == 0xBF) {
+        return SliceBuffer(buffer, 3);
+      }
+    }
+    return buffer;
+  }
+
   Result<TransformFlow<ChunkedBlock>> operator()(std::shared_ptr<Buffer> next_buffer) {
     if (!buffer_) {
       if (ARROW_PREDICT_TRUE(!next_buffer)) {
@@ -189,7 +201,8 @@ class ChunkingTransformer {
         return TransformFinish();
       }
       partial_ = std::make_shared<Buffer>("");
-      buffer_ = std::move(next_buffer);
+      // Strip BOM from the first buffer
+      buffer_ = StripBOM(std::move(next_buffer));
       return TransformSkip();
     }
     DCHECK_NE(partial_, nullptr);

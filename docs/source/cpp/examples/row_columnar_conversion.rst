@@ -47,9 +47,9 @@ provides several utilities:
 * :class:`arrow::TableBatchReader`: read a table in a batch at a time, with each
   batch being a zero-copy slice.
 
-The following example shows how to implement conversion between ``rapidjson::Document``
-and Arrow objects. You can read the full code example at
-https://github.com/apache/arrow/blob/main/cpp/examples/arrow/rapidjson_row_converter.cc
+The following example shows how to implement conversion between
+``simdjson::dom::element`` values and Arrow objects. You can read the full code example at
+https://github.com/apache/arrow/blob/main/cpp/examples/arrow/simdjson_row_converter.cc
 
 Writing conversions to Arrow
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -63,7 +63,7 @@ check the first N rows to infer a schema if there is none already available.
 
 At the top level, we define a function ``ConvertToRecordBatch``:
 
-.. literalinclude:: ../../../../cpp/examples/arrow/rapidjson_row_converter.cc
+.. literalinclude:: ../../../../cpp/examples/arrow/simdjson_row_converter.cc
    :language: cpp
    :start-at: arrow::Result<std::shared_ptr<arrow::RecordBatch>> ConvertToRecordBatch(
    :end-at: }  // ConvertToRecordBatch
@@ -87,10 +87,10 @@ an iterator of the column values for the current field across the rows. In
 row-based structures that are flat (such as a vector of values) this may be
 trivial to implement. But if the schema is nested, as in the case of JSON documents,
 a special iterator is needed to navigate the levels of nesting. See the
-`full example <https://github.com/apache/arrow/blob/main/cpp/examples/arrow/rapidjson_row_converter.cc>`_
+`full example <https://github.com/apache/arrow/blob/main/cpp/examples/arrow/simdjson_row_converter.cc>`_
 for the implementation details of ``DocValuesIterator``.
 
-.. literalinclude:: ../../../../cpp/examples/arrow/rapidjson_row_converter.cc
+.. literalinclude:: ../../../../cpp/examples/arrow/simdjson_row_converter.cc
    :language: cpp
    :start-at: class JsonValueConverter
    :end-at: };  // JsonValueConverter
@@ -113,7 +113,7 @@ to iterate over slices of a table. This returns Arrow's iterator type
 (:class:`arrow::Iterator`) so rows could then be processed either one-at-a-time
 or be collected into a container.
 
-.. literalinclude:: ../../../../cpp/examples/arrow/rapidjson_row_converter.cc
+.. literalinclude:: ../../../../cpp/examples/arrow/simdjson_row_converter.cc
    :language: cpp
    :start-at: class ArrowToDocumentConverter
    :end-at: };  // ArrowToDocumentConverter
@@ -126,7 +126,7 @@ write a template method for array types that have primitive C equivalents
 (booleans, integers, and floats) using ``arrow::enable_if_primitive_ctype``.
 See :ref:`type-traits` for other type predicates.
 
-.. literalinclude:: ../../../../cpp/examples/arrow/rapidjson_row_converter.cc
+.. literalinclude:: ../../../../cpp/examples/arrow/simdjson_row_converter.cc
    :language: cpp
    :start-at: class RowBatchBuilder
    :end-at: };  // RowBatchBuilder

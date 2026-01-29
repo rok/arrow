@@ -38,10 +38,10 @@ std::string GenerateTestData(const Input& input, int num_rows,
   std::default_random_engine engine(kSeed);
   std::string json;
   for (int i = 0; i < num_rows; ++i) {
-    StringBuffer sb;
-    Writer writer(sb);
+    Writer writer;
     ABORT_NOT_OK(Generate(input, engine, &writer, options));
-    json += pretty ? PrettyPrint(sb.GetString()) : sb.GetString();
+    std::string row(writer.GetString());
+    json += pretty ? PrettyPrint(row) : row;
     json += "\n";
   }
   return json;

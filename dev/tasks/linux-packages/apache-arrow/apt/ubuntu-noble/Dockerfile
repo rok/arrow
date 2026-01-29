@@ -74,7 +74,7 @@ RUN \
     python3-dev \
     python3-pip \
     python3-setuptools \
-    rapidjson-dev \
+    libsimdjson-dev \
     tzdata \
     valac \
     zlib1g-dev && \

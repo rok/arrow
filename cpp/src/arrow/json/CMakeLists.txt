@@ -26,13 +26,20 @@ add_arrow_test(test
                PREFIX
                "arrow-json"
                EXTRA_LINK_LIBS
-               RapidJSON)
+               simdjson::simdjson
+               DEFINITIONS
+               SIMDJSON_HEADER_ONLY)
 
 add_arrow_benchmark(parser_benchmark
                     PREFIX
                     "arrow-json"
                     EXTRA_LINK_LIBS
-                    RapidJSON)
+                    simdjson::simdjson)
+
+# Add SIMDJSON_HEADER_ONLY to benchmark (add_benchmark doesn't support DEFINITIONS)
+if(TARGET arrow-json-parser-benchmark)
+  target_compile_definitions(arrow-json-parser-benchmark PRIVATE SIMDJSON_HEADER_ONLY)
+endif()
 arrow_install_all_headers("arrow/json")
 
 # pkg-config support

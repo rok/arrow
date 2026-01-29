@@ -446,8 +446,7 @@ class BaseTestStreamingJSONRead(BaseTestJSON):
         }
         with pytest.raises(
             pa.ArrowInvalid,
-            match="JSON parse error:\
- Missing a comma or '}' after an object member*"
+            match="JSON parse error: Invalid value.*"
         ):
             reader.read_next_batch()
 

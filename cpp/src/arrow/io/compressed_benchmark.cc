@@ -15,6 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
+#include "arrow/util/benchmark_util.h"
 #include "benchmark/benchmark.h"
 
 #include <algorithm>
@@ -171,7 +172,7 @@ static void CompressedInputStreamNonZeroCopyBufferReturnedByCallee(
 }
 
 #ifdef ARROW_WITH_LZ4
-static void CompressedInputArguments(::benchmark::internal::Benchmark* b) {
+static void CompressedInputArguments(arrow::BenchmarkType* b) {
   b->ArgNames({"num_bytes", "batch_size"})
       ->Args({8 * 1024, 8 * 1024})
       ->Args({64 * 1024, 8 * 1024})
