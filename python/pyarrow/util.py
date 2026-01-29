@@ -232,7 +232,7 @@ def _break_traceback_cycle_from_frame(frame):
 
 def _download_urllib(url, out_path):
     from urllib.request import urlopen, Request
-    req = Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+    req = Request(url, headers={'User-Agent': 'pyarrow'})
     with urlopen(req) as response:
         with open(out_path, 'wb') as f:
             f.write(response.read())
