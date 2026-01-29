@@ -26,9 +26,7 @@ add_arrow_test(test
                PREFIX
                "arrow-json"
                EXTRA_LINK_LIBS
-               simdjson::simdjson
-               DEFINITIONS
-               SIMDJSON_HEADER_ONLY)
+               simdjson::simdjson)
 
 add_arrow_benchmark(parser_benchmark
                     PREFIX
@@ -36,10 +34,7 @@ add_arrow_benchmark(parser_benchmark
                     EXTRA_LINK_LIBS
                     simdjson::simdjson)
 
-# Add SIMDJSON_HEADER_ONLY to benchmark (add_benchmark doesn't support DEFINITIONS)
-if(TARGET arrow-json-parser-benchmark)
-  target_compile_definitions(arrow-json-parser-benchmark PRIVATE SIMDJSON_HEADER_ONLY)
-endif()
+# Note: simdjson is now linked as a static library, not header-only
 arrow_install_all_headers("arrow/json")
 
 # pkg-config support
