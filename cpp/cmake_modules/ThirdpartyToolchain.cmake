@@ -2612,6 +2612,9 @@ macro(build_simdjson)
 
   # Ensure bundled headers take precedence over system/conda/vcpkg versions
   include_directories(BEFORE SYSTEM "${SIMDJSON_INCLUDE_DIR}")
+
+  # Add to bundled static libs so it gets merged into arrow_bundled_dependencies
+  list(APPEND ARROW_BUNDLED_STATIC_LIBS simdjson::simdjson)
 endmacro()
 
 if(ARROW_WITH_SIMDJSON)
