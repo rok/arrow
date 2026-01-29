@@ -51,7 +51,7 @@
     "openssl",
     "orc",
     "protobuf",
-    "rapidjson",
+    "simdjson",
     "re2",
     "snappy",
     "sqlite3",

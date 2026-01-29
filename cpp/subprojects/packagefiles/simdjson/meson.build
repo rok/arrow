@@ -15,13 +15,16 @@
 # specific language governing permissions and limitations
 # under the License.
 
-[wrap-file]
-directory = rapidjson-232389d4f1012dddec4ef84861face2d2ba85709
-source_url = https://github.com/Tencent/rapidjson/archive/232389d4f1012dddec4ef84861face2d2ba85709.tar.gz
-source_filename = rapidjson-232389d4f1012dddec4ef84861face2d2ba85709.tar.gz
-source_hash = b9290a9a6d444c8e049bd589ab804e0ccf2b05dc5984a19ed5ae75d090064806
-source_fallback_url = https://apache.jfrog.io/artifactory/arrow/thirdparty/7.0.0/rapidjson-232389d4f1012dddec4ef84861face2d2ba85709.tar.gz
-patch_directory = rapidjson
+project('simdjson', 'cpp', version: '3.12.3', default_options: ['cpp_std=c++17'])
 
-[provide]
-rapidjson = rapidjson_dep
+simdjson_lib = static_library(
+    'simdjson',
+    'singleheader/simdjson.cpp',
+    include_directories: include_directories('singleheader'),
+    cpp_args: ['-DSIMDJSON_THREADS_ENABLED=1'],
+)
+
+simdjson_dep = declare_dependency(
+    include_directories: include_directories('singleheader'),
+    link_with: simdjson_lib,
+)

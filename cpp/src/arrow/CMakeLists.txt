@@ -617,11 +617,6 @@ if(ARROW_WITH_OPENTELEMETRY)
     target_link_libraries(${ARROW_UTIL_TARGET} PRIVATE ${ARROW_OPENTELEMETRY_LIBS})
   endforeach()
 endif()
-if(ARROW_WITH_RAPIDJSON)
-  foreach(ARROW_UTIL_TARGET ${ARROW_UTIL_TARGETS})
-    target_link_libraries(${ARROW_UTIL_TARGET} PRIVATE RapidJSON)
-  endforeach()
-endif()
 if(ARROW_WITH_ZLIB)
   foreach(ARROW_UTIL_TARGET ${ARROW_UTIL_TARGETS})
     target_link_libraries(${ARROW_UTIL_TARGET} PRIVATE ZLIB::ZLIB)
@@ -645,8 +640,8 @@ else()
 endif()
 
 set(ARROW_TESTING_SHARED_LINK_LIBS arrow_shared ${ARROW_GTEST_GTEST})
-set(ARROW_TESTING_SHARED_PRIVATE_LINK_LIBS arrow::flatbuffers RapidJSON)
-set(ARROW_TESTING_STATIC_LINK_LIBS arrow::flatbuffers RapidJSON arrow_static
+set(ARROW_TESTING_SHARED_PRIVATE_LINK_LIBS arrow::flatbuffers simdjson::simdjson)
+set(ARROW_TESTING_STATIC_LINK_LIBS arrow::flatbuffers simdjson::simdjson arrow_static
                                    ${ARROW_GTEST_GTEST})
 if(ARROW_ENABLE_THREADING)
   list(APPEND ARROW_TESTING_SHARED_PRIVATE_LINK_LIBS arrow::Boost::process)
@@ -679,6 +674,10 @@ set(ARROW_TESTING_SRCS
     testing/random.cc
     testing/util.cc)
 
+# Simdjson: Always uses bundled header-only mode (set in ThirdpartyToolchain.cmake).
+# SIMDJSON_HEADER_ONLY is defined globally in ThirdpartyToolchain.cmake and on
+# simdjson::simdjson INTERFACE_COMPILE_DEFINITIONS.
+
 #
 # Configure the base Arrow libraries
 #
@@ -687,7 +686,8 @@ if(ARROW_BUILD_INTEGRATION OR ARROW_BUILD_TESTS)
   arrow_add_object_library(ARROW_INTEGRATION integration/json_integration.cc
                            integration/json_internal.cc)
   foreach(ARROW_INTEGRATION_TARGET ${ARROW_INTEGRATION_TARGETS})
-    target_link_libraries(${ARROW_INTEGRATION_TARGET} PRIVATE RapidJSON)
+    target_link_libraries(${ARROW_INTEGRATION_TARGET} PRIVATE simdjson::simdjson)
+    target_compile_definitions(${ARROW_INTEGRATION_TARGET} PRIVATE SIMDJSON_HEADER_ONLY)
   endforeach()
 else()
   set(ARROW_INTEGRATION_TARGET_SHARED)
@@ -989,6 +989,9 @@ else()
 endif()
 
 if(ARROW_JSON)
+  # Bundled simdjson uses header-only mode (all code inline).
+  # simdjson::simdjson provides include directories via INTERFACE_INCLUDE_DIRECTORIES.
+  # simdjson_impl.cc is kept for compatibility but is empty in header-only mode.
   arrow_add_object_library(ARROW_JSON
                            extension/fixed_shape_tensor.cc
                            extension/opaque.cc
@@ -998,12 +1001,14 @@ if(ARROW_JSON)
                            json/converter.cc
                            json/from_string.cc
                            json/object_parser.cc
-                           json/object_writer.cc
                            json/parser.cc
-                           json/reader.cc)
+                           json/reader.cc
+                           json/simdjson_impl.cc)
   foreach(ARROW_JSON_TARGET ${ARROW_JSON_TARGETS})
-    target_link_libraries(${ARROW_JSON_TARGET} PRIVATE RapidJSON)
+    target_link_libraries(${ARROW_JSON_TARGET} PRIVATE simdjson::simdjson)
+    target_compile_definitions(${ARROW_JSON_TARGET} PRIVATE SIMDJSON_HEADER_ONLY)
   endforeach()
+  list(APPEND ARROW_SHARED_PRIVATE_LINK_LIBS simdjson::simdjson)
 else()
   set(ARROW_JSON_TARGET_SHARED)
   set(ARROW_JSON_TARGET_STATIC)
@@ -1223,7 +1228,8 @@ if(ARROW_TESTING)
   endif()
 
   foreach(LIB_TARGET ${ARROW_TESTING_LIBRARIES})
-    target_compile_definitions(${LIB_TARGET} PRIVATE ARROW_TESTING_EXPORTING)
+    target_compile_definitions(${LIB_TARGET} PRIVATE ARROW_TESTING_EXPORTING
+                                                     SIMDJSON_HEADER_ONLY)
   endforeach()
 endif()
 

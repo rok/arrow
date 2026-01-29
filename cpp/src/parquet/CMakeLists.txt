@@ -262,9 +262,9 @@ endif()
 
 list(APPEND PARQUET_SHARED_LINK_LIBS arrow_shared)
 
-# Add RapidJSON libraries
-list(APPEND PARQUET_SHARED_PRIVATE_LINK_LIBS RapidJSON)
-list(APPEND PARQUET_STATIC_LINK_LIBS RapidJSON)
+# Add simdjson libraries
+list(APPEND PARQUET_SHARED_PRIVATE_LINK_LIBS simdjson::simdjson)
+list(APPEND PARQUET_STATIC_LINK_LIBS simdjson::simdjson)
 
 # These are libraries that we will link privately with parquet_shared (as they
 # do not need to be linked transitively by other linkers)
@@ -308,6 +308,11 @@ add_arrow_lib(parquet
               STATIC_INSTALL_INTERFACE_LIBS
               ${PARQUET_STATIC_INSTALL_INTERFACE_LIBS})
 
+# Add SIMDJSON_HEADER_ONLY for bundled simdjson (header-only mode)
+foreach(LIB_TARGET ${PARQUET_LIBRARIES})
+  target_compile_definitions(${LIB_TARGET} PRIVATE SIMDJSON_HEADER_ONLY)
+endforeach()
+
 if(WIN32 AND NOT (ARROW_TEST_LINKAGE STREQUAL "static"))
   add_library(parquet_test_support STATIC
               "${PARQUET_THRIFT_SOURCE_DIR}/parquet_types.cpp")
@@ -322,7 +327,7 @@ if(ARROW_TESTING)
   # "link" our dependencies so that include paths are configured
   # correctly
   target_link_libraries(parquet_testing PUBLIC ${ARROW_GTEST_GMOCK})
-  list(APPEND PARQUET_TEST_LINK_LIBS parquet_testing RapidJSON)
+  list(APPEND PARQUET_TEST_LINK_LIBS parquet_testing simdjson::simdjson)
 endif()
 
 if(NOT ARROW_BUILD_SHARED)

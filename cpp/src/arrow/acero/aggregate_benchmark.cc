@@ -401,14 +401,14 @@ static void BenchmarkAggregate(
   state.SetItemsProcessed(batch->num_rows() * state.iterations());
 }
 
-#define GROUP_BY_BENCHMARK(Name, Impl)                               \
-  static void Name(benchmark::State& state) {                        \
-    RegressionArgs args(state, false);                               \
-    auto rng = random::RandomArrayGenerator(1923);                   \
-    (Impl)();                                                        \
-  }                                                                  \
-  BENCHMARK(Name)->Apply([](benchmark::internal::Benchmark* bench) { \
-    BenchmarkSetArgsWithSizes(bench, {1 * 1024 * 1024});             \
+#define GROUP_BY_BENCHMARK(Name, Impl)                     \
+  static void Name(benchmark::State& state) {              \
+    RegressionArgs args(state, false);                     \
+    auto rng = random::RandomArrayGenerator(1923);         \
+    (Impl)();                                              \
+  }                                                        \
+  BENCHMARK(Name)->Apply([](arrow::BenchmarkType* bench) { \
+    BenchmarkSetArgsWithSizes(bench, {1 * 1024 * 1024});   \
   })
 
 // Grouped Sum
@@ -607,7 +607,7 @@ static void SumKernel(benchmark::State& state) {
   state.SetItemsProcessed(state.iterations() * array_size);
 }
 
-static void SumKernelArgs(benchmark::internal::Benchmark* bench) {
+static void SumKernelArgs(arrow::BenchmarkType* bench) {
   BenchmarkSetArgsWithSizes(bench, {1 * 1024 * 1024});  // 1M
 }
 
@@ -673,7 +673,7 @@ void ModeKernelWide(benchmark::State& state) {
   ModeKernel<ArrowType>(state, -1234567, 7654321);
 }
 
-static void ModeKernelArgs(benchmark::internal::Benchmark* bench) {
+static void ModeKernelArgs(arrow::BenchmarkType* bench) {
   BenchmarkSetArgsWithSizes(bench, {1 * 1024 * 1024});  // 1M
 }
 
@@ -706,7 +706,7 @@ static void MinMaxKernelBench(benchmark::State& state) {
   state.SetItemsProcessed(state.iterations() * array_size);
 }
 
-static void MinMaxKernelBenchArgs(benchmark::internal::Benchmark* bench) {
+static void MinMaxKernelBenchArgs(arrow::BenchmarkType* bench) {
   BenchmarkSetArgsWithSizes(bench, {1 * 1024 * 1024});  // 1M
 }
 
@@ -760,7 +760,7 @@ void VarianceKernelBench(benchmark::State& state) {
   state.SetItemsProcessed(state.iterations() * array_size);
 }
 
-static void VarianceKernelBenchArgs(benchmark::internal::Benchmark* bench) {
+static void VarianceKernelBenchArgs(arrow::BenchmarkType* bench) {
   BenchmarkSetArgsWithSizes(bench, {1 * 1024 * 1024});
 }
 
@@ -840,7 +840,7 @@ void QuantileKernelCentilesNarrow(benchmark::State& state) {
   QuantileKernel<ArrowType>(state, -30000, 30000, centiles());
 }
 
-static void QuantileKernelArgs(benchmark::internal::Benchmark* bench) {
+static void QuantileKernelArgs(arrow::BenchmarkType* bench) {
   BenchmarkSetArgsWithSizes(bench, {1 * 1024 * 1024});
 }
 

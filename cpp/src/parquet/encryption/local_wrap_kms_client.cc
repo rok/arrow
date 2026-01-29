@@ -15,8 +15,8 @@
 // specific language governing permissions and limitations
 // under the License.
 
+#include "arrow/json/json_util.h"
 #include "arrow/json/object_parser.h"
-#include "arrow/json/object_writer.h"
 #include "arrow/util/secure_string.h"
 
 #include "parquet/encryption/key_toolkit_internal.h"
@@ -24,7 +24,6 @@
 #include "parquet/exception.h"
 
 using ::arrow::json::internal::ObjectParser;
-using ::arrow::json::internal::ObjectWriter;
 using ::arrow::util::SecureString;
 
 namespace parquet::encryption {
@@ -41,12 +40,14 @@ LocalWrapKmsClient::LocalKeyWrap::LocalKeyWrap(std::string master_key_version,
 
 std::string LocalWrapKmsClient::LocalKeyWrap::CreateSerialized(
     const std::string& encrypted_encoded_key) {
-  ObjectWriter json_writer;
+  ::arrow::json::JsonWriter json_writer;
+  json_writer.StartObject();
 
   json_writer.SetString(kLocalWrapKeyVersionField, kLocalWrapNoKeyVersion);
   json_writer.SetString(kLocalWrapEncryptedKeyField, encrypted_encoded_key);
 
-  return json_writer.Serialize();
+  json_writer.EndObject();
+  return std::string(json_writer.GetString());
 }
 
 LocalWrapKmsClient::LocalKeyWrap LocalWrapKmsClient::LocalKeyWrap::Parse(

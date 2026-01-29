@@ -1557,7 +1557,8 @@ TEST(TestLogicalTypeOperation, LogicalTypeRepresentation) {
        R"({"Type": "Geometry", "crs": "crs with \"quotes\" and \\backslashes\\"})"},
       {LogicalType::Geometry("crs with control characters \u0001 and \u001F"),
        "Geometry(crs=crs with control characters \u0001 and \u001F)",
-       R"({"Type": "Geometry", "crs": "crs with control characters \u0001 and \u001F"})"},
+       // simdjson uses lowercase hex digits for unicode escape sequences
+       R"({"Type": "Geometry", "crs": "crs with control characters \u0001 and \u001f"})"},
       {LogicalType::Geography(), "Geography(crs=, algorithm=spherical)",
        R"({"Type": "Geography"})"},
       {LogicalType::Geography("srid:1234",

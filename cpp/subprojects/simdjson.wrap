@@ -15,6 +15,13 @@
 # specific language governing permissions and limitations
 # under the License.
 
-project('rapidjson', 'cpp')
+[wrap-file]
+directory = simdjson-3.12.3
+source_url = https://github.com/simdjson/simdjson/archive/refs/tags/v3.12.3.tar.gz
+source_filename = simdjson-v3.12.3.tar.gz
+source_hash = d0af071f2f4187d8b26b556e83ef832b634bd5feb4e2f537b9dabbd334d4e334
+source_fallback_url = https://apache.jfrog.io/artifactory/arrow/thirdparty/7.0.0/simdjson-v3.12.3.tar.gz
+patch_directory = simdjson
 
-rapidjson_dep = declare_dependency(include_directories: 'include')
+[provide]
+simdjson = simdjson_dep

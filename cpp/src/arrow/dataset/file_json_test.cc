@@ -20,22 +20,18 @@
 #include "arrow/dataset/plan.h"
 #include "arrow/dataset/test_util_internal.h"
 #include "arrow/filesystem/mockfs.h"
+#include "arrow/json/json_util.h"
 #include "arrow/json/parser.h"
-#include "arrow/json/rapidjson_defs.h"
 #include "arrow/testing/gtest_util.h"
 #include "arrow/testing/util.h"
 #include "arrow/util/logging_internal.h"
 
-#include "rapidjson/ostreamwrapper.h"
-#include "rapidjson/writer.h"
-
 namespace arrow {
 
 using internal::checked_cast;
+using json::JsonWriter;
 
 namespace dataset {
-
-namespace rj = arrow::rapidjson;
 
 #define CASE(TYPE_CLASS)                            \
   case TYPE_CLASS##Type::type_id: {                 \
@@ -60,32 +56,31 @@ static Status VisitWriteableTypeId(Type::type id, VISITOR* visitor) {
 // dataset API as well. However, this ad-hoc implementation is good enough for the shared
 // format test fixtures
 struct WriteVisitor {
-  static Status OK(bool ok) {
-    return ok ? Status::OK()
-              : Status::Invalid("Unexpected false return from JSON writer");
-  }
-
   template <typename T>
   enable_if_physical_signed_integer<T, Status> Visit(const T*) {
     const auto& scalar = checked_cast<const NumericScalar<T>&>(scalar_);
-    return OK(writer_.Int64(scalar.value));
+    writer_.Int64(static_cast<int64_t>(scalar.value));
+    return Status::OK();
   }
 
   template <typename T>
   enable_if_physical_unsigned_integer<T, Status> Visit(const T*) {
     const auto& scalar = checked_cast<const NumericScalar<T>&>(scalar_);
-    return OK(writer_.Uint64(scalar.value));
+    writer_.Uint64(static_cast<uint64_t>(scalar.value));
+    return Status::OK();
   }
 
   template <typename T>
   enable_if_physical_floating_point<T, Status> Visit(const T*) {
     const auto& scalar = checked_cast<const NumericScalar<T>&>(scalar_);
-    return OK(writer_.Double(scalar.value));
+    writer_.Double(static_cast<double>(scalar.value));
+    return Status::OK();
   }
 
   Status Visit(const BooleanType*) {
     const auto& scalar = checked_cast<const BooleanScalar&>(scalar_);
-    return OK(writer_.Bool(scalar.value));
+    writer_.Bool(scalar.value);
+    return Status::OK();
   }
 
   Status Visit(const StructType*) {
@@ -93,16 +88,15 @@ struct WriteVisitor {
     const auto& type = checked_cast<const StructType&>(*scalar.type);
     DCHECK_EQ(type.num_fields(), static_cast<int>(scalar.value.size()));
 
-    RETURN_NOT_OK(OK(writer_.StartObject()));
+    writer_.StartObject();
 
     for (int i = 0; i < type.num_fields(); ++i) {
       const auto& name = type.field(i)->name();
-      RETURN_NOT_OK(
-          OK(writer_.Key(name.data(), static_cast<rj::SizeType>(name.length()))));
+      writer_.Key(name);
 
       const auto& child = *scalar.value[i];
       if (!child.is_valid) {
-        RETURN_NOT_OK(OK(writer_.Null()));
+        writer_.Null();
         continue;
       }
 
@@ -110,17 +104,16 @@ struct WriteVisitor {
       RETURN_NOT_OK(VisitWriteableTypeId(child.type->id(), &visitor));
     }
 
-    RETURN_NOT_OK(OK(writer_.EndObject(type.num_fields())));
+    writer_.EndObject();
     return Status::OK();
   }
 
-  rj::Writer<rj::OStreamWrapper>& writer_;
+  JsonWriter& writer_;
   const Scalar& scalar_;
 };
 
-Status WriteJson(const StructScalar& scalar, rj::OStreamWrapper* sink) {
-  rj::Writer<rj::OStreamWrapper> writer(*sink);
-  WriteVisitor visitor{writer, scalar};
+Status WriteJson(const StructScalar& scalar, JsonWriter* writer) {
+  WriteVisitor visitor{*writer, scalar};
   return VisitWriteableTypeId(Type::STRUCT, &visitor);
 }
 
@@ -131,10 +124,10 @@ class JsonFormatHelper {
   static Result<std::shared_ptr<Buffer>> Write(RecordBatchReader* reader) {
     ARROW_ASSIGN_OR_RAISE(auto scalars, ToScalars(reader));
     std::stringstream ss;
-    rj::OStreamWrapper sink(ss);
     for (const auto& scalar : scalars) {
-      RETURN_NOT_OK(WriteJson(*scalar, &sink));
-      ss << "\n";
+      JsonWriter writer;
+      RETURN_NOT_OK(WriteJson(*scalar, &writer));
+      ss << std::string(writer.GetString()) << "\n";
     }
     return Buffer::FromString(ss.str());
   }

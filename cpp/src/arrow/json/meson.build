@@ -25,14 +25,14 @@ exc = executable(
         'parser_test.cc',
         'reader_test.cc',
     ],
-    dependencies: [arrow_test_dep, rapidjson_dep],
+    dependencies: [arrow_test_dep, simdjson_dep],
 )
 test('arrow-json-test', exc)
 
 exc = executable(
     'arrow-json-parser-benchmark',
     sources: ['parser_benchmark.cc'],
-    dependencies: [arrow_benchmark_dep, rapidjson_dep],
+    dependencies: [arrow_benchmark_dep, simdjson_dep],
 )
 benchmark('arrow-json-parser-benchmark', exc)
 
@@ -43,11 +43,10 @@ install_headers(
         'chunker.h',
         'converter.h',
         'from_string.h',
+        'json_util.h',
         'object_parser.h',
-        'object_writer.h',
         'options.h',
         'parser.h',
-        'rapidjson_defs.h',
         'reader.h',
         'test_common.h',
         'type_fwd.h',

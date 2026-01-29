@@ -142,7 +142,7 @@ if needs_json
     dataset_tests += {
         'file_json': {
             'sources': ['file_json_test.cc'],
-            'dependencies': [rapidjson_dep],
+            'dependencies': [simdjson_dep],
         },
     }
 endif

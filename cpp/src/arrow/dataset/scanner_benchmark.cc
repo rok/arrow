@@ -15,6 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
+#include "arrow/util/benchmark_util.h"
 #include "benchmark/benchmark.h"
 
 #include "arrow/acero/options.h"
@@ -251,7 +252,7 @@ static void ScanOnlyBench(benchmark::State& state) {
                           GetBytesForSchema());
 }
 
-static void ScanBenchmark_Customize(benchmark::internal::Benchmark* b) {
+static void ScanBenchmark_Customize(arrow::BenchmarkType* b) {
   for (const int32_t num_batches : {1000}) {
     for (const int batch_size : {10, 100, 1000}) {
       for (const int scan_idx : {kScanIdx, kScanV2Idx}) {

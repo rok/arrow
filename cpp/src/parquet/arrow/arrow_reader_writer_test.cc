@@ -1493,7 +1493,6 @@ class TestBinaryLikeParquetIO : public ParquetIOTestBase {
                       const std::shared_ptr<DataType>& fallback_type) {
     const auto specific_array = ::arrow::ArrayFromJSON(specific_type, json);
     const auto fallback_array = ::arrow::ArrayFromJSON(fallback_type, json);
-
     // When the original Arrow schema isn't stored, the array is decoded as
     // the fallback type (since there is no specific Parquet logical
     // type for it).

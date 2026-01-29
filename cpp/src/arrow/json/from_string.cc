@@ -15,7 +15,11 @@
 // specific language governing permissions and limitations
 // under the License.
 
+#include <cctype>
+#include <cmath>
 #include <cstdint>
+#include <limits>
+#include <optional>
 #include <sstream>
 #include <string_view>
 #include <type_traits>
@@ -40,15 +44,7 @@
 #include "arrow/util/logging_internal.h"
 #include "arrow/util/value_parsing.h"
 
-#include "arrow/json/rapidjson_defs.h"
-
-#include <rapidjson/document.h>
-#include <rapidjson/error/en.h>
-#include <rapidjson/rapidjson.h>
-#include <rapidjson/reader.h>
-#include <rapidjson/writer.h>
-
-namespace rj = arrow::rapidjson;
+#include <simdjson.h>
 
 namespace arrow {
 
@@ -62,30 +58,485 @@ using ::arrow::internal::checked_pointer_cast;
 
 namespace {
 
-constexpr auto kParseFlags = rj::kParseFullPrecisionFlag | rj::kParseNanAndInfFlag;
+bool IsWhitespace(char c) { return c == ' ' || c == '\t' || c == '\n' || c == '\r'; }
 
-const char* JsonTypeName(rj::Type json_type) {
+// Preprocess JSON string to handle non-standard NaN/Inf literals.
+// simdjson strictly follows the JSON spec which doesn't allow these literals.
+// This function replaces NaN/Inf/-Inf/-Infinity in value positions with quoted strings
+// that we handle later to preserve RapidJSON behavior.
+std::string PreprocessNanInf(std::string_view json_string) {
+  std::string result;
+  result.reserve(json_string.size() + 32);  // Reserve extra space for quotes
+
+  enum class Container { Array, Object };
+
+  bool in_string = false;
+  bool escape_next = false;
+  bool expect_value = true;
+  bool expect_key = false;
+  std::vector<Container> stack;
+
+  auto is_value_delim = [](char ch) {
+    return IsWhitespace(ch) || ch == ',' || ch == ']' || ch == '}';
+  };
+
+  auto replace_token = [&](std::string_view token, std::string_view replacement,
+                           size_t* index) {
+    result.append(replacement);
+    *index += token.size() - 1;
+    expect_value = false;
+  };
+
+  for (size_t i = 0; i < json_string.size(); ++i) {
+    char c = json_string[i];
+
+    if (escape_next) {
+      result.push_back(c);
+      escape_next = false;
+      continue;
+    }
+
+    if (in_string) {
+      result.push_back(c);
+      if (c == '\\') {
+        escape_next = true;
+      } else if (c == '"') {
+        in_string = false;
+        if (!stack.empty() && stack.back() == Container::Object && expect_key) {
+          expect_key = false;
+        } else {
+          expect_value = false;
+        }
+      }
+      continue;
+    }
+
+    if (c == '"') {
+      result.push_back(c);
+      in_string = true;
+      continue;
+    }
+
+    if (IsWhitespace(c)) {
+      result.push_back(c);
+      continue;
+    }
+
+    switch (c) {
+      case '{':
+        result.push_back(c);
+        stack.push_back(Container::Object);
+        expect_key = true;
+        expect_value = false;
+        continue;
+      case '[':
+        result.push_back(c);
+        stack.push_back(Container::Array);
+        expect_value = true;
+        expect_key = false;
+        continue;
+      case '}':
+      case ']':
+        result.push_back(c);
+        if (!stack.empty()) {
+          stack.pop_back();
+        }
+        expect_key = false;
+        expect_value = false;
+        continue;
+      case ':':
+        result.push_back(c);
+        expect_key = false;
+        expect_value = true;
+        continue;
+      case ',':
+        result.push_back(c);
+        if (!stack.empty() && stack.back() == Container::Object) {
+          expect_key = true;
+          expect_value = false;
+        } else {
+          expect_value = true;
+          expect_key = false;
+        }
+        continue;
+      default:
+        break;
+    }
+
+    if (expect_value) {
+      const auto remaining = json_string.size() - i;
+      auto after_ok = [&](size_t len) {
+        return (i + len >= json_string.size()) || is_value_delim(json_string[i + len]);
+      };
+
+      if (remaining >= 9 && json_string.substr(i, 9) == "-Infinity" && after_ok(9)) {
+        replace_token("-Infinity", "\"-Infinity\"", &i);
+        continue;
+      }
+      if (remaining >= 8 && json_string.substr(i, 8) == "Infinity" && after_ok(8)) {
+        replace_token("Infinity", "\"Infinity\"", &i);
+        continue;
+      }
+      if (remaining >= 4 && json_string.substr(i, 4) == "-Inf" && after_ok(4)) {
+        replace_token("-Inf", "\"-Inf\"", &i);
+        continue;
+      }
+      if (remaining >= 3 && json_string.substr(i, 3) == "Inf" && after_ok(3)) {
+        replace_token("Inf", "\"Inf\"", &i);
+        continue;
+      }
+      if (remaining >= 4 && json_string.substr(i, 4) == "-NaN" && after_ok(4)) {
+        replace_token("-NaN", "\"-NaN\"", &i);
+        continue;
+      }
+      if (remaining >= 3 && json_string.substr(i, 3) == "NaN" && after_ok(3)) {
+        replace_token("NaN", "\"NaN\"", &i);
+        continue;
+      }
+
+      if (c == '-' || (c >= '0' && c <= '9') || c == 't' || c == 'f' || c == 'n') {
+        expect_value = false;
+      }
+    }
+
+    result.push_back(c);
+  }
+
+  return result;
+}
+
+bool IsStringLikeType(const std::shared_ptr<DataType>& type) {
+  switch (type->id()) {
+    case Type::STRING:
+    case Type::BINARY:
+    case Type::LARGE_STRING:
+    case Type::LARGE_BINARY:
+    case Type::STRING_VIEW:
+    case Type::BINARY_VIEW:
+    case Type::FIXED_SIZE_BINARY:
+      return true;
+    default:
+      return false;
+  }
+}
+
+Status AppendCodepointAsUtf8(uint32_t codepoint, std::string* out) {
+  if (codepoint > 0x10FFFF) {
+    return Status::Invalid("Invalid Unicode code point in JSON string");
+  }
+  if (codepoint <= 0x7F) {
+    out->push_back(static_cast<char>(codepoint));
+    return Status::OK();
+  }
+  if (codepoint <= 0x7FF) {
+    out->push_back(static_cast<char>(0xC0 | (codepoint >> 6)));
+    out->push_back(static_cast<char>(0x80 | (codepoint & 0x3F)));
+    return Status::OK();
+  }
+  if (codepoint <= 0xFFFF) {
+    out->push_back(static_cast<char>(0xE0 | (codepoint >> 12)));
+    out->push_back(static_cast<char>(0x80 | ((codepoint >> 6) & 0x3F)));
+    out->push_back(static_cast<char>(0x80 | (codepoint & 0x3F)));
+    return Status::OK();
+  }
+  out->push_back(static_cast<char>(0xF0 | (codepoint >> 18)));
+  out->push_back(static_cast<char>(0x80 | ((codepoint >> 12) & 0x3F)));
+  out->push_back(static_cast<char>(0x80 | ((codepoint >> 6) & 0x3F)));
+  out->push_back(static_cast<char>(0x80 | (codepoint & 0x3F)));
+  return Status::OK();
+}
+
+bool IsHexDigit(char c) {
+  return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
+}
+
+Result<uint32_t> ParseHex4(std::string_view input, size_t pos) {
+  if (pos + 4 > input.size()) {
+    return Status::Invalid("Truncated \\u escape in JSON string");
+  }
+  uint32_t value = 0;
+  for (size_t i = 0; i < 4; ++i) {
+    char c = input[pos + i];
+    if (!IsHexDigit(c)) {
+      return Status::Invalid("Invalid hex digit in \\u escape");
+    }
+    value <<= 4;
+    if (c >= '0' && c <= '9') {
+      value |= static_cast<uint32_t>(c - '0');
+    } else if (c >= 'a' && c <= 'f') {
+      value |= static_cast<uint32_t>(c - 'a' + 10);
+    } else {
+      value |= static_cast<uint32_t>(c - 'A' + 10);
+    }
+  }
+  return value;
+}
+
+Status SkipWhitespace(std::string_view input, size_t* pos) {
+  while (*pos < input.size() && IsWhitespace(input[*pos])) {
+    ++(*pos);
+  }
+  return Status::OK();
+}
+
+Status ParseJsonStringValue(std::string_view input, size_t* pos, std::string* out) {
+  if (*pos >= input.size() || input[*pos] != '"') {
+    return Status::Invalid("Expected JSON string");
+  }
+  ++(*pos);
+  out->clear();
+  while (*pos < input.size()) {
+    char c = input[*pos];
+    if (c == '"') {
+      ++(*pos);
+      return Status::OK();
+    }
+    if (static_cast<unsigned char>(c) < 0x20) {
+      return Status::Invalid("Control character in JSON string");
+    }
+    if (c == '\\') {
+      ++(*pos);
+      if (*pos >= input.size()) {
+        return Status::Invalid("Truncated escape in JSON string");
+      }
+      char esc = input[*pos];
+      switch (esc) {
+        case '"':
+        case '\\':
+        case '/':
+          out->push_back(esc);
+          ++(*pos);
+          break;
+        case 'b':
+          out->push_back('\b');
+          ++(*pos);
+          break;
+        case 'f':
+          out->push_back('\f');
+          ++(*pos);
+          break;
+        case 'n':
+          out->push_back('\n');
+          ++(*pos);
+          break;
+        case 'r':
+          out->push_back('\r');
+          ++(*pos);
+          break;
+        case 't':
+          out->push_back('\t');
+          ++(*pos);
+          break;
+        case 'u': {
+          ++(*pos);
+          ARROW_ASSIGN_OR_RAISE(uint32_t codepoint, ParseHex4(input, *pos));
+          *pos += 4;
+          if (codepoint >= 0xD800 && codepoint <= 0xDBFF) {
+            if (*pos + 6 > input.size() || input[*pos] != '\\' ||
+                input[*pos + 1] != 'u') {
+              return Status::Invalid("Missing low surrogate in JSON string");
+            }
+            *pos += 2;
+            ARROW_ASSIGN_OR_RAISE(uint32_t low, ParseHex4(input, *pos));
+            *pos += 4;
+            if (low < 0xDC00 || low > 0xDFFF) {
+              return Status::Invalid("Invalid low surrogate in JSON string");
+            }
+            codepoint = 0x10000 + ((codepoint - 0xD800) << 10) + (low - 0xDC00);
+          } else if (codepoint >= 0xDC00 && codepoint <= 0xDFFF) {
+            return Status::Invalid("Unexpected low surrogate in JSON string");
+          }
+          RETURN_NOT_OK(AppendCodepointAsUtf8(codepoint, out));
+          break;
+        }
+        default:
+          return Status::Invalid("Invalid escape in JSON string");
+      }
+      continue;
+    }
+    out->push_back(c);
+    ++(*pos);
+  }
+  return Status::Invalid("Unterminated JSON string");
+}
+
+Status ParseJsonNull(std::string_view input, size_t* pos) {
+  if (*pos + 4 <= input.size() && input.substr(*pos, 4) == "null") {
+    *pos += 4;
+    return Status::OK();
+  }
+  return Status::Invalid("Expected null");
+}
+
+Result<std::vector<std::optional<std::string>>> ParseJsonStringArrayUnsafe(
+    std::string_view input) {
+  size_t pos = 0;
+  RETURN_NOT_OK(SkipWhitespace(input, &pos));
+  if (pos >= input.size() || input[pos] != '[') {
+    return Status::Invalid("Expected JSON array");
+  }
+  ++pos;
+
+  std::vector<std::optional<std::string>> values;
+  RETURN_NOT_OK(SkipWhitespace(input, &pos));
+  if (pos < input.size() && input[pos] == ']') {
+    ++pos;
+    RETURN_NOT_OK(SkipWhitespace(input, &pos));
+    if (pos != input.size()) {
+      return Status::Invalid("Trailing content after JSON array");
+    }
+    return values;
+  }
+
+  while (pos < input.size()) {
+    RETURN_NOT_OK(SkipWhitespace(input, &pos));
+    if (pos >= input.size()) {
+      return Status::Invalid("Unexpected end of JSON array");
+    }
+    if (input[pos] == '"') {
+      std::string value;
+      RETURN_NOT_OK(ParseJsonStringValue(input, &pos, &value));
+      values.emplace_back(std::move(value));
+    } else {
+      RETURN_NOT_OK(ParseJsonNull(input, &pos));
+      values.emplace_back(std::nullopt);
+    }
+    RETURN_NOT_OK(SkipWhitespace(input, &pos));
+    if (pos >= input.size()) {
+      return Status::Invalid("Unexpected end of JSON array");
+    }
+    if (input[pos] == ',') {
+      ++pos;
+      continue;
+    }
+    if (input[pos] == ']') {
+      ++pos;
+      RETURN_NOT_OK(SkipWhitespace(input, &pos));
+      if (pos != input.size()) {
+        return Status::Invalid("Trailing content after JSON array");
+      }
+      return values;
+    }
+    return Status::Invalid("Expected ',' or ']' in JSON array");
+  }
+  return Status::Invalid("Unterminated JSON array");
+}
+
+Result<std::shared_ptr<Array>> BuildStringLikeArray(
+    const std::shared_ptr<DataType>& type,
+    const std::vector<std::optional<std::string>>& values) {
+  switch (type->id()) {
+    case Type::STRING: {
+      StringBuilder builder;
+      for (const auto& value : values) {
+        if (value.has_value()) {
+          RETURN_NOT_OK(builder.Append(*value));
+        } else {
+          RETURN_NOT_OK(builder.AppendNull());
+        }
+      }
+      return builder.Finish();
+    }
+    case Type::BINARY: {
+      BinaryBuilder builder;
+      for (const auto& value : values) {
+        if (value.has_value()) {
+          RETURN_NOT_OK(builder.Append(*value));
+        } else {
+          RETURN_NOT_OK(builder.AppendNull());
+        }
+      }
+      return builder.Finish();
+    }
+    case Type::LARGE_STRING: {
+      LargeStringBuilder builder;
+      for (const auto& value : values) {
+        if (value.has_value()) {
+          RETURN_NOT_OK(builder.Append(*value));
+        } else {
+          RETURN_NOT_OK(builder.AppendNull());
+        }
+      }
+      return builder.Finish();
+    }
+    case Type::LARGE_BINARY: {
+      LargeBinaryBuilder builder;
+      for (const auto& value : values) {
+        if (value.has_value()) {
+          RETURN_NOT_OK(builder.Append(*value));
+        } else {
+          RETURN_NOT_OK(builder.AppendNull());
+        }
+      }
+      return builder.Finish();
+    }
+    case Type::STRING_VIEW: {
+      StringViewBuilder builder;
+      for (const auto& value : values) {
+        if (value.has_value()) {
+          RETURN_NOT_OK(builder.Append(*value));
+        } else {
+          RETURN_NOT_OK(builder.AppendNull());
+        }
+      }
+      return builder.Finish();
+    }
+    case Type::BINARY_VIEW: {
+      BinaryViewBuilder builder;
+      for (const auto& value : values) {
+        if (value.has_value()) {
+          RETURN_NOT_OK(builder.Append(*value));
+        } else {
+          RETURN_NOT_OK(builder.AppendNull());
+        }
+      }
+      return builder.Finish();
+    }
+    case Type::FIXED_SIZE_BINARY: {
+      auto fixed_type = checked_pointer_cast<FixedSizeBinaryType>(type);
+      FixedSizeBinaryBuilder builder(fixed_type);
+      for (const auto& value : values) {
+        if (value.has_value()) {
+          if (value->size() != static_cast<size_t>(fixed_type->byte_width())) {
+            return Status::Invalid("Invalid string length ", value->size(),
+                                   " in JSON input for ", type->ToString());
+          }
+          RETURN_NOT_OK(builder.Append(*value));
+        } else {
+          RETURN_NOT_OK(builder.AppendNull());
+        }
+      }
+      return builder.Finish();
+    }
+    default:
+      return Status::TypeError("Unsupported type for string parsing: ", type->ToString());
+  }
+}
+
+const char* JsonTypeName(simdjson::dom::element_type json_type) {
   switch (json_type) {
-    case rapidjson::kNullType:
+    case simdjson::dom::element_type::NULL_VALUE:
       return "null";
-    case rapidjson::kFalseType:
-      return "false";
-    case rapidjson::kTrueType:
-      return "true";
-    case rapidjson::kObjectType:
+    case simdjson::dom::element_type::BOOL:
+      return "boolean";
+    case simdjson::dom::element_type::OBJECT:
       return "object";
-    case rapidjson::kArrayType:
+    case simdjson::dom::element_type::ARRAY:
       return "array";
-    case rapidjson::kStringType:
+    case simdjson::dom::element_type::STRING:
       return "string";
-    case rapidjson::kNumberType:
-      return "number";
+    case simdjson::dom::element_type::INT64:
+      return "int64";
+    case simdjson::dom::element_type::UINT64:
+      return "uint64";
+    case simdjson::dom::element_type::DOUBLE:
+      return "double";
     default:
       return "unknown";
   }
 }
 
-Status JSONTypeError(const char* expected_type, rj::Type json_type) {
+Status JSONTypeError(const char* expected_type, simdjson::dom::element_type json_type) {
   return Status::Invalid("Expected ", expected_type, " or null, got JSON type ",
                          JsonTypeName(json_type));
 }
@@ -96,11 +547,11 @@ class JSONConverter {
 
   virtual Status Init() { return Status::OK(); }
 
-  virtual Status AppendValue(const rj::Value& json_obj) = 0;
+  virtual Status AppendValue(simdjson::dom::element json_obj) = 0;
 
   Status AppendNull() { return this->builder()->AppendNull(); }
 
-  virtual Status AppendValues(const rj::Value& json_array) = 0;
+  virtual Status AppendValues(simdjson::dom::element json_array) = 0;
 
   virtual std::shared_ptr<ArrayBuilder> builder() = 0;
 
@@ -124,18 +575,22 @@ Status GetConverter(const std::shared_ptr<DataType>&,
 template <class Derived>
 class ConcreteConverter : public JSONConverter {
  public:
-  Result<int64_t> SizeOfJSONArray(const rj::Value& json_obj) {
-    if (!json_obj.IsArray()) {
-      return JSONTypeError("array", json_obj.GetType());
+  Result<int64_t> SizeOfJSONArray(simdjson::dom::element json_obj) {
+    if (!json_obj.is_array()) {
+      return JSONTypeError("array", json_obj.type());
     }
-    return json_obj.Size();
+    return static_cast<int64_t>(json_obj.get_array().value().size());
   }
 
-  Status AppendValues(const rj::Value& json_array) final {
+  Status AppendValues(simdjson::dom::element json_array) final {
     auto self = static_cast<Derived*>(this);
     ARROW_ASSIGN_OR_RAISE(auto size, SizeOfJSONArray(json_array));
-    for (uint32_t i = 0; i < size; ++i) {
-      RETURN_NOT_OK(self->AppendValue(json_array[i]));
+    auto arr = json_array.get_array().value();
+    int64_t i = 0;
+    for (auto elem : arr) {
+      if (i >= size) break;
+      RETURN_NOT_OK(self->AppendValue(elem));
+      ++i;
     }
     return Status::OK();
   }
@@ -167,11 +622,11 @@ class NullConverter final : public ConcreteConverter<NullConverter> {
     builder_ = std::make_shared<NullBuilder>();
   }
 
-  Status AppendValue(const rj::Value& json_obj) override {
-    if (json_obj.IsNull()) {
+  Status AppendValue(simdjson::dom::element json_obj) override {
+    if (json_obj.is_null()) {
       return AppendNull();
     }
-    return JSONTypeError("null", json_obj.GetType());
+    return JSONTypeError("null", json_obj.type());
   }
 
   std::shared_ptr<ArrayBuilder> builder() override { return builder_; }
@@ -190,17 +645,20 @@ class BooleanConverter final : public ConcreteConverter<BooleanConverter> {
     builder_ = std::make_shared<BooleanBuilder>();
   }
 
-  Status AppendValue(const rj::Value& json_obj) override {
-    if (json_obj.IsNull()) {
+  Status AppendValue(simdjson::dom::element json_obj) override {
+    if (json_obj.is_null()) {
       return AppendNull();
     }
-    if (json_obj.IsBool()) {
-      return builder_->Append(json_obj.GetBool());
+    if (json_obj.is_bool()) {
+      return builder_->Append(json_obj.get_bool().value());
     }
-    if (json_obj.IsInt()) {
-      return builder_->Append(json_obj.GetInt() != 0);
+    if (json_obj.is_int64()) {
+      return builder_->Append(json_obj.get_int64().value() != 0);
     }
-    return JSONTypeError("boolean", json_obj.GetType());
+    if (json_obj.is_uint64()) {
+      return builder_->Append(json_obj.get_uint64().value() != 0);
+    }
+    return JSONTypeError("boolean", json_obj.type());
   }
 
   std::shared_ptr<ArrayBuilder> builder() override { return builder_; }
@@ -214,77 +672,138 @@ class BooleanConverter final : public ConcreteConverter<BooleanConverter> {
 
 // Convert single signed integer value (also {Date,Time}{32,64} and Timestamp)
 template <typename T>
-enable_if_physical_signed_integer<T, Status> ConvertNumber(const rj::Value& json_obj,
-                                                           const DataType& type,
-                                                           typename T::c_type* out) {
-  if (json_obj.IsInt64()) {
-    int64_t v64 = json_obj.GetInt64();
+enable_if_physical_signed_integer<T, Status> ConvertNumber(
+    simdjson::dom::element json_obj, const DataType& type, typename T::c_type* out) {
+  if (json_obj.is_int64()) {
+    int64_t v64 = json_obj.get_int64().value();
     *out = static_cast<typename T::c_type>(v64);
     if (*out == v64) {
       return Status::OK();
     } else {
       return Status::Invalid("Value ", v64, " out of bounds for ", type);
     }
+  } else if (json_obj.is_uint64()) {
+    // simdjson may parse positive integers as uint64
+    uint64_t v64 = json_obj.get_uint64().value();
+    if (v64 <= static_cast<uint64_t>(std::numeric_limits<int64_t>::max())) {
+      int64_t v64s = static_cast<int64_t>(v64);
+      *out = static_cast<typename T::c_type>(v64s);
+      if (*out == v64s) {
+        return Status::OK();
+      } else {
+        return Status::Invalid("Value ", v64, " out of bounds for ", type);
+      }
+    }
+    return Status::Invalid("Value ", v64, " out of bounds for ", type);
   } else {
     *out = static_cast<typename T::c_type>(0);
-    return JSONTypeError("signed int", json_obj.GetType());
+    return JSONTypeError("signed int", json_obj.type());
   }
 }
 
 // Convert single unsigned integer value
 template <typename T>
-enable_if_unsigned_integer<T, Status> ConvertNumber(const rj::Value& json_obj,
+enable_if_unsigned_integer<T, Status> ConvertNumber(simdjson::dom::element json_obj,
                                                     const DataType& type,
                                                     typename T::c_type* out) {
-  if (json_obj.IsUint64()) {
-    uint64_t v64 = json_obj.GetUint64();
+  if (json_obj.is_uint64()) {
+    uint64_t v64 = json_obj.get_uint64().value();
     *out = static_cast<typename T::c_type>(v64);
     if (*out == v64) {
       return Status::OK();
     } else {
       return Status::Invalid("Value ", v64, " out of bounds for ", type);
     }
+  } else if (json_obj.is_int64()) {
+    // simdjson may parse small positive integers as int64
+    int64_t v64 = json_obj.get_int64().value();
+    if (v64 >= 0) {
+      uint64_t v64u = static_cast<uint64_t>(v64);
+      *out = static_cast<typename T::c_type>(v64u);
+      if (*out == v64u) {
+        return Status::OK();
+      } else {
+        return Status::Invalid("Value ", v64, " out of bounds for ", type);
+      }
+    }
+    return Status::Invalid("Value ", v64, " out of bounds for ", type);
   } else {
     *out = static_cast<typename T::c_type>(0);
-    return JSONTypeError("unsigned int", json_obj.GetType());
+    return JSONTypeError("unsigned int", json_obj.type());
   }
 }
 
 // Convert float16/HalfFloatType
 template <typename T>
-enable_if_half_float<T, Status> ConvertNumber(const rj::Value& json_obj,
+enable_if_half_float<T, Status> ConvertNumber(simdjson::dom::element json_obj,
                                               const DataType& type, uint16_t* out) {
-  if (json_obj.IsDouble()) {
-    double f64 = json_obj.GetDouble();
+  if (json_obj.is_double()) {
+    double f64 = json_obj.get_double().value();
     *out = Float16(f64).bits();
     return Status::OK();
-  } else if (json_obj.IsUint()) {
-    uint32_t u32t = json_obj.GetUint();
-    double f64 = static_cast<double>(u32t);
+  } else if (json_obj.is_uint64()) {
+    uint64_t u64 = json_obj.get_uint64().value();
+    double f64 = static_cast<double>(u64);
     *out = Float16(f64).bits();
     return Status::OK();
-  } else if (json_obj.IsInt()) {
-    int32_t i32t = json_obj.GetInt();
-    double f64 = static_cast<double>(i32t);
+  } else if (json_obj.is_int64()) {
+    int64_t i64 = json_obj.get_int64().value();
+    double f64 = static_cast<double>(i64);
     *out = Float16(f64).bits();
     return Status::OK();
+  } else if (json_obj.is_string()) {
+    // Handle NaN/Inf that were preprocessed to strings
+    std::string_view str = json_obj.get_string().value();
+    if (str == "NaN" || str == "-NaN") {
+      *out = Float16(std::nan("")).bits();
+      return Status::OK();
+    } else if (str == "Inf" || str == "Infinity") {
+      *out = Float16(INFINITY).bits();
+      return Status::OK();
+    } else if (str == "-Inf" || str == "-Infinity") {
+      *out = Float16(-INFINITY).bits();
+      return Status::OK();
+    }
+    *out = static_cast<uint16_t>(0);
+    return JSONTypeError("number", json_obj.type());
   } else {
     *out = static_cast<uint16_t>(0);
-    return JSONTypeError("unsigned int", json_obj.GetType());
+    return JSONTypeError("number", json_obj.type());
   }
 }
 
 // Convert single floating point value
 template <typename T>
-enable_if_physical_floating_point<T, Status> ConvertNumber(const rj::Value& json_obj,
-                                                           const DataType& type,
-                                                           typename T::c_type* out) {
-  if (json_obj.IsNumber()) {
-    *out = static_cast<typename T::c_type>(json_obj.GetDouble());
+enable_if_physical_floating_point<T, Status> ConvertNumber(
+    simdjson::dom::element json_obj, const DataType& type, typename T::c_type* out) {
+  // simdjson doesn't have is_number(), so check all numeric types
+  if (json_obj.is_double()) {
+    *out = static_cast<typename T::c_type>(json_obj.get_double().value());
     return Status::OK();
+  } else if (json_obj.is_int64()) {
+    *out = static_cast<typename T::c_type>(json_obj.get_int64().value());
+    return Status::OK();
+  } else if (json_obj.is_uint64()) {
+    *out = static_cast<typename T::c_type>(json_obj.get_uint64().value());
+    return Status::OK();
+  } else if (json_obj.is_string()) {
+    // Handle NaN/Inf that were preprocessed to strings
+    std::string_view str = json_obj.get_string().value();
+    if (str == "NaN" || str == "-NaN") {
+      *out = static_cast<typename T::c_type>(std::nan(""));
+      return Status::OK();
+    } else if (str == "Inf" || str == "Infinity") {
+      *out = static_cast<typename T::c_type>(INFINITY);
+      return Status::OK();
+    } else if (str == "-Inf" || str == "-Infinity") {
+      *out = static_cast<typename T::c_type>(-INFINITY);
+      return Status::OK();
+    }
+    *out = static_cast<typename T::c_type>(0);
+    return JSONTypeError("number", json_obj.type());
   } else {
     *out = static_cast<typename T::c_type>(0);
-    return JSONTypeError("number", json_obj.GetType());
+    return JSONTypeError("number", json_obj.type());
   }
 }
 
@@ -303,8 +822,8 @@ class IntegerConverter final
 
   Status Init() override { return this->MakeConcreteBuilder(&builder_); }
 
-  Status AppendValue(const rj::Value& json_obj) override {
-    if (json_obj.IsNull()) {
+  Status AppendValue(simdjson::dom::element json_obj) override {
+    if (json_obj.is_null()) {
       return this->AppendNull();
     }
     c_type value;
@@ -330,8 +849,8 @@ class FloatConverter final : public ConcreteConverter<FloatConverter<Type, Build
 
   Status Init() override { return this->MakeConcreteBuilder(&builder_); }
 
-  Status AppendValue(const rj::Value& json_obj) override {
-    if (json_obj.IsNull()) {
+  Status AppendValue(simdjson::dom::element json_obj) override {
+    if (json_obj.is_null()) {
       return this->AppendNull();
     }
     c_type value;
@@ -360,14 +879,14 @@ class DecimalConverter final
 
   Status Init() override { return this->MakeConcreteBuilder(&builder_); }
 
-  Status AppendValue(const rj::Value& json_obj) override {
-    if (json_obj.IsNull()) {
+  Status AppendValue(simdjson::dom::element json_obj) override {
+    if (json_obj.is_null()) {
       return this->AppendNull();
     }
-    if (json_obj.IsString()) {
+    if (json_obj.is_string()) {
       int32_t precision, scale;
       DecimalValue d;
-      auto view = std::string_view(json_obj.GetString(), json_obj.GetStringLength());
+      std::string_view view = json_obj.get_string().value();
       RETURN_NOT_OK(DecimalValue::FromString(view, &d, &precision, &scale));
       if (scale != decimal_type_->scale()) {
         return Status::Invalid("Invalid scale for decimal: expected ",
@@ -375,7 +894,7 @@ class DecimalConverter final
       }
       return builder_->Append(d);
     }
-    return JSONTypeError("decimal string", json_obj.GetType());
+    return JSONTypeError("decimal string", json_obj.type());
   }
 
   std::shared_ptr<ArrayBuilder> builder() override { return builder_; }
@@ -405,20 +924,20 @@ class TimestampConverter final : public ConcreteConverter<TimestampConverter> {
     builder_ = std::make_shared<TimestampBuilder>(type, default_memory_pool());
   }
 
-  Status AppendValue(const rj::Value& json_obj) override {
-    if (json_obj.IsNull()) {
+  Status AppendValue(simdjson::dom::element json_obj) override {
+    if (json_obj.is_null()) {
       return this->AppendNull();
     }
     int64_t value;
-    if (json_obj.IsNumber()) {
+    if (json_obj.is_int64() || json_obj.is_uint64() || json_obj.is_double()) {
       RETURN_NOT_OK(ConvertNumber<Int64Type>(json_obj, *this->type_, &value));
-    } else if (json_obj.IsString()) {
-      std::string_view view(json_obj.GetString(), json_obj.GetStringLength());
+    } else if (json_obj.is_string()) {
+      std::string_view view = json_obj.get_string().value();
       if (!ParseValue(*timestamp_type_, view.data(), view.size(), &value)) {
         return Status::Invalid("couldn't parse timestamp from ", view);
       }
     } else {
-      return JSONTypeError("timestamp", json_obj.GetType());
+      return JSONTypeError("timestamp", json_obj.type());
     }
     return builder_->Append(value);
   }
@@ -441,21 +960,22 @@ class DayTimeIntervalConverter final
     builder_ = std::make_shared<DayTimeIntervalBuilder>(default_memory_pool());
   }
 
-  Status AppendValue(const rj::Value& json_obj) override {
-    if (json_obj.IsNull()) {
+  Status AppendValue(simdjson::dom::element json_obj) override {
+    if (json_obj.is_null()) {
       return this->AppendNull();
     }
     DayTimeIntervalType::DayMilliseconds value;
-    if (!json_obj.IsArray()) {
-      return JSONTypeError("array", json_obj.GetType());
+    if (!json_obj.is_array()) {
+      return JSONTypeError("array", json_obj.type());
     }
-    if (json_obj.Size() != 2) {
+    auto arr = json_obj.get_array().value();
+    if (arr.size() != 2) {
       return Status::Invalid(
-          "day time interval pair must have exactly two elements, had ", json_obj.Size());
+          "day time interval pair must have exactly two elements, had ", arr.size());
     }
-    RETURN_NOT_OK(ConvertNumber<Int32Type>(json_obj[0], *this->type_, &value.days));
+    RETURN_NOT_OK(ConvertNumber<Int32Type>(arr.at(0).value(), *this->type_, &value.days));
     RETURN_NOT_OK(
-        ConvertNumber<Int32Type>(json_obj[1], *this->type_, &value.milliseconds));
+        ConvertNumber<Int32Type>(arr.at(1).value(), *this->type_, &value.milliseconds));
     return builder_->Append(value);
   }
 
@@ -473,22 +993,24 @@ class MonthDayNanoIntervalConverter final
     builder_ = std::make_shared<MonthDayNanoIntervalBuilder>(default_memory_pool());
   }
 
-  Status AppendValue(const rj::Value& json_obj) override {
-    if (json_obj.IsNull()) {
+  Status AppendValue(simdjson::dom::element json_obj) override {
+    if (json_obj.is_null()) {
       return this->AppendNull();
     }
     MonthDayNanoIntervalType::MonthDayNanos value;
-    if (!json_obj.IsArray()) {
-      return JSONTypeError("array", json_obj.GetType());
+    if (!json_obj.is_array()) {
+      return JSONTypeError("array", json_obj.type());
     }
-    if (json_obj.Size() != 3) {
+    auto arr = json_obj.get_array().value();
+    if (arr.size() != 3) {
       return Status::Invalid(
-          "month_day_nano_interval  must have exactly 3 elements, had ", json_obj.Size());
+          "month_day_nano_interval  must have exactly 3 elements, had ", arr.size());
     }
-    RETURN_NOT_OK(ConvertNumber<Int32Type>(json_obj[0], *this->type_, &value.months));
-    RETURN_NOT_OK(ConvertNumber<Int32Type>(json_obj[1], *this->type_, &value.days));
     RETURN_NOT_OK(
-        ConvertNumber<Int64Type>(json_obj[2], *this->type_, &value.nanoseconds));
+        ConvertNumber<Int32Type>(arr.at(0).value(), *this->type_, &value.months));
+    RETURN_NOT_OK(ConvertNumber<Int32Type>(arr.at(1).value(), *this->type_, &value.days));
+    RETURN_NOT_OK(
+        ConvertNumber<Int64Type>(arr.at(2).value(), *this->type_, &value.nanoseconds));
 
     return builder_->Append(value);
   }
@@ -510,15 +1032,15 @@ class StringConverter final
 
   Status Init() override { return this->MakeConcreteBuilder(&builder_); }
 
-  Status AppendValue(const rj::Value& json_obj) override {
-    if (json_obj.IsNull()) {
+  Status AppendValue(simdjson::dom::element json_obj) override {
+    if (json_obj.is_null()) {
       return this->AppendNull();
     }
-    if (json_obj.IsString()) {
-      auto view = std::string_view(json_obj.GetString(), json_obj.GetStringLength());
+    if (json_obj.is_string()) {
+      std::string_view view = json_obj.get_string().value();
       return builder_->Append(view);
     } else {
-      return JSONTypeError("string", json_obj.GetType());
+      return JSONTypeError("string", json_obj.type());
     }
   }
 
@@ -541,12 +1063,12 @@ class FixedSizeBinaryConverter final
 
   Status Init() override { return this->MakeConcreteBuilder(&builder_); }
 
-  Status AppendValue(const rj::Value& json_obj) override {
-    if (json_obj.IsNull()) {
+  Status AppendValue(simdjson::dom::element json_obj) override {
+    if (json_obj.is_null()) {
       return this->AppendNull();
     }
-    if (json_obj.IsString()) {
-      auto view = std::string_view(json_obj.GetString(), json_obj.GetStringLength());
+    if (json_obj.is_string()) {
+      std::string_view view = json_obj.get_string().value();
       if (view.length() != static_cast<size_t>(builder_->byte_width())) {
         std::stringstream ss;
         ss << "Invalid string length " << view.length() << " in JSON input for "
@@ -555,7 +1077,7 @@ class FixedSizeBinaryConverter final
       }
       return builder_->Append(view);
     } else {
-      return JSONTypeError("string", json_obj.GetType());
+      return JSONTypeError("string", json_obj.type());
     }
   }
 
@@ -588,8 +1110,8 @@ class VarLengthListLikeConverter final
     return Status::OK();
   }
 
-  Status AppendValue(const rj::Value& json_obj) override {
-    if (json_obj.IsNull()) {
+  Status AppendValue(simdjson::dom::element json_obj) override {
+    if (json_obj.is_null()) {
       return this->AppendNull();
     }
     // Extend the child converter with this JSON array
@@ -623,29 +1145,31 @@ class MapConverter final : public ConcreteConverter<MapConverter> {
     return Status::OK();
   }
 
-  Status AppendValue(const rj::Value& json_obj) override {
-    if (json_obj.IsNull()) {
+  Status AppendValue(simdjson::dom::element json_obj) override {
+    if (json_obj.is_null()) {
       return this->AppendNull();
     }
     RETURN_NOT_OK(builder_->Append());
-    if (!json_obj.IsArray()) {
-      return JSONTypeError("array", json_obj.GetType());
+    if (!json_obj.is_array()) {
+      return JSONTypeError("array", json_obj.type());
     }
-    auto size = json_obj.Size();
-    for (uint32_t i = 0; i < size; ++i) {
-      const auto& json_pair = json_obj[i];
-      if (!json_pair.IsArray()) {
-        return JSONTypeError("array", json_pair.GetType());
+    auto arr = json_obj.get_array().value();
+    for (auto json_pair : arr) {
+      if (!json_pair.is_array()) {
+        return JSONTypeError("array", json_pair.type());
       }
-      if (json_pair.Size() != 2) {
+      auto pair_arr = json_pair.get_array().value();
+      if (pair_arr.size() != 2) {
         return Status::Invalid("key item pair must have exactly two elements, had ",
-                               json_pair.Size());
+                               pair_arr.size());
       }
-      if (json_pair[0].IsNull()) {
+      auto key_elem = pair_arr.at(0).value();
+      auto item_elem = pair_arr.at(1).value();
+      if (key_elem.is_null()) {
         return Status::Invalid("null key is invalid");
       }
-      RETURN_NOT_OK(key_converter_->AppendValue(json_pair[0]));
-      RETURN_NOT_OK(item_converter_->AppendValue(json_pair[1]));
+      RETURN_NOT_OK(key_converter_->AppendValue(key_elem));
+      RETURN_NOT_OK(item_converter_->AppendValue(item_elem));
     }
     return Status::OK();
   }
@@ -674,15 +1198,16 @@ class FixedSizeListConverter final : public ConcreteConverter<FixedSizeListConve
     return Status::OK();
   }
 
-  Status AppendValue(const rj::Value& json_obj) override {
-    if (json_obj.IsNull()) {
+  Status AppendValue(simdjson::dom::element json_obj) override {
+    if (json_obj.is_null()) {
       return this->AppendNull();
     }
     RETURN_NOT_OK(builder_->Append());
     // Extend the child converter with this JSON array
     RETURN_NOT_OK(child_converter_->AppendValues(json_obj));
-    if (json_obj.GetArray().Size() != static_cast<rj::SizeType>(list_size_)) {
-      return Status::Invalid("incorrect list size ", json_obj.GetArray().Size());
+    auto arr = json_obj.get_array().value();
+    if (arr.size() != static_cast<size_t>(list_size_)) {
+      return Status::Invalid("incorrect list size ", arr.size());
     }
     return Status::OK();
   }
@@ -718,45 +1243,49 @@ class StructConverter final : public ConcreteConverter<StructConverter> {
   // Append a JSON value that is either an array of N elements in order
   // or an object mapping struct names to values (omitted struct members
   // are mapped to null).
-  Status AppendValue(const rj::Value& json_obj) override {
-    if (json_obj.IsNull()) {
+  Status AppendValue(simdjson::dom::element json_obj) override {
+    if (json_obj.is_null()) {
       return this->AppendNull();
     }
-    if (json_obj.IsArray()) {
-      auto size = json_obj.Size();
-      auto expected_size = static_cast<uint32_t>(type_->num_fields());
+    if (json_obj.is_array()) {
+      auto arr = json_obj.get_array().value();
+      auto size = arr.size();
+      auto expected_size = static_cast<size_t>(type_->num_fields());
       if (size != expected_size) {
         return Status::Invalid("Expected array of size ", expected_size,
                                ", got array of size ", size);
       }
-      for (uint32_t i = 0; i < size; ++i) {
-        RETURN_NOT_OK(child_converters_[i]->AppendValue(json_obj[i]));
+      size_t i = 0;
+      for (auto elem : arr) {
+        RETURN_NOT_OK(child_converters_[i]->AppendValue(elem));
+        ++i;
       }
       return builder_->Append();
     }
-    if (json_obj.IsObject()) {
-      auto remaining = json_obj.MemberCount();
+    if (json_obj.is_object()) {
+      auto obj = json_obj.get_object().value();
+      size_t remaining = obj.size();
       auto num_children = type_->num_fields();
       for (int32_t i = 0; i < num_children; ++i) {
         const auto& field = type_->field(i);
-        auto it = json_obj.FindMember(field->name());
-        if (it != json_obj.MemberEnd()) {
+        auto found = obj[field->name()];
+        if (!found.error()) {
           --remaining;
-          RETURN_NOT_OK(child_converters_[i]->AppendValue(it->value));
+          RETURN_NOT_OK(child_converters_[i]->AppendValue(found.value()));
         } else {
           RETURN_NOT_OK(child_converters_[i]->AppendNull());
         }
       }
       if (remaining > 0) {
-        rj::StringBuffer sb;
-        rj::Writer<rj::StringBuffer> writer(sb);
-        json_obj.Accept(writer);
+        // Serialize the object for error message
+        std::ostringstream ss;
+        ss << json_obj;
         return Status::Invalid("Unexpected members in JSON object for type ",
-                               type_->ToString(), " Object: ", sb.GetString());
+                               type_->ToString(), " Object: ", ss.str());
       }
       return builder_->Append();
     }
-    return JSONTypeError("array or object", json_obj.GetType());
+    return JSONTypeError("array or object", json_obj.type());
   }
 
   std::shared_ptr<ArrayBuilder> builder() override { return builder_; }
@@ -801,23 +1330,27 @@ class UnionConverter final : public ConcreteConverter<UnionConverter> {
 
   // Append a JSON value that must be a 2-long array, containing the type_id
   // and value of the UnionArray's slot.
-  Status AppendValue(const rj::Value& json_obj) override {
-    if (json_obj.IsNull()) {
+  Status AppendValue(simdjson::dom::element json_obj) override {
+    if (json_obj.is_null()) {
       return this->AppendNull();
     }
-    if (!json_obj.IsArray()) {
-      return JSONTypeError("array", json_obj.GetType());
+    if (!json_obj.is_array()) {
+      return JSONTypeError("array", json_obj.type());
     }
-    if (json_obj.Size() != 2) {
+    auto arr = json_obj.get_array().value();
+    if (arr.size() != 2) {
       return Status::Invalid("Expected [type_id, value] pair, got array of size ",
-                             json_obj.Size());
+                             arr.size());
     }
-    const auto& id_obj = json_obj[0];
-    if (!id_obj.IsInt()) {
-      return JSONTypeError("int", id_obj.GetType());
+    auto id_obj = arr.at(0).value();
+    if (!id_obj.is_int64() && !id_obj.is_uint64()) {
+      return JSONTypeError("int", id_obj.type());
     }
 
-    auto id = static_cast<int8_t>(id_obj.GetInt());
+    int64_t id_val = id_obj.is_int64()
+                         ? id_obj.get_int64().value()
+                         : static_cast<int64_t>(id_obj.get_uint64().value());
+    auto id = static_cast<int8_t>(id_val);
     auto child_num = type_id_to_child_num_[id];
     if (child_num == -1) {
       return Status::Invalid("type_id ", id, " not found in ", *type_);
@@ -834,7 +1367,7 @@ class UnionConverter final : public ConcreteConverter<UnionConverter> {
     } else {
       RETURN_NOT_OK(checked_cast<DenseUnionBuilder&>(*builder_).Append(id));
     }
-    return child_converter->AppendValue(json_obj[1]);
+    return child_converter->AppendValue(arr.at(1).value());
   }
 
   std::shared_ptr<ArrayBuilder> builder() override { return builder_; }
@@ -980,12 +1513,21 @@ Result<std::shared_ptr<Array>> ArrayFromJSONString(const std::shared_ptr<DataTyp
   std::shared_ptr<JSONConverter> converter;
   RETURN_NOT_OK(GetConverter(type, &converter));
 
-  rj::Document json_doc;
-  json_doc.Parse<kParseFlags>(json_string.data(), json_string.length());
-  if (json_doc.HasParseError()) {
-    return Status::Invalid("JSON parse error at offset ", json_doc.GetErrorOffset(), ": ",
-                           GetParseError_En(json_doc.GetParseError()));
+  // Preprocess to handle NaN/Inf literals (not standard JSON)
+  std::string preprocessed = PreprocessNanInf(json_string);
+
+  simdjson::dom::parser parser;
+  simdjson::padded_string padded_json(preprocessed);
+  auto result = parser.parse(padded_json);
+  if (result.error()) {
+    // Preserve RapidJSON's permissive UTF-8 behavior for string-like types.
+    if (result.error() == simdjson::UTF8_ERROR && IsStringLikeType(type)) {
+      ARROW_ASSIGN_OR_RAISE(auto values, ParseJsonStringArrayUnsafe(json_string));
+      return BuildStringLikeArray(type, values);
+    }
+    return Status::Invalid("JSON parse error: ", simdjson::error_message(result.error()));
   }
+  auto json_doc = result.value();
 
   // The JSON document should be an array, append it
   RETURN_NOT_OK(converter->AppendValues(json_doc));
@@ -1036,12 +1578,31 @@ Result<std::shared_ptr<Scalar>> ScalarFromJSONString(
   std::shared_ptr<JSONConverter> converter;
   RETURN_NOT_OK(GetConverter(type, &converter));
 
-  rj::Document json_doc;
-  json_doc.Parse<kParseFlags>(json_string.data(), json_string.length());
-  if (json_doc.HasParseError()) {
-    return Status::Invalid("JSON parse error at offset ", json_doc.GetErrorOffset(), ": ",
-                           GetParseError_En(json_doc.GetParseError()));
+  // Preprocess to handle NaN/Inf literals (not standard JSON)
+  std::string preprocessed = PreprocessNanInf(json_string);
+
+  simdjson::dom::parser parser;
+  simdjson::padded_string padded_json(preprocessed);
+  auto result = parser.parse(padded_json);
+  if (result.error()) {
+    // Preserve RapidJSON's permissive UTF-8 behavior for string-like types.
+    if (result.error() == simdjson::UTF8_ERROR && IsStringLikeType(type)) {
+      std::string wrapped;
+      wrapped.reserve(json_string.size() + 2);
+      wrapped.push_back('[');
+      wrapped.append(json_string.data(), json_string.size());
+      wrapped.push_back(']');
+      ARROW_ASSIGN_OR_RAISE(auto values, ParseJsonStringArrayUnsafe(wrapped));
+      if (values.size() != 1) {
+        return Status::Invalid("Expected a single JSON value");
+      }
+      ARROW_ASSIGN_OR_RAISE(auto array, BuildStringLikeArray(type, {values.front()}));
+      DCHECK_EQ(array->length(), 1);
+      return array->GetScalar(0);
+    }
+    return Status::Invalid("JSON parse error: ", simdjson::error_message(result.error()));
   }
+  auto json_doc = result.value();
 
   std::shared_ptr<Array> array;
   RETURN_NOT_OK(converter->AppendValue(json_doc));

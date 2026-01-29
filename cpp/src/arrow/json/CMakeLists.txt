@@ -26,13 +26,15 @@ add_arrow_test(test
                PREFIX
                "arrow-json"
                EXTRA_LINK_LIBS
-               RapidJSON)
+               simdjson::simdjson)
 
 add_arrow_benchmark(parser_benchmark
                     PREFIX
                     "arrow-json"
                     EXTRA_LINK_LIBS
-                    RapidJSON)
+                    simdjson::simdjson)
+
+# Note: simdjson is now linked as a static library, not header-only
 arrow_install_all_headers("arrow/json")
 
 # pkg-config support

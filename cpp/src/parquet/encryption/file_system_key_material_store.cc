@@ -19,8 +19,8 @@
 
 #include "arrow/filesystem/filesystem.h"
 #include "arrow/filesystem/path_util.h"
+#include "arrow/json/json_util.h"
 #include "arrow/json/object_parser.h"
-#include "arrow/json/object_writer.h"
 #include "arrow/result.h"
 
 #include "parquet/encryption/file_system_key_material_store.h"
@@ -80,11 +80,13 @@ void FileSystemKeyMaterialStore::LoadKeyMaterialMap() {
 }
 
 std::string FileSystemKeyMaterialStore::BuildKeyMaterialMapJson() {
-  ::arrow::json::internal::ObjectWriter writer;
+  ::arrow::json::JsonWriter writer;
+  writer.StartObject();
   for (const auto& it : key_material_map_) {
     writer.SetString(it.first, it.second);
   }
-  return writer.Serialize();
+  writer.EndObject();
+  return std::string(writer.GetString());
 }
 
 void FileSystemKeyMaterialStore::SaveMaterial() {

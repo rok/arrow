@@ -16,6 +16,7 @@
 // under the License.
 
 #include "arrow/type.h"
+#include "arrow/util/benchmark_util.h"
 #include "benchmark/benchmark.h"
 
 #include <memory>
@@ -146,7 +147,7 @@ void WriteCsvNumericCheckQuote(benchmark::State& state) {
   BenchmarkWriteCsv(state, options, *batch);
 }
 
-void NullPercents(benchmark::internal::Benchmark* bench) {
+void NullPercents(arrow::BenchmarkType* bench) {
   std::vector<int> null_percents = {0, 1, 10, 50};
   for (int null_percent : null_percents) {
     bench->Args({null_percent});

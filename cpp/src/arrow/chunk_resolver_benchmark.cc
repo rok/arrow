@@ -97,7 +97,7 @@ struct ResolveManyBenchmark {
 };
 
 template <typename IndexType>
-void ResolveManySetArgs(benchmark::internal::Benchmark* bench) {
+void ResolveManySetArgs(arrow::BenchmarkType* bench) {
   constexpr int32_t kNonAligned = 3;
   const int64_t kNumIndicesFew = (kChunkedArrayLength >> 7) - kNonAligned;
   const int64_t kNumIndicesMany = (kChunkedArrayLength >> 1) - kNonAligned;

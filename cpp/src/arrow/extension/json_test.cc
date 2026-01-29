@@ -16,7 +16,6 @@
 // under the License.
 
 #include "arrow/extension/json.h"
-
 #include "arrow/array/validate.h"
 #include "arrow/ipc/test_common.h"
 #include "arrow/record_batch.h"

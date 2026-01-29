@@ -97,7 +97,7 @@
         "numpy": [],
         "pandas": ["0.25.1"],
         "pip+setuptools_scm": [],
-        "rapidjson": [],
+        "simdjson": [],
         "re2": [],
         "snappy": [],
         "thrift-cpp": [],

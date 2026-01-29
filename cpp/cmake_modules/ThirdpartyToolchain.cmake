@@ -63,7 +63,7 @@ set(ARROW_THIRDPARTY_DEPENDENCIES
     orc
     re2
     Protobuf
-    RapidJSON
+    simdjson
     Snappy
     Substrait
     Thrift
@@ -142,6 +142,14 @@ else()
   set(ARROW_ACTUAL_DEPENDENCY_SOURCE "${ARROW_DEPENDENCY_SOURCE}")
 endif()
 
+# simdjson 4.2.0+ is required for the builder API and constevalutil used in json_util.h.
+# Always use bundled simdjson because:
+# 1. Most package managers have older versions (vcpkg 3.12.x, conda, Debian < 4.2.0)
+# 2. Using bundled in header-only mode eliminates consumer dependencies on simdjson
+# 3. This provides consistent behavior across all builds
+set(simdjson_SOURCE "BUNDLED")
+message(STATUS "simdjson: Using BUNDLED (required version 4.2.0+ not widely available)")
+
 if(ARROW_PACKAGE_PREFIX)
   message(STATUS "Setting (unset) dependency *_ROOT variables: ${ARROW_PACKAGE_PREFIX}")
   set(ENV{PKG_CONFIG_PATH} "${ARROW_PACKAGE_PREFIX}/lib/pkgconfig/")
@@ -207,8 +215,8 @@ macro(build_dependency DEPENDENCY_NAME)
     build_orc()
   elseif("${DEPENDENCY_NAME}" STREQUAL "Protobuf")
     build_protobuf()
-  elseif("${DEPENDENCY_NAME}" STREQUAL "RapidJSON")
-    build_rapidjson()
+  elseif("${DEPENDENCY_NAME}" STREQUAL "simdjson")
+    build_simdjson()
   elseif("${DEPENDENCY_NAME}" STREQUAL "re2")
     build_re2()
   elseif("${DEPENDENCY_NAME}" STREQUAL "Snappy")
@@ -380,7 +388,6 @@ if(ARROW_WITH_OPENTELEMETRY)
 endif()
 
 if(ARROW_PARQUET)
-  set(ARROW_WITH_RAPIDJSON ON)
   set(ARROW_WITH_THRIFT ON)
 endif()
 
@@ -408,7 +415,7 @@ if(ARROW_AZURE)
 endif()
 
 if(ARROW_JSON OR ARROW_FLIGHT_SQL_ODBC)
-  set(ARROW_WITH_RAPIDJSON ON)
+  set(ARROW_WITH_SIMDJSON ON)
 endif()
 
 if(ARROW_ORC OR ARROW_FLIGHT)
@@ -765,12 +772,12 @@ else()
            "${THIRDPARTY_MIRROR_URL}/re2-${ARROW_RE2_BUILD_VERSION}.tar.gz")
 endif()
 
-if(DEFINED ENV{ARROW_RAPIDJSON_URL})
-  set(RAPIDJSON_SOURCE_URL "$ENV{ARROW_RAPIDJSON_URL}")
+if(DEFINED ENV{ARROW_SIMDJSON_URL})
+  set(SIMDJSON_SOURCE_URL "$ENV{ARROW_SIMDJSON_URL}")
 else()
-  set_urls(RAPIDJSON_SOURCE_URL
-           "https://github.com/miloyip/rapidjson/archive/${ARROW_RAPIDJSON_BUILD_VERSION}.tar.gz"
-           "${THIRDPARTY_MIRROR_URL}/rapidjson-${ARROW_RAPIDJSON_BUILD_VERSION}.tar.gz")
+  set_urls(SIMDJSON_SOURCE_URL
+           "https://github.com/simdjson/simdjson/archive/refs/tags/${ARROW_SIMDJSON_BUILD_VERSION}.tar.gz"
+           "${THIRDPARTY_MIRROR_URL}/simdjson-${ARROW_SIMDJSON_BUILD_VERSION}.tar.gz")
 endif()
 
 if(DEFINED ENV{ARROW_S2N_TLS_URL})
@@ -2573,44 +2580,59 @@ if(ARROW_BUILD_BENCHMARKS)
                      FALSE)
 endif()
 
-macro(build_rapidjson)
-  message(STATUS "Building RapidJSON from source")
-  set(RAPIDJSON_PREFIX
-      "${CMAKE_CURRENT_BINARY_DIR}/rapidjson_ep/src/rapidjson_ep-install")
-  set(RAPIDJSON_CMAKE_ARGS
-      ${EP_COMMON_CMAKE_ARGS}
-      -DRAPIDJSON_BUILD_DOC=OFF
-      -DRAPIDJSON_BUILD_EXAMPLES=OFF
-      -DRAPIDJSON_BUILD_TESTS=OFF
-      "-DCMAKE_INSTALL_PREFIX=${RAPIDJSON_PREFIX}")
+macro(build_simdjson)
+  message(STATUS "simdjson: Building from source")
+  set(SIMDJSON_PREFIX "${CMAKE_CURRENT_BINARY_DIR}/simdjson_ep/src/simdjson_ep-install")
+  set(SIMDJSON_INCLUDE_DIR "${SIMDJSON_PREFIX}/include")
+  set(SIMDJSON_STATIC_LIB
+      "${SIMDJSON_PREFIX}/lib/${CMAKE_STATIC_LIBRARY_PREFIX}simdjson${CMAKE_STATIC_LIBRARY_SUFFIX}"
+  )
 
-  externalproject_add(rapidjson_ep
+  set(SIMDJSON_CMAKE_ARGS
+      ${EP_COMMON_CMAKE_ARGS} -DSIMDJSON_DEVELOPER_MODE=OFF
+      -DSIMDJSON_BUILD_STATIC_LIB=ON "-DCMAKE_INSTALL_PREFIX=${SIMDJSON_PREFIX}")
+
+  externalproject_add(simdjson_ep
                       ${EP_COMMON_OPTIONS}
                       PREFIX "${CMAKE_BINARY_DIR}"
-                      URL ${RAPIDJSON_SOURCE_URL}
-                      URL_HASH "SHA256=${ARROW_RAPIDJSON_BUILD_SHA256_CHECKSUM}"
-                      CMAKE_ARGS ${RAPIDJSON_CMAKE_ARGS})
+                      URL ${SIMDJSON_SOURCE_URL}
+                      URL_HASH "SHA256=${ARROW_SIMDJSON_BUILD_SHA256_CHECKSUM}"
+                      BUILD_BYPRODUCTS "${SIMDJSON_STATIC_LIB}"
+                      CMAKE_ARGS ${SIMDJSON_CMAKE_ARGS})
 
-  set(RAPIDJSON_INCLUDE_DIR "${RAPIDJSON_PREFIX}/include")
-  # The include directory must exist before it is referenced by a target.
-  file(MAKE_DIRECTORY "${RAPIDJSON_INCLUDE_DIR}")
+  file(MAKE_DIRECTORY "${SIMDJSON_INCLUDE_DIR}")
 
-  add_library(RapidJSON INTERFACE IMPORTED)
-  target_include_directories(RapidJSON INTERFACE "${RAPIDJSON_INCLUDE_DIR}")
-  add_dependencies(RapidJSON rapidjson_ep)
+  if(NOT TARGET simdjson::simdjson)
+    add_library(simdjson::simdjson STATIC IMPORTED)
+  endif()
+  set_target_properties(simdjson::simdjson PROPERTIES IMPORTED_LOCATION
+                                                      "${SIMDJSON_STATIC_LIB}")
+  target_include_directories(simdjson::simdjson INTERFACE "${SIMDJSON_INCLUDE_DIR}")
+  add_dependencies(simdjson::simdjson simdjson_ep)
 
-  set(RAPIDJSON_VENDORED TRUE)
+  # Ensure bundled headers take precedence over system/conda/vcpkg versions
+  include_directories(BEFORE SYSTEM "${SIMDJSON_INCLUDE_DIR}")
+
+  # Add to bundled static libs so it gets merged into arrow_bundled_dependencies
+  list(APPEND ARROW_BUNDLED_STATIC_LIBS simdjson::simdjson)
 endmacro()
 
-if(ARROW_WITH_RAPIDJSON)
-  set(ARROW_RAPIDJSON_REQUIRED_VERSION "1.1.0")
-  resolve_dependency(RapidJSON
-                     HAVE_ALT
-                     TRUE
-                     REQUIRED_VERSION
-                     ${ARROW_RAPIDJSON_REQUIRED_VERSION}
-                     IS_RUNTIME_DEPENDENCY
-                     FALSE)
+if(ARROW_WITH_SIMDJSON)
+  # Always use bundled simdjson 4.2.0+ (required for builder API and constevalutil)
+  resolve_dependency(simdjson)
+
+  # Add bundled simdjson include path to the BEGINNING of CMAKE_CXX_FLAGS.
+  # This ensures bundled simdjson headers are found BEFORE conda/system headers,
+  # which is necessary because conda environments add -isystem to CMAKE_CXX_FLAGS
+  # which would otherwise take precedence over our include_directories().
+  if(MSVC)
+    # MSVC uses /external:I for system include directories
+    set(CMAKE_CXX_FLAGS "/external:I ${SIMDJSON_INCLUDE_DIR} ${CMAKE_CXX_FLAGS}")
+    set(CMAKE_C_FLAGS "/external:I ${SIMDJSON_INCLUDE_DIR} ${CMAKE_C_FLAGS}")
+  else()
+    set(CMAKE_CXX_FLAGS "-isystem ${SIMDJSON_INCLUDE_DIR} ${CMAKE_CXX_FLAGS}")
+    set(CMAKE_C_FLAGS "-isystem ${SIMDJSON_INCLUDE_DIR} ${CMAKE_C_FLAGS}")
+  endif()
 endif()
 
 macro(build_xsimd)
