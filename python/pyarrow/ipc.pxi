@@ -1558,58 +1558,61 @@ def normalize_batches(batches, min_rows=0, max_rows=None, min_bytes=0,
             raise ValueError(
                 f"min_bytes ({min_bytes}) must be <= max_bytes ({max_bytes})")
 
-    acc = []
-    acc_rows = 0
-    acc_bytes = 0
-
-    def _should_flush():
-        mins_met = acc_rows >= min_rows and acc_bytes >= min_bytes
-        max_rows_exceeded = max_rows is not None and acc_rows >= max_rows
-        max_bytes_exceeded = max_bytes is not None and acc_bytes >= max_bytes
-        return mins_met or max_rows_exceeded or max_bytes_exceeded
-
-    def _flush_batches():
-        nonlocal acc, acc_rows, acc_bytes
-        if len(acc) == 1:
-            merged = acc[0]
-        else:
-            merged = concat_batches(acc)
-        acc = []
-        acc_rows = 0
-        acc_bytes = 0
-
-        while merged.num_rows > 0:
-            chunk_rows = merged.num_rows
-
-            if max_rows is not None:
-                chunk_rows = min(chunk_rows, max_rows)
-
-            if max_bytes is not None and merged.num_rows > 0:
-                bytes_per_row = merged.nbytes / merged.num_rows
-                if bytes_per_row > 0:
-                    rows_for_bytes = max(1, int(max_bytes / bytes_per_row))
-                    chunk_rows = min(chunk_rows, rows_for_bytes)
-
-            chunk = merged.slice(0, chunk_rows)
-            remainder = merged.slice(chunk_rows)
-
-            if remainder.num_rows > 0:
-                yield chunk
-                merged = remainder
-            else:
-                yield chunk
-                break
+    cdef:
+        list acc = []
+        int64_t acc_rows = 0
+        int64_t acc_bytes = 0
+        int64_t _min_rows = min_rows
+        int64_t _min_bytes = min_bytes
+        int64_t _max_rows = max_rows if max_rows is not None else -1
+        int64_t _max_bytes = max_bytes if max_bytes is not None else -1
+        int64_t chunk_rows, rows_for_bytes, batch_rows, batch_bytes
+        double bytes_per_row
+        bint has_max_rows = max_rows is not None
+        bint has_max_bytes = max_bytes is not None
 
     for batch in batches:
-        if batch.num_rows == 0:
+        batch_rows = batch.num_rows
+        if batch_rows == 0:
             continue
 
         acc.append(batch)
-        acc_rows += batch.num_rows
+        acc_rows += batch_rows
         acc_bytes += batch.nbytes
 
-        while _should_flush():
-            yield from _flush_batches()
+        while acc_rows > 0 and (
+            (acc_rows >= _min_rows and acc_bytes >= _min_bytes) or
+            (has_max_rows and acc_rows >= _max_rows) or
+            (has_max_bytes and acc_bytes >= _max_bytes)
+        ):
+            if len(acc) == 1:
+                merged = acc[0]
+            else:
+                merged = concat_batches(acc)
+            acc = []
+            acc_rows = 0
+            acc_bytes = 0
+
+            while merged.num_rows > 0:
+                chunk_rows = merged.num_rows
+
+                if has_max_rows and chunk_rows > _max_rows:
+                    chunk_rows = _max_rows
+
+                if has_max_bytes and merged.num_rows > 0:
+                    bytes_per_row = merged.nbytes / <double>merged.num_rows
+                    if bytes_per_row > 0:
+                        rows_for_bytes = max(
+                            1, <int64_t>(_max_bytes / bytes_per_row))
+                        if chunk_rows > rows_for_bytes:
+                            chunk_rows = rows_for_bytes
+
+                if chunk_rows >= merged.num_rows:
+                    yield merged
+                    break
+
+                yield merged.slice(0, chunk_rows)
+                merged = merged.slice(chunk_rows)
 
     if acc:
         if len(acc) == 1:

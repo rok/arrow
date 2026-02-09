@@ -1548,7 +1548,8 @@ def test_normalize_batches_from_dataset(tmp_path):
     ds = pytest.importorskip("pyarrow.dataset")
     table = pa.table({'a': range(200), 'b': [float(i) for i in range(200)]})
     ds.write_dataset(table, tmp_path, format="parquet",
-                     max_rows_per_file=50)
+                     max_rows_per_file=50,
+                     max_rows_per_group=50)
     dataset = ds.dataset(tmp_path, format="parquet")
     batches = dataset.to_batches()
     result = list(pa.normalize_batches(batches, max_rows=30))
