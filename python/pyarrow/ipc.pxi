@@ -1502,3 +1502,117 @@ def read_record_batch(obj, Schema schema,
                             CIpcReadOptions.Defaults()))
 
     return pyarrow_wrap_batch(result)
+
+
+def normalize_batches(batches, min_rows=0, max_rows=None, min_bytes=0,
+                      max_bytes=None):
+    """
+    Normalize a stream of record batches to fall within row and byte bounds.
+
+    Splits oversized batches and concatenates undersized ones, yielding
+    batches that fall within configurable row and byte limits.
+
+    Parameters
+    ----------
+    batches : iterable of RecordBatch
+        Input record batches.
+    min_rows : int, default 0
+        Minimum number of rows per output batch. The last batch may have
+        fewer rows.
+    max_rows : int or None, default None
+        Maximum number of rows per output batch.
+    min_bytes : int, default 0
+        Minimum byte size per output batch. The last batch may be smaller.
+    max_bytes : int or None, default None
+        Maximum byte size per output batch.
+
+    Yields
+    ------
+    RecordBatch
+        Normalized record batches.
+
+    Examples
+    --------
+    >>> import pyarrow as pa
+    >>> batch = pa.record_batch([pa.array(range(100))], names=['x'])
+    >>> batches = list(pa.normalize_batches([batch], max_rows=30))
+    >>> [b.num_rows for b in batches]
+    [30, 30, 30, 10]
+    """
+    if min_rows < 0:
+        raise ValueError(f"min_rows must be non-negative, got {min_rows}")
+    if min_bytes < 0:
+        raise ValueError(f"min_bytes must be non-negative, got {min_bytes}")
+    if max_rows is not None:
+        if max_rows <= 0:
+            raise ValueError(
+                f"max_rows must be positive, got {max_rows}")
+        if min_rows > max_rows:
+            raise ValueError(
+                f"min_rows ({min_rows}) must be <= max_rows ({max_rows})")
+    if max_bytes is not None:
+        if max_bytes <= 0:
+            raise ValueError(
+                f"max_bytes must be positive, got {max_bytes}")
+        if min_bytes > max_bytes:
+            raise ValueError(
+                f"min_bytes ({min_bytes}) must be <= max_bytes ({max_bytes})")
+
+    acc = []
+    acc_rows = 0
+    acc_bytes = 0
+
+    def _should_flush():
+        mins_met = acc_rows >= min_rows and acc_bytes >= min_bytes
+        max_rows_exceeded = max_rows is not None and acc_rows >= max_rows
+        max_bytes_exceeded = max_bytes is not None and acc_bytes >= max_bytes
+        return mins_met or max_rows_exceeded or max_bytes_exceeded
+
+    def _flush_batches():
+        nonlocal acc, acc_rows, acc_bytes
+        if len(acc) == 1:
+            merged = acc[0]
+        else:
+            merged = concat_batches(acc)
+        acc = []
+        acc_rows = 0
+        acc_bytes = 0
+
+        while merged.num_rows > 0:
+            chunk_rows = merged.num_rows
+
+            if max_rows is not None:
+                chunk_rows = min(chunk_rows, max_rows)
+
+            if max_bytes is not None and merged.num_rows > 0:
+                bytes_per_row = merged.nbytes / merged.num_rows
+                if bytes_per_row > 0:
+                    rows_for_bytes = max(1, int(max_bytes / bytes_per_row))
+                    chunk_rows = min(chunk_rows, rows_for_bytes)
+
+            chunk = merged.slice(0, chunk_rows)
+            remainder = merged.slice(chunk_rows)
+
+            if remainder.num_rows > 0:
+                yield chunk
+                merged = remainder
+            else:
+                yield chunk
+                break
+
+    for batch in batches:
+        if batch.num_rows == 0:
+            continue
+
+        acc.append(batch)
+        acc_rows += batch.num_rows
+        acc_bytes += batch.nbytes
+
+        while _should_flush():
+            yield from _flush_batches()
+
+    if acc:
+        if len(acc) == 1:
+            yield acc[0]
+        else:
+            yield concat_batches(acc)

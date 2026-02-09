@@ -1429,3 +1429,103 @@ def read_options_args(request):
 def test_read_options_repr(read_options_args):
     # https://github.com/apache/arrow/issues/47358
     check_ipc_options_repr(pa.ipc.IpcReadOptions, read_options_args)
+
+
+def _make_batch(num_rows):
+    return pa.record_batch([pa.array(range(num_rows))], names=['x'])
+
+
+def test_normalize_batches_split_large():
+    batch = _make_batch(100)
+    result = list(pa.normalize_batches([batch], max_rows=30))
+    row_counts = [b.num_rows for b in result]
+    assert row_counts == [30, 30, 30, 10]
+
+
+def test_normalize_batches_concat_small():
+    batches = [_make_batch(5) for _ in range(8)]
+    result = list(pa.normalize_batches(batches, min_rows=20))
+    total_rows = sum(b.num_rows for b in result)
+    assert total_rows == 40
+    assert all(b.num_rows >= 20 for b in result[:-1])
+
+
+def test_normalize_batches_passthrough():
+    batches = [_make_batch(10), _make_batch(10)]
+    result = list(pa.normalize_batches(batches, min_rows=5, max_rows=15))
+    row_counts = [b.num_rows for b in result]
+    assert row_counts == [10, 10]
+
+
+def test_normalize_batches_empty_input():
+    result = list(pa.normalize_batches([]))
+    assert result == []
+
+
+def test_normalize_batches_empty_batches_skipped():
+    batches = [_make_batch(0), _make_batch(5), _make_batch(0)]
+    result = list(pa.normalize_batches(batches))
+    assert len(result) == 1
+    assert result[0].num_rows == 5
+
+
+def test_normalize_batches_max_bytes():
+    batch = _make_batch(100)
+    bytes_per_row = batch.nbytes / batch.num_rows
+    max_bytes = int(bytes_per_row * 25)
+    result = list(pa.normalize_batches([batch], max_bytes=max_bytes))
+    assert all(b.num_rows <= 26 for b in result)
+    assert sum(b.num_rows for b in result) == 100
+
+
+def test_normalize_batches_min_bytes():
+    batches = [_make_batch(5) for _ in range(10)]
+    single_bytes = batches[0].nbytes
+    min_bytes = single_bytes * 4
+    result = list(pa.normalize_batches(batches, min_bytes=min_bytes))
+    total_rows = sum(b.num_rows for b in result)
+    assert total_rows == 50
+    if len(result) > 1:
+        assert all(b.nbytes >= min_bytes for b in result[:-1])
+
+
+def test_normalize_batches_combined_constraints():
+    batch = _make_batch(100)
+    bytes_per_row = batch.nbytes / batch.num_rows
+    result = list(pa.normalize_batches(
+        [batch], max_rows=40, max_bytes=int(bytes_per_row * 30)))
+    assert all(b.num_rows <= 40 for b in result)
+    assert sum(b.num_rows for b in result) == 100
+
+
+def test_normalize_batches_validation():
+    with pytest.raises(ValueError, match="min_rows must be non-negative"):
+        list(pa.normalize_batches([], min_rows=-1))
+    with pytest.raises(ValueError, match="min_bytes must be non-negative"):
+        list(pa.normalize_batches([], min_bytes=-1))
+    with pytest.raises(ValueError, match="max_rows must be positive"):
+        list(pa.normalize_batches([], max_rows=0))
+    with pytest.raises(ValueError, match="max_bytes must be positive"):
+        list(pa.normalize_batches([], max_bytes=0))
+    with pytest.raises(ValueError, match="min_rows.*must be <= max_rows"):
+        list(pa.normalize_batches([], min_rows=10, max_rows=5))
+    with pytest.raises(ValueError, match="min_bytes.*must be <= max_bytes"):
+        list(pa.normalize_batches([], min_bytes=100, max_bytes=50))
+
+
+def test_normalize_batches_last_batch_below_minimum():
+    batches = [_make_batch(5), _make_batch(3)]
+    result = list(pa.normalize_batches(batches, min_rows=100))
+    assert len(result) == 1
+    assert result[0].num_rows == 8
+
+
+def test_normalize_batches_preserves_schema():
+    schema = pa.schema([('a', pa.int32()), ('b', pa.utf8())])
+    batch = pa.record_batch(
+        [pa.array([1, 2, 3], type=pa.int32()),
+         pa.array(['x', 'y', 'z'], type=pa.utf8())],
+        schema=schema)
+    result = list(pa.normalize_batches([batch, batch], max_rows=4))
+    for b in result:
+        assert b.schema.equals(schema)
