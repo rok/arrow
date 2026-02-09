@@ -1529,3 +1529,31 @@ def test_normalize_batches_preserves_schema():
     result = list(pa.normalize_batches([batch, batch], max_rows=4))
     for b in result:
         assert b.schema.equals(schema)
+
+
+def test_normalize_batches_from_table():
+    table = pa.table({'x': range(100), 'y': [str(i) for i in range(100)]})
+    batches = table.to_batches(max_chunksize=7)
+    result = list(pa.normalize_batches(batches, min_rows=20, max_rows=30))
+    total_rows = sum(b.num_rows for b in result)
+    assert total_rows == 100
+    for b in result[:-1]:
+        assert 20 <= b.num_rows <= 30
+    assert result[-1].num_rows <= 30
+    for b in result:
+        assert b.schema.equals(table.schema)
+
+
+def test_normalize_batches_from_dataset(tmp_path):
+    ds = pytest.importorskip("pyarrow.dataset")
+    table = pa.table({'a': range(200), 'b': [float(i) for i in range(200)]})
+    ds.write_dataset(table, tmp_path, format="parquet",
+                     max_rows_per_file=50)
+    dataset = ds.dataset(tmp_path, format="parquet")
+    batches = dataset.to_batches()
+    result = list(pa.normalize_batches(batches, max_rows=30))
+    total_rows = sum(b.num_rows for b in result)
+    assert total_rows == 200
+    assert all(b.num_rows <= 30 for b in result)
+    for b in result:
+        assert b.schema.equals(dataset.schema)
