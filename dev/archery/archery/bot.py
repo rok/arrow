@@ -179,7 +179,7 @@ class PullRequestWorkflowBot:
         Returns the expected next state based on the event and
         the current state.
         """
-        if (self.event_name == "pull_request_target" and
+        if (self.event_name in ("pull_request", "pull_request_target") and
                 self.event_payload['action'] == 'opened'):
             if self.is_committer('pull_request'):
                 return PullRequestState.committer_review
@@ -202,7 +202,7 @@ class PullRequestWorkflowBot:
                 return PullRequestState.merge
             else:
                 return PullRequestState.changes
-        elif (self.event_name == "pull_request_target" and
+        elif (self.event_name in ("pull_request", "pull_request_target") and
               self.event_payload['action'] == 'synchronize' and
               current_state == PullRequestState.changes):
             return PullRequestState.change_review

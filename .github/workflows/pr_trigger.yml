@@ -15,18 +15,15 @@
 # specific language governing permissions and limitations
 # under the License.
 
-name: Dev PR
+name: "PR Trigger"
 
 on:
   pull_request:
     types:
       - opened
-      - edited
+      - converted_to_draft
+      - ready_for_review
       - synchronize
-
-concurrency:
-  group: ${{ github.workflow }}-${{ github.repository }}-${{ github.event.number }}
-  cancel-in-progress: true
 
 permissions:
   contents: read

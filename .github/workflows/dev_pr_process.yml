@@ -1,0 +1,142 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
+name: Dev PR Process
+
+on:
+  workflow_run:
+    workflows: ["Dev PR"]
+    types:
+      - completed
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  process:
+    name: Process
+    runs-on: ubuntu-latest
+    if: github.event.workflow_run.conclusion == 'success'
+    steps:
+      - name: Download PR event payload
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const run_id = context.payload.workflow_run.id;
+            const artifacts = await github.rest.actions.listWorkflowRunArtifacts({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: run_id,
+            });
+            const artifact = artifacts.data.artifacts.find(
+              a => a.name === "pr_event_payload"
+            );
+            if (!artifact) {
+              core.setFailed("No pr_event_payload artifact found");
+              return;
+            }
+            const download = await github.rest.actions.downloadArtifact({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              artifact_id: artifact.id,
+              archive_format: 'zip',
+            });
+            const fs = require('fs');
+            fs.writeFileSync(
+              `${process.env.GITHUB_WORKSPACE}/pr_event.zip`,
+              Buffer.from(download.data)
+            );
+
+      - name: Extract event payload
+        id: event
+        run: |
+          mkdir -p pr_event
+          unzip pr_event.zip -d pr_event
+          EVENT_PATH="$(pwd)/pr_event/event.json"
+          echo "path=${EVENT_PATH}" >> $GITHUB_OUTPUT
+          PR_NUMBER=$(jq -r '.number' "${EVENT_PATH}")
+          PR_ACTION=$(jq -r '.action' "${EVENT_PATH}")
+          echo "pr_number=${PR_NUMBER}" >> $GITHUB_OUTPUT
+          echo "pr_action=${PR_ACTION}" >> $GITHUB_OUTPUT
+
+      - uses: actions/checkout@v6
+        with:
+          repository: apache/arrow
+          ref: main
+          persist-credentials: false
+
+      - name: Add Issue link
+        if: |
+          (steps.event.outputs.pr_action == 'opened' ||
+           steps.event.outputs.pr_action == 'edited')
+        uses: actions/github-script@v8
+        env:
+          PR_EVENT_PATH: ${{ steps.event.outputs.path }}
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const payload = JSON.parse(fs.readFileSync(process.env.PR_EVENT_PATH, 'utf8'));
+            const prContext = {...context, payload};
+            const script = require(`${process.env.GITHUB_WORKSPACE}/.github/workflows/dev_pr/link.js`);
+            await script({github, context: prContext});
+
+      - name: Check title
+        if: |
+          (steps.event.outputs.pr_action == 'opened' ||
+           steps.event.outputs.pr_action == 'edited')
+        uses: actions/github-script@v8
+        env:
+          PR_EVENT_PATH: ${{ steps.event.outputs.path }}
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const payload = JSON.parse(fs.readFileSync(process.env.PR_EVENT_PATH, 'utf8'));
+            const prContext = {...context, payload};
+            const script = require(`${process.env.GITHUB_WORKSPACE}/.github/workflows/dev_pr/title_check.js`);
+            await script({github, context: prContext});
+
+      - name: Check Issue
+        if: |
+          (steps.event.outputs.pr_action == 'opened' ||
+           steps.event.outputs.pr_action == 'edited')
+        uses: actions/github-script@v8
+        env:
+          PR_EVENT_PATH: ${{ steps.event.outputs.path }}
+        with:
+          debug: true
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const payload = JSON.parse(fs.readFileSync(process.env.PR_EVENT_PATH, 'utf8'));
+            const prContext = {...context, payload};
+            const script = require(`${process.env.GITHUB_WORKSPACE}/.github/workflows/dev_pr/issue_check.js`);
+            await script({github, context: prContext});
+
+      - name: Assign GitHub labels
+        if: |
+          (steps.event.outputs.pr_action == 'opened' ||
+           steps.event.outputs.pr_action == 'synchronize')
+        uses: actions/labeler@v6
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          configuration-path: .github/workflows/dev_pr/labeler.yml
+          sync-labels: true
+          pr-number: ${{ steps.event.outputs.pr_number }}

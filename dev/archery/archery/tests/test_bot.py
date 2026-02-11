@@ -375,7 +375,7 @@ def test_open_pull_request(load_fixture, responses, fixture_name, expected_label
     )
     payload = load_fixture(fixture_name)
 
-    bot = PullRequestWorkflowBot('pull_request_target', payload)
+    bot = PullRequestWorkflowBot('pull_request', payload)
     bot.handle()
 
     # Setting awaiting committer review or awaiting review label
@@ -412,7 +412,7 @@ def test_open_pull_request_with_committer_list(load_fixture, responses, fixture_
 
     # Even though the author_association is not committer the list overrides.
     bot = PullRequestWorkflowBot(
-        'pull_request_target', payload, committers=['kszucs'])
+        'pull_request', payload, committers=['kszucs'])
     bot.handle()
 
     # Setting awaiting committer review or awaiting review label
@@ -453,7 +453,7 @@ def test_open_pull_request_with_existing_label(
     payload = load_fixture(fixture_name)
     payload['pull_request']['labels'] = ['awaiting review']
 
-    bot = PullRequestWorkflowBot('pull_request_target', payload)
+    bot = PullRequestWorkflowBot('pull_request', payload)
     bot.handle()
 
     post = responses.calls[-1]
@@ -609,7 +609,7 @@ def test_pull_request_synchronize_event_on_awaiting_changes(
         status=201
     )
 
-    bot = PullRequestWorkflowBot('pull_request_target', payload)
+    bot = PullRequestWorkflowBot('pull_request', payload)
     bot.handle()
     # after push event label changes.
     post = responses.calls[-1]
@@ -633,7 +633,7 @@ def test_pull_request_synchronize_event_on_awaiting_review(
         status=200
     )
 
-    bot = PullRequestWorkflowBot('pull_request_target', payload)
+    bot = PullRequestWorkflowBot('pull_request', payload)
     bot.handle()
     # No requests to delete or post new labels on push awaiting review
     assert len(responses.calls) == 2
@@ -663,7 +663,7 @@ def test_pull_request_synchronize_event_on_existing_pr_without_state(
         status=201
     )
 
-    bot = PullRequestWorkflowBot('pull_request_target', payload)
+    bot = PullRequestWorkflowBot('pull_request', payload)
     bot.handle()
     # after push event label get set to default
     post = responses.calls[-1]
