@@ -18,14 +18,21 @@
 """
 Extract docstrings from pyarrow runtime and insert them into stub files.
 
-Usage (from python/ directory with pyarrow built):
-    python scripts/update_stub_docstrings.py pyarrow-stubs
+Called from CMakeLists.txt install(CODE ...) after .pyi stubs and .so
+extensions have been installed to CMAKE_INSTALL_PREFIX.
+
+Usage:
+    python scripts/update_stub_docstrings.py <install_prefix> <source_dir>
 """
 
 import argparse
 import importlib
 import inspect
+import os
+import shutil
 import sys
+import sysconfig
+import tempfile
 from pathlib import Path
 from textwrap import indent
 
@@ -198,31 +205,56 @@ def add_docstrings_to_stubs(stubs_dir):
         stub_file.write_text(modified.code)
 
 
-def add_docstrings_from_build(stubs_dir, build_lib):
+def _create_importable_pyarrow(pyarrow_pkg, source_dir, install_prefix):
     """
-    Entry point for setup.py: update docstrings using pyarrow from build directory.
-
-    During the build process, pyarrow is not installed in the system Python.
-    We need to temporarily add the build directory to sys.path so we can
-    import pyarrow and extract docstrings from it.
+    Populate pyarrow_pkg with symlinks to source .py files, compiled
+    extensions, shared libraries, and subpackages so that pyarrow is
+    importable from the parent of pyarrow_pkg.
     """
-    stubs_dir, build_lib = Path(stubs_dir), Path(build_lib)
+    ext_suffix = sysconfig.get_config_var("EXT_SUFFIX") or ".so"
+    source_pyarrow = source_dir / "pyarrow"
+    link = shutil.copy2 if sys.platform == "win32" else os.symlink
 
-    sys.path.insert(0, str(build_lib))
-    try:
-        add_docstrings_to_stubs(stubs_dir)
-    finally:
-        sys.path.pop(0)
+    for f in source_pyarrow.iterdir():
+        if f.suffix == ".py":
+            link(f, pyarrow_pkg / f.name)
+        elif f.is_dir() and not f.name.startswith((".", "__")):
+            if sys.platform == "win32":
+                shutil.copytree(f, pyarrow_pkg / f.name, symlinks=True)
+            else:
+                link(f, pyarrow_pkg / f.name)
+
+    # Link compiled extensions and shared libraries from the install prefix
+    for f in install_prefix.iterdir():
+        dest = pyarrow_pkg / f.name
+        if dest.exists():
+            continue
+        is_extension = ext_suffix in f.name or f.suffix == ".pyd"
+        is_shared_lib = f.name.startswith("lib") and (
+            ".so" in f.name or f.suffix in (".dylib", ".dll")
+        )
+        if is_extension or is_shared_lib:
+            link(f, dest)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("stubs_dir", type=Path, help="Path to pyarrow-stubs folder")
+    parser.add_argument("install_prefix", type=Path,
+                        help="CMAKE_INSTALL_PREFIX with built .so and .pyi files")
+    parser.add_argument("source_dir", type=Path,
+                        help="CMake source directory (python/)")
     args = parser.parse_args()
 
-    # Add the directory containing this script's parent (python/) to sys.path
-    # so pyarrow can be imported when running from the python/ directory
-    script_dir = Path(__file__).resolve().parent
-    python_dir = script_dir.parent
-    sys.path.insert(0, str(python_dir))
-    add_docstrings_to_stubs(args.stubs_dir.resolve())
+    install_prefix = args.install_prefix.resolve()
+    source_dir = args.source_dir.resolve()
+
+    if not any(install_prefix.glob("*.pyi")):
+        print("No .pyi files in install prefix, skipping docstring injection")
+        sys.exit(0)
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        pyarrow_pkg = Path(tmpdir) / "pyarrow"
+        pyarrow_pkg.mkdir()
+        _create_importable_pyarrow(pyarrow_pkg, source_dir, install_prefix)
+        sys.path.insert(0, tmpdir)
+        add_docstrings_to_stubs(install_prefix)

@@ -1019,3 +1019,30 @@ if(PYARROW_BUILD_PARQUET)
     target_link_libraries(_parquet_encryption PRIVATE arrow_python_parquet_encryption)
   endif()
 endif()
+
+#
+# Type stubs with docstring injection
+#
+# Install .pyi stub files from pyarrow-stubs/ into the wheel, then run a
+# script that imports the just-built pyarrow to extract runtime docstrings
+# and inject them into the installed stubs.
+set(STUBS_SRC_DIR "${CMAKE_SOURCE_DIR}/pyarrow-stubs/pyarrow")
+if(EXISTS "${STUBS_SRC_DIR}")
+  install(DIRECTORY "${STUBS_SRC_DIR}/"
+          DESTINATION "."
+          FILES_MATCHING
+          PATTERN "*.pyi")
+
+  install(CODE "
+    execute_process(
+      COMMAND \"${Python3_EXECUTABLE}\"
+              \"${CMAKE_SOURCE_DIR}/scripts/update_stub_docstrings.py\"
+              \"\${CMAKE_INSTALL_PREFIX}\"
+              \"${CMAKE_SOURCE_DIR}\"
+      RESULT_VARIABLE _result
+    )
+    if(NOT _result EQUAL 0)
+      message(WARNING \"Stub docstring injection failed (exit code: \${_result})\")
+    endif()
+  ")
+endif()
