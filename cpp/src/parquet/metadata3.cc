@@ -21,13 +21,14 @@
 #include <string>
 #include <vector>
 
+#include "arrow/util/bit_util.h"
 #include "arrow/util/compression.h"
 #include "arrow/util/crc32.h"
 #include "arrow/util/endian.h"
 #include "arrow/util/ubsan.h"
 #include "arrow/util/unreachable.h"
-#include "parquet/file_writer.h"
 #include "generated/parquet_types.h"
+#include "parquet/file_writer.h"
 #include "parquet/thrift_internal.h"
 
 namespace parquet {
@@ -92,7 +93,7 @@ static_assert(IsEnumEq(format::PageType::DICTIONARY_PAGE,
 constexpr double kMinCompressionRatio = 1.2;
 
 constexpr uint8_t kExtUUID[16] = {0xde, 0xad, 0xbe, 0xef, 0xde, 0xad, 0xbe, 0xef,
-                                   0xde, 0xad, 0xbe, 0xef, 0xde, 0xad, 0xbe, 0xef};
+                                  0xde, 0xad, 0xbe, 0xef, 0xde, 0xad, 0xbe, 0xef};
 
 // Extended format compression codec (using same values as format3::CompressionCodec)
 enum class CompressionCodec : uint8_t {
@@ -100,22 +101,27 @@ enum class CompressionCodec : uint8_t {
   LZ4_RAW = 7,
 };
 
-auto GetNumChildren(
+int32_t GetNumChildren(
     const flatbuffers::Vector<flatbuffers::Offset<format3::SchemaElement>>& s, size_t i) {
   return s.Get(i)->num_children();
 }
 
-auto GetNumChildren(const std::vector<format::SchemaElement>& s, size_t i) {
+int32_t GetNumChildren(const std::vector<format::SchemaElement>& s, size_t i) {
   return s[i].num_children;
 }
 
-auto GetName(const flatbuffers::Vector<flatbuffers::Offset<format3::SchemaElement>>& s,
-             size_t i) {
+std::string GetName(
+    const flatbuffers::Vector<flatbuffers::Offset<format3::SchemaElement>>& s, size_t i) {
   return s.Get(i)->name()->str();
 }
 
-auto GetName(const std::vector<format::SchemaElement>& s, size_t i) { return s[i].name; }
+std::string GetName(const std::vector<format::SchemaElement>& s, size_t i) {
+  return s[i].name;
+}
 
+// Maps between column chunk indices (leaf columns only) and schema element indices
+// (all columns including groups). Also tracks parent relationships for building
+// column paths.
 class ColumnMap {
  public:
   template <typename Schema>
@@ -126,7 +132,9 @@ class ColumnMap {
     BuildParents(s);
   }
 
+  // Convert a column chunk index to the corresponding schema element index.
   size_t ToSchema(size_t cc_idx) const { return colchunk2schema_[cc_idx]; }
+  // Convert a schema element index to its column chunk index, if it is a leaf column.
   std::optional<size_t> ToCc(size_t schema_idx) const {
     auto it =
         std::lower_bound(colchunk2schema_.begin(), colchunk2schema_.end(), schema_idx);
@@ -177,6 +185,9 @@ class ColumnMap {
   std::vector<uint32_t> parents_;
 };
 
+// Packed representation of min/max statistics for a column chunk.
+// Values are split into lo4 (4 bytes), lo8 (8 bytes), and hi8 (8 bytes) parts
+// to allow compact flatbuffer encoding.
 struct MinMax {
   struct Packed {
     uint32_t lo4 = 0;
@@ -1137,12 +1148,13 @@ static std::string PackFlatbuffer(const std::string& in) {
   uint8_t* const p = reinterpret_cast<uint8_t*>(out.data()) + n + 1;
 
   // Compute and store checksums and lengths
-  uint32_t crc32 = ::arrow::internal::crc32(0, reinterpret_cast<const uint8_t*>(out.data()), n + 1);
-  StoreLE32(crc32, p + 0);           // crc32(data .. compressor)
-  StoreLE32(n, p + 4);               // compressed_len
-  StoreLE32(in.size(), p + 8);       // raw_len
+  uint32_t crc32 =
+      ::arrow::internal::crc32(0, reinterpret_cast<const uint8_t*>(out.data()), n + 1);
+  StoreLE32(crc32, p + 0);      // crc32(data .. compressor)
+  StoreLE32(n, p + 4);          // compressed_len
+  StoreLE32(in.size(), p + 8);  // raw_len
   uint32_t len_crc32 = ::arrow::internal::crc32(0, p + 4, 8);
-  StoreLE32(len_crc32, p + 12);      // crc32(compressed_len .. raw_len)
+  StoreLE32(len_crc32, p + 12);  // crc32(compressed_len .. raw_len)
 
   // Store UUID identifier
   std::memcpy(p + 16, kExtUUID, 16);
@@ -1150,43 +1162,20 @@ static std::string PackFlatbuffer(const std::string& in) {
   return out;
 }
 
-inline uint8_t* WriteULEB64(uint64_t v, uint8_t* out) {
-  uint8_t* p = out;
-  do {
-    uint8_t b = v & 0x7F;
-    if (v < 0x80) {
-      *p++ = b;
-      return p;
-    }
-    *p++ = b | 0x80;
-    v >>= 7;
-  } while (true);
-}
-
-inline uint32_t CountLeadingZeros32(uint32_t v) {
-  if (v == 0) return 32;
-  uint32_t count = 0;
-  uint32_t mask = 0x80000000;
-  while ((v & mask) == 0) {
-    ++count;
-    mask >>= 1;
-  }
-  return count;
-}
-
-inline int32_t ULEB32Len(uint32_t v) {
-  return 1 + ((32 - CountLeadingZeros32(v | 0x1)) * 9) / 64;
-}
-
 void AppendFlatbuffer(std::string flatbuffer, std::string* thrift) {
+  using ::arrow::bit_util::kMaxLEB128ByteLenFor;
+  using ::arrow::bit_util::WriteLEB128;
+
   // Pack the flatbuffer with LZ4 compression and checksums
   std::string packed = PackFlatbuffer(flatbuffer);
 
   const uint32_t kFieldId = 32767;
-  int header_size = 1 + ULEB32Len(kFieldId) + ULEB32Len(packed.length());
+  // Max header: 1 (type byte) + max ULEB for field id + max ULEB for packed length
+  constexpr int32_t kMaxHeaderSize =
+      1 + kMaxLEB128ByteLenFor<uint32_t> + kMaxLEB128ByteLenFor<uint32_t>;
 
   const size_t old_size = thrift->size();
-  thrift->resize(old_size + header_size + packed.size() + 1);  // +1 for stop field
+  thrift->resize(old_size + kMaxHeaderSize + packed.size() + 1);  // +1 for stop field
 
   // Pointer to the new write position
   uint8_t* p = reinterpret_cast<uint8_t*>(&(*thrift)[old_size]);
@@ -1194,9 +1183,10 @@ void AppendFlatbuffer(std::string flatbuffer, std::string* thrift) {
   // Write the binary type indicator
   *p++ = 0x08;
 
-  // Write field id and size using ULEB64
-  p = WriteULEB64(kFieldId, p);
-  p = WriteULEB64(static_cast<uint32_t>(packed.size()), p);
+  // Write field id and size using ULEB128
+  p += WriteLEB128(kFieldId, p, kMaxLEB128ByteLenFor<uint32_t>);
+  p += WriteLEB128(static_cast<uint32_t>(packed.size()), p,
+                   kMaxLEB128ByteLenFor<uint32_t>);
 
   // Copy the packed payload
   std::memcpy(p, packed.data(), packed.size());
@@ -1204,13 +1194,16 @@ void AppendFlatbuffer(std::string flatbuffer, std::string* thrift) {
 
   // Add stop field
   *p = 0x00;
-  return;
+
+  // Trim to actual size (header may have been smaller than max)
+  thrift->resize(p - reinterpret_cast<uint8_t*>(thrift->data()) + 1);
 }
 
-::arrow::Result<int32_t> ExtractFlatbuffer(std::shared_ptr<Buffer> buf, std::string* out_flatbuffer) {
+::arrow::Result<uint32_t> ExtractFlatbuffer(std::shared_ptr<Buffer> buf,
+                                            std::string* out_flatbuffer) {
   if (buf->size() < 8) return 8;
   PARQUET_THROW_NOT_OK(CheckMagicNumber(buf->data() + buf->size() - 4));
-  uint32_t md_len = LoadLE32(buf->data() + buf->size() -8);
+  uint32_t md_len = LoadLE32(buf->data() + buf->size() - 8);
   if (md_len < 34) return 0;
   if (buf->size() < 42) return 42;  // 34 (metadata3 trailer) + 8 (len + PAR1)
 
@@ -1235,7 +1228,8 @@ void AppendFlatbuffer(std::string flatbuffer, std::string* thrift) {
   }
 
   // Verify data CRC
-  uint32_t expected_crc = ::arrow::internal::crc32(0, p - compressed_len, compressed_len + 1);
+  uint32_t expected_crc =
+      ::arrow::internal::crc32(0, p - compressed_len, compressed_len + 1);
   if (crc32_val != expected_crc) {
     return ::arrow::Status::Invalid("Extended metadata data CRC mismatch");
   }
@@ -1254,11 +1248,11 @@ void AppendFlatbuffer(std::string flatbuffer, std::string* thrift) {
         return ::arrow::Status::Invalid("LZ4 length error: raw_len < compressed_len");
       }
       // Use Arrow's LZ4 codec for decompression
-      ARROW_ASSIGN_OR_RAISE(auto codec, ::arrow::util::Codec::Create(::arrow::Compression::LZ4));
-      ARROW_ASSIGN_OR_RAISE(
-          int64_t actual_size,
-          codec->Decompress(compressed_len, p - compressed_len, raw_len,
-                            decompressed_data.data()));
+      ARROW_ASSIGN_OR_RAISE(auto codec,
+                            ::arrow::util::Codec::Create(::arrow::Compression::LZ4));
+      ARROW_ASSIGN_OR_RAISE(int64_t actual_size,
+                            codec->Decompress(compressed_len, p - compressed_len, raw_len,
+                                              decompressed_data.data()));
       if (static_cast<uint32_t>(actual_size) != raw_len) {
         return ::arrow::Status::Invalid("LZ4 decompression failed: expected ", raw_len,
                                         " bytes but got ", actual_size, " bytes");
@@ -1276,7 +1270,8 @@ void AppendFlatbuffer(std::string flatbuffer, std::string* thrift) {
   }
 
   ARROW_CHECK_NE(out_flatbuffer, nullptr);
-  out_flatbuffer->assign(reinterpret_cast<const char*>(decompressed_data.data()), raw_len);
+  out_flatbuffer->assign(reinterpret_cast<const char*>(decompressed_data.data()),
+                         raw_len);
 
   return compressed_len + 42;
 }

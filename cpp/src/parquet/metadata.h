@@ -25,12 +25,12 @@
 #include <string>
 #include <vector>
 
+#include "generated/parquet_types.h"
 #include "parquet/encryption/type_fwd.h"
 #include "parquet/index_location.h"
 #include "parquet/platform.h"
 #include "parquet/properties.h"
 #include "parquet/type_fwd.h"
-#include "generated/parquet_types.h"
 
 namespace parquet {
 
@@ -389,8 +389,8 @@ class PARQUET_EXPORT FileMetaData {
                         const ReaderProperties& properties,
                         std::shared_ptr<InternalFileDecryptor> file_decryptor = NULLPTR);
 
-  explicit FileMetaData(std::unique_ptr<format::FileMetaData> metadata, uint32_t metadata_len,
-                        const ReaderProperties& properties);
+  explicit FileMetaData(std::unique_ptr<format::FileMetaData> metadata,
+                        uint32_t metadata_len, const ReaderProperties& properties);
 
   void set_file_decryptor(std::shared_ptr<InternalFileDecryptor> file_decryptor);
   const std::shared_ptr<InternalFileDecryptor>& file_decryptor() const;

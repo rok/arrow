@@ -394,7 +394,7 @@ TEST_F(TestMetadata3RoundTrip, Int32Columns) {
   // Read back without metadata3 to get Thrift metadata
   auto source1 = std::make_shared<::arrow::io::BufferReader>(buffer);
   auto reader_props_thrift = default_reader_properties();
-  reader_props_thrift.set_read_metadata3(false);
+  reader_props_thrift.set_read_flatbuffer_metadata_if_present(false);
   auto file_reader1 = ParquetFileReader::Open(source1, reader_props_thrift);
   auto metadata1 = file_reader1->metadata();
   std::string thrift1 = metadata1->SerializeToString();
@@ -402,7 +402,7 @@ TEST_F(TestMetadata3RoundTrip, Int32Columns) {
   // Read back with metadata3 enabled to read from flatbuffer
   auto source2 = std::make_shared<::arrow::io::BufferReader>(buffer);
   auto reader_props_fb = default_reader_properties();
-  reader_props_fb.set_read_metadata3(true);
+  reader_props_fb.set_read_flatbuffer_metadata_if_present(true);
   auto file_reader2 = ParquetFileReader::Open(source2, reader_props_fb);
   auto metadata2 = file_reader2->metadata();
   std::string thrift2 = metadata2->SerializeToString();
@@ -430,7 +430,7 @@ TEST_F(TestMetadata3RoundTrip, Int64Columns) {
   // Read back without metadata3 to get Thrift metadata
   auto source1 = std::make_shared<::arrow::io::BufferReader>(buffer);
   auto reader_props_thrift = default_reader_properties();
-  reader_props_thrift.set_read_metadata3(false);
+  reader_props_thrift.set_read_flatbuffer_metadata_if_present(false);
   auto file_reader1 = ParquetFileReader::Open(source1, reader_props_thrift);
   auto metadata1 = file_reader1->metadata();
   std::string thrift1 = metadata1->SerializeToString();
@@ -438,7 +438,7 @@ TEST_F(TestMetadata3RoundTrip, Int64Columns) {
   // Read back with metadata3 enabled to read from flatbuffer
   auto source2 = std::make_shared<::arrow::io::BufferReader>(buffer);
   auto reader_props_fb = default_reader_properties();
-  reader_props_fb.set_read_metadata3(true);
+  reader_props_fb.set_read_flatbuffer_metadata_if_present(true);
   auto file_reader2 = ParquetFileReader::Open(source2, reader_props_fb);
   auto metadata2 = file_reader2->metadata();
   std::string thrift2 = metadata2->SerializeToString();
@@ -466,7 +466,7 @@ TEST_F(TestMetadata3RoundTrip, FloatDoubleColumns) {
   // Read back without metadata3 to get Thrift metadata
   auto source1 = std::make_shared<::arrow::io::BufferReader>(buffer);
   auto reader_props_thrift = default_reader_properties();
-  reader_props_thrift.set_read_metadata3(false);
+  reader_props_thrift.set_read_flatbuffer_metadata_if_present(false);
   auto file_reader1 = ParquetFileReader::Open(source1, reader_props_thrift);
   auto metadata1 = file_reader1->metadata();
   std::string thrift1 = metadata1->SerializeToString();
@@ -474,7 +474,7 @@ TEST_F(TestMetadata3RoundTrip, FloatDoubleColumns) {
   // Read back with metadata3 enabled to read from flatbuffer
   auto source2 = std::make_shared<::arrow::io::BufferReader>(buffer);
   auto reader_props_fb = default_reader_properties();
-  reader_props_fb.set_read_metadata3(true);
+  reader_props_fb.set_read_flatbuffer_metadata_if_present(true);
   auto file_reader2 = ParquetFileReader::Open(source2, reader_props_fb);
   auto metadata2 = file_reader2->metadata();
   std::string thrift2 = metadata2->SerializeToString();
@@ -502,7 +502,7 @@ TEST_F(TestMetadata3RoundTrip, ByteArrayColumns) {
   // Read back without metadata3 to get Thrift metadata
   auto source1 = std::make_shared<::arrow::io::BufferReader>(buffer);
   auto reader_props_thrift = default_reader_properties();
-  reader_props_thrift.set_read_metadata3(false);
+  reader_props_thrift.set_read_flatbuffer_metadata_if_present(false);
   auto file_reader1 = ParquetFileReader::Open(source1, reader_props_thrift);
   auto metadata1 = file_reader1->metadata();
   std::string thrift1 = metadata1->SerializeToString();
@@ -510,7 +510,7 @@ TEST_F(TestMetadata3RoundTrip, ByteArrayColumns) {
   // Read back with metadata3 enabled to read from flatbuffer
   auto source2 = std::make_shared<::arrow::io::BufferReader>(buffer);
   auto reader_props_fb = default_reader_properties();
-  reader_props_fb.set_read_metadata3(true);
+  reader_props_fb.set_read_flatbuffer_metadata_if_present(true);
   auto file_reader2 = ParquetFileReader::Open(source2, reader_props_fb);
   auto metadata2 = file_reader2->metadata();
   std::string thrift2 = metadata2->SerializeToString();
@@ -544,7 +544,7 @@ TEST_F(TestMetadata3RoundTrip, FixedLenByteArrayColumns) {
   // Read back without metadata3 to get Thrift metadata
   auto source1 = std::make_shared<::arrow::io::BufferReader>(buffer);
   auto reader_props_thrift = default_reader_properties();
-  reader_props_thrift.set_read_metadata3(false);
+  reader_props_thrift.set_read_flatbuffer_metadata_if_present(false);
   auto file_reader1 = ParquetFileReader::Open(source1, reader_props_thrift);
   auto metadata1 = file_reader1->metadata();
   std::string thrift1 = metadata1->SerializeToString();
@@ -552,7 +552,7 @@ TEST_F(TestMetadata3RoundTrip, FixedLenByteArrayColumns) {
   // Read back with metadata3 enabled to read from flatbuffer
   auto source2 = std::make_shared<::arrow::io::BufferReader>(buffer);
   auto reader_props_fb = default_reader_properties();
-  reader_props_fb.set_read_metadata3(true);
+  reader_props_fb.set_read_flatbuffer_metadata_if_present(true);
   auto file_reader2 = ParquetFileReader::Open(source2, reader_props_fb);
   auto metadata2 = file_reader2->metadata();
   std::string thrift2 = metadata2->SerializeToString();
@@ -582,7 +582,7 @@ TEST_F(TestMetadata3RoundTrip, MixedColumnTypes) {
   // Read back without metadata3 to get Thrift metadata
   auto source1 = std::make_shared<::arrow::io::BufferReader>(buffer);
   auto reader_props_thrift = default_reader_properties();
-  reader_props_thrift.set_read_metadata3(false);
+  reader_props_thrift.set_read_flatbuffer_metadata_if_present(false);
   auto file_reader1 = ParquetFileReader::Open(source1, reader_props_thrift);
   auto metadata1 = file_reader1->metadata();
   std::string thrift1 = metadata1->SerializeToString();
@@ -590,7 +590,7 @@ TEST_F(TestMetadata3RoundTrip, MixedColumnTypes) {
   // Read back with metadata3 enabled to read from flatbuffer
   auto source2 = std::make_shared<::arrow::io::BufferReader>(buffer);
   auto reader_props_fb = default_reader_properties();
-  reader_props_fb.set_read_metadata3(true);
+  reader_props_fb.set_read_flatbuffer_metadata_if_present(true);
   auto file_reader2 = ParquetFileReader::Open(source2, reader_props_fb);
   auto metadata2 = file_reader2->metadata();
   std::string thrift2 = metadata2->SerializeToString();
@@ -844,7 +844,7 @@ TEST_F(TestMetadata3RoundTrip, ManyRowGroups) {
   // Read back without metadata3 to get Thrift metadata
   auto source1 = std::make_shared<::arrow::io::BufferReader>(buffer);
   auto reader_props_thrift = default_reader_properties();
-  reader_props_thrift.set_read_metadata3(false);
+  reader_props_thrift.set_read_flatbuffer_metadata_if_present(false);
   auto file_reader1 = ParquetFileReader::Open(source1, reader_props_thrift);
   auto metadata1 = file_reader1->metadata();
   std::string thrift1 = metadata1->SerializeToString();
@@ -852,7 +852,7 @@ TEST_F(TestMetadata3RoundTrip, ManyRowGroups) {
   // Read back with metadata3 enabled to read from flatbuffer
   auto source2 = std::make_shared<::arrow::io::BufferReader>(buffer);
   auto reader_props_fb = default_reader_properties();
-  reader_props_fb.set_read_metadata3(true);
+  reader_props_fb.set_read_flatbuffer_metadata_if_present(true);
   auto file_reader2 = ParquetFileReader::Open(source2, reader_props_fb);
   auto metadata2 = file_reader2->metadata();
   std::string thrift2 = metadata2->SerializeToString();
