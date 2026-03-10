@@ -30,6 +30,64 @@ def test_get_include():
     assert os.path.exists(os.path.join(include_dir, 'arrow', 'api.h'))
 
 
+def test_get_include_uses_extension_location(monkeypatch):
+    source_dir = os.path.join(os.sep, 'source-tree', 'pyarrow')
+    extension_dir = os.path.join(os.sep, 'site-packages', 'pyarrow')
+    monkeypatch.setattr(pa, '__file__', os.path.join(source_dir, '__init__.py'))
+    monkeypatch.setattr(pa.lib, '__file__', os.path.join(extension_dir, 'lib.so'))
+
+    assert pa.get_include() == os.path.join(extension_dir, 'include')
+
+
+def test_get_library_dirs_use_extension_location(monkeypatch):
+    source_dir = os.path.join(os.sep, 'source-tree', 'pyarrow')
+    extension_dir = os.path.join(os.sep, 'site-packages', 'pyarrow')
+    monkeypatch.setattr(pa, '__file__', os.path.join(source_dir, '__init__.py'))
+    monkeypatch.setattr(pa.lib, '__file__', os.path.join(extension_dir, 'lib.so'))
+    monkeypatch.setattr(pa, '_has_pkg_config', lambda pkgname: False)
+    monkeypatch.delenv('ARROW_HOME', raising=False)
+
+    library_dirs = pa.get_library_dirs()
+    assert library_dirs == [extension_dir]
+
+
+def test_get_library_dirs_win32_uses_extension_location(monkeypatch):
+    source_dir = os.path.join(os.sep, 'source-tree', 'pyarrow')
+    extension_dir = os.path.join(os.sep, 'site-packages', 'pyarrow')
+    source_pyarrow_libs = os.path.abspath(
+        os.path.join(source_dir, os.pardir, 'pyarrow.libs')
+    )
+    extension_pyarrow_libs = os.path.abspath(
+        os.path.join(extension_dir, os.pardir, 'pyarrow.libs')
+    )
+    arrow_lib = os.path.join(
+        os.path.dirname(sys.executable), 'Library', 'lib', 'arrow.lib'
+    )
+
+    monkeypatch.setattr(pa, '__file__', os.path.join(source_dir, '__init__.py'))
+    monkeypatch.setattr(pa.lib, '__file__', os.path.join(extension_dir, 'lib.so'))
+    monkeypatch.setattr(pa, '_has_pkg_config', lambda pkgname: False)
+    monkeypatch.delenv('ARROW_HOME', raising=False)
+    monkeypatch.setattr(pa._sys, 'platform', 'win32')
+
+    original_exists = pa._os.path.exists
+
+    def fake_exists(path):
+        if path == arrow_lib:
+            return False
+        if path == extension_pyarrow_libs:
+            return True
+        if path == source_pyarrow_libs:
+            return False
+        return original_exists(path)
+
+    monkeypatch.setattr(pa._os.path, 'exists', fake_exists)
+
+    library_dirs = pa.get_library_dirs()
+    assert extension_pyarrow_libs in library_dirs
+    assert source_pyarrow_libs not in library_dirs
+
+
 @pytest.mark.skipif('sys.platform != "win32"')
 def test_get_library_dirs_win32():
     assert any(os.path.exists(os.path.join(directory, 'arrow.lib'))

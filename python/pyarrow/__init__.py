@@ -362,7 +362,11 @@ def create_library_symlinks():
     import glob
     if _sys.platform == 'win32':
         return
-    package_cwd = _os.path.dirname(__file__)
+    # Use pyarrow.lib location instead of just __file__. That works
+    # for both editable and non-editable builds as it points
+    # to the actual location of the compiled C++ extension.
+    from pyarrow import lib as _lib
+    package_cwd = _os.path.dirname(_lib.__file__)
 
     if _sys.platform == 'linux':
         bundled_libs = glob.glob(_os.path.join(package_cwd, '*.so.*'))
@@ -382,8 +386,8 @@ def create_library_symlinks():
         try:
             _os.symlink(lib_hard_path, symlink_path)
         except PermissionError:
-            print("Tried creating symlink {}. If you need to link to "
-                  "bundled shared libraries, run "
+            print(f"Tried creating symlink {symlink_path}. If you need to "
+                  "link to bundled shared libraries, run "
                   "pyarrow.create_library_symlinks() as root")
 
 
@@ -432,7 +436,7 @@ def get_library_dirs():
         # GH-45530: Add pyarrow.libs dir containing delvewheel-mangled
         # msvcp140.dll
         pyarrow_libs_dir = _os.path.abspath(
-            _os.path.join(_os.path.dirname(__file__), _os.pardir, "pyarrow.libs")
+            _os.path.join(package_cwd, _os.pardir, "pyarrow.libs")
         )
         if _os.path.exists(pyarrow_libs_dir):
             append_library_dir(pyarrow_libs_dir)
@@ -442,6 +446,6 @@ def get_library_dirs():
         append_library_dir(_os.path.join(_os.environ['ARROW_HOME'], 'lib'))
     else:
         # Python wheels bundle the Arrow libraries in the pyarrow directory.
-        append_library_dir(_os.path.dirname(_os.path.abspath(__file__)))
+        append_library_dir(_os.path.dirname(_os.path.abspath(_lib.__file__)))
 
     return library_dirs
