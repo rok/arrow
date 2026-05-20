@@ -26,6 +26,8 @@
 #include <vector>
 
 #include "arrow/array.h"
+#include "arrow/array/concatenate.h"
+#include "arrow/array/util.h"
 #include "arrow/buffer.h"
 #include "arrow/extension_type.h"
 #include "arrow/io/memory.h"
@@ -126,6 +128,7 @@ class ColumnReaderImpl : public ColumnReader {
   virtual ::arrow::Status BuildArray(int64_t length_upper_bound,
                                      std::shared_ptr<::arrow::ChunkedArray>* out) = 0;
   virtual bool IsOrHasRepeatedChild() const = 0;
+  virtual bool is_vector() const { return false; }
 };
 
 namespace {
@@ -273,10 +276,16 @@ class FileReaderImpl : public FileReader {
     // TODO(wesm): This calculation doesn't make much sense when we have repeated
     // schema nodes
     int64_t records_to_read = 0;
+    DCHECK(dynamic_cast<ColumnReaderImpl*>(reader) != nullptr);
+    const bool is_vector = static_cast<ColumnReaderImpl*>(reader)->is_vector();
     for (auto row_group : row_groups) {
       // Can throw exception
-      records_to_read +=
-          reader_->metadata()->RowGroup(row_group)->ColumnChunk(i)->num_values();
+      if (is_vector) {
+        records_to_read += reader_->metadata()->RowGroup(row_group)->num_rows();
+      } else {
+        records_to_read +=
+            reader_->metadata()->RowGroup(row_group)->ColumnChunk(i)->num_values();
+      }
     }
 #ifdef ARROW_WITH_OPENTELEMETRY
     std::string column_name = reader_->metadata()->schema()->Column(i)->name();
@@ -575,6 +584,8 @@ class ExtensionReader : public ColumnReaderImpl {
     return storage_reader_->IsOrHasRepeatedChild();
   }
 
+  bool is_vector() const final { return storage_reader_->is_vector(); }
+
   const std::shared_ptr<Field> field() override { return field_; }
 
  private:
@@ -704,6 +715,143 @@ class PARQUET_NO_EXPORT FixedSizeListReader : public ListReader<int32_t> {
     std::shared_ptr<Array> result = ::arrow::MakeArray(data);
     return std::make_shared<ChunkedArray>(result);
   }
+};
+
+// Reads Parquet VECTOR columns into Arrow FixedSizeList arrays.
+//
+// VECTOR stores one definition level per element even though the public Arrow result is a
+// single FixedSizeList slot per row. For nullable VECTOR rows, the child reader therefore
+// materializes spaced child slots and this reader collapses each vector's per-element def
+// levels back into a parent validity bitmap.
+class PARQUET_NO_EXPORT VectorFixedSizeListReader : public ColumnReaderImpl {
+ public:
+  VectorFixedSizeListReader(std::shared_ptr<ReaderContext> ctx,
+                            std::shared_ptr<Field> field,
+                            ::parquet::internal::LevelInfo level_info,
+                            std::unique_ptr<ColumnReaderImpl> child_reader)
+      : ctx_(std::move(ctx)),
+        field_(std::move(field)),
+        level_info_(level_info),
+        item_reader_(std::move(child_reader)),
+        list_size_(checked_cast<const ::arrow::FixedSizeListType&>(*field_->type())
+                       .list_size()) {}
+
+  Status GetDefLevels(const int16_t** data, int64_t* length) override {
+    if (collapsed_def_levels_.empty()) {
+      *data = nullptr;
+      *length = rows_loaded_;
+    } else {
+      *data = collapsed_def_levels_.data();
+      *length = rows_loaded_;
+    }
+    return Status::OK();
+  }
+
+  Status GetRepLevels(const int16_t** data, int64_t* length) override {
+    *data = nullptr;
+    *length = rows_loaded_;
+    return Status::OK();
+  }
+
+  bool IsOrHasRepeatedChild() const final { return false; }
+
+  bool is_vector() const final { return true; }
+
+  Status LoadBatch(int64_t number_of_records) final {
+    rows_loaded_ = 0;
+    collapsed_def_levels_.clear();
+    RETURN_NOT_OK(item_reader_->LoadBatch(number_of_records * list_size_));
+
+    const int16_t* def_levels = nullptr;
+    int64_t num_levels = 0;
+    RETURN_NOT_OK(item_reader_->GetDefLevels(&def_levels, &num_levels));
+    if (num_levels % list_size_ != 0) {
+      return Status::Invalid("VECTOR column produced a non-multiple of vector length ",
+                             num_levels, " for list_size=", list_size_);
+    }
+    rows_loaded_ = num_levels / list_size_;
+
+    if (field_->nullable() && def_levels != nullptr) {
+      collapsed_def_levels_.reserve(static_cast<size_t>(rows_loaded_));
+      for (int64_t row = 0; row < rows_loaded_; ++row) {
+        const int64_t first_level_index = row * list_size_;
+        const bool first_is_present =
+            def_levels[first_level_index] >= level_info_.def_level;
+#ifndef NDEBUG
+        for (int32_t i = 1; i < list_size_; ++i) {
+          DCHECK_EQ(def_levels[first_level_index + i] >= level_info_.def_level,
+                    first_is_present);
+        }
+#endif
+        collapsed_def_levels_.push_back(first_is_present ? level_info_.def_level
+                                                         : level_info_.def_level - 1);
+      }
+    }
+    return Status::OK();
+  }
+
+  Status BuildArray(int64_t length_upper_bound,
+                    std::shared_ptr<ChunkedArray>* out) override {
+    std::shared_ptr<ChunkedArray> child_out;
+    RETURN_NOT_OK(item_reader_->BuildArray(length_upper_bound * list_size_, &child_out));
+    ARROW_ASSIGN_OR_RAISE(std::shared_ptr<ArrayData> child_data,
+                          ChunksToSingle(*child_out));
+    std::shared_ptr<Array> child_array = ::arrow::MakeArray(child_data);
+    if (rows_loaded_ == 0) {
+      if (child_array->length() % list_size_ != 0) {
+        return Status::Invalid("VECTOR FixedSizeList child length ",
+                               child_array->length(),
+                               " was not divisible by list_size=", list_size_);
+      }
+      rows_loaded_ = child_array->length() / list_size_;
+    }
+
+    if (child_array->length() != rows_loaded_ * list_size_) {
+      return Status::Invalid("VECTOR FixedSizeList child length ", child_array->length(),
+                             " did not match expected ", rows_loaded_ * list_size_);
+    }
+
+    std::shared_ptr<ResizableBuffer> validity_buffer;
+    int64_t null_count = 0;
+    if (field_->nullable()) {
+      ARROW_ASSIGN_OR_RAISE(
+          validity_buffer,
+          AllocateResizableBuffer(bit_util::BytesForBits(rows_loaded_), ctx_->pool));
+      memset(validity_buffer->mutable_data(), 0,
+             static_cast<size_t>(bit_util::BytesForBits(rows_loaded_)));
+      if (collapsed_def_levels_.empty()) {
+        bit_util::SetBitsTo(validity_buffer->mutable_data(), 0, rows_loaded_, true);
+      } else {
+        for (int64_t row = 0; row < rows_loaded_; ++row) {
+          if (collapsed_def_levels_[row] == level_info_.def_level) {
+            bit_util::SetBit(validity_buffer->mutable_data(), row);
+          } else {
+            ++null_count;
+          }
+        }
+      }
+      validity_buffer->ZeroPadding();
+    }
+
+    auto data = std::make_shared<ArrayData>(
+        field_->type(), rows_loaded_,
+        std::vector<std::shared_ptr<Buffer>>{null_count > 0 ? validity_buffer : nullptr},
+        null_count);
+    data->child_data.push_back(child_data);
+    *out = std::make_shared<ChunkedArray>(::arrow::MakeArray(std::move(data)));
+    return Status::OK();
+  }
+
+  const std::shared_ptr<Field> field() override { return field_; }
+
+ private:
+  std::shared_ptr<ReaderContext> ctx_;
+  std::shared_ptr<Field> field_;
+  ::parquet::internal::LevelInfo level_info_;
+  std::unique_ptr<ColumnReaderImpl> item_reader_;
+  int32_t list_size_;
+  int64_t rows_loaded_ = 0;
+  std::vector<int16_t> collapsed_def_levels_;
 };
 
 class PARQUET_NO_EXPORT StructReader : public ColumnReaderImpl {
@@ -884,8 +1032,12 @@ Status GetReader(const SchemaField& field, const std::shared_ptr<Field>& arrow_f
     }
     std::unique_ptr<FileColumnIterator> input(
         ctx->iterator_factory(field.column_index, ctx->reader));
-    *out = std::make_unique<LeafReader>(ctx, arrow_field, std::move(input),
-                                        field.level_info);
+    auto leaf_field = arrow_field;
+    if (field.is_vector && field.level_info.def_level > 0) {
+      leaf_field = leaf_field->WithNullable(true);
+    }
+    *out =
+        std::make_unique<LeafReader>(ctx, leaf_field, std::move(input), field.level_info);
   } else if (type_id == ::arrow::Type::LIST || type_id == ::arrow::Type::MAP ||
              type_id == ::arrow::Type::FIXED_SIZE_LIST ||
              type_id == ::arrow::Type::LARGE_LIST) {
@@ -950,8 +1102,16 @@ Status GetReader(const SchemaField& field, const std::shared_ptr<Field>& arrow_f
             list_field->WithType(::arrow::fixed_size_list(reader_child_type, list_size));
       }
 
-      *out = std::make_unique<FixedSizeListReader>(ctx, list_field, field.level_info,
-                                                   std::move(child_reader));
+      if (field.is_vector) {
+        if (child->is_leaf() && child->column_index >= 0 && list_field->nullable()) {
+          DCHECK(child_reader->field()->nullable());
+        }
+        *out = std::make_unique<VectorFixedSizeListReader>(
+            ctx, list_field, field.level_info, std::move(child_reader));
+      } else {
+        *out = std::make_unique<FixedSizeListReader>(ctx, list_field, field.level_info,
+                                                     std::move(child_reader));
+      }
     } else {
       return Status::UnknownError("Unknown list type: ", field.field->ToString());
     }

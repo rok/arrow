@@ -109,6 +109,11 @@ class PARQUET_EXPORT Node {
 
   bool is_repeated() const { return repetition_ == Repetition::REPEATED; }
 
+  /// \brief True when this node specifically has VECTOR repetition; use
+  /// ColumnDescriptor::in_vector_column() to ask whether a column is part of
+  /// a VECTOR subtree.
+  bool is_vector() const { return repetition_ == Repetition::VECTOR; }
+
   bool is_required() const { return repetition_ == Repetition::REQUIRED; }
 
   virtual bool Equals(const Node* other) const = 0;
@@ -127,6 +132,10 @@ class PARQUET_EXPORT Node {
   /// field_id is less than 0 (e.g. -1), it will not be set when serialized to
   /// Thrift.
   int field_id() const { return field_id_; }
+
+  /// \brief The fixed number of values per parent when repetition == VECTOR.
+  /// Returns -1 when this node is not VECTOR-repeated.
+  int32_t vector_length() const { return vector_length_; }
 
   const Node* parent() const { return parent_; }
 
@@ -155,21 +164,25 @@ class PARQUET_EXPORT Node {
   friend class GroupNode;
 
   Node(Node::type type, const std::string& name, Repetition::type repetition,
-       ConvertedType::type converted_type = ConvertedType::NONE, int field_id = -1)
+       ConvertedType::type converted_type = ConvertedType::NONE, int field_id = -1,
+       int32_t vector_length = -1)
       : type_(type),
         name_(name),
         repetition_(repetition),
         converted_type_(converted_type),
         field_id_(field_id),
+        vector_length_(vector_length),
         parent_(NULLPTR) {}
 
   Node(Node::type type, const std::string& name, Repetition::type repetition,
-       std::shared_ptr<const LogicalType> logical_type, int field_id = -1)
+       std::shared_ptr<const LogicalType> logical_type, int field_id = -1,
+       int32_t vector_length = -1)
       : type_(type),
         name_(name),
         repetition_(repetition),
         logical_type_(std::move(logical_type)),
         field_id_(field_id),
+        vector_length_(vector_length),
         parent_(NULLPTR) {}
 
   Node::type type_;
@@ -178,6 +191,7 @@ class PARQUET_EXPORT Node {
   ConvertedType::type converted_type_{ConvertedType::NONE};
   std::shared_ptr<const LogicalType> logical_type_;
   int field_id_;
+  int32_t vector_length_;
   // Nodes should not be shared, they have a single parent.
   const Node* parent_;
 
@@ -205,9 +219,9 @@ class PARQUET_EXPORT PrimitiveNode : public Node {
                              Type::type type,
                              ConvertedType::type converted_type = ConvertedType::NONE,
                              int length = -1, int precision = -1, int scale = -1,
-                             int field_id = -1) {
+                             int field_id = -1, int32_t vector_length = -1) {
     return NodePtr(new PrimitiveNode(name, repetition, type, converted_type, length,
-                                     precision, scale, field_id));
+                                     precision, scale, field_id, vector_length));
   }
 
   // If no logical type, pass LogicalType::None() or nullptr
@@ -215,9 +229,10 @@ class PARQUET_EXPORT PrimitiveNode : public Node {
   static inline NodePtr Make(const std::string& name, Repetition::type repetition,
                              std::shared_ptr<const LogicalType> logical_type,
                              Type::type primitive_type, int primitive_length = -1,
-                             int field_id = -1) {
+                             int field_id = -1, int32_t vector_length = -1) {
     return NodePtr(new PrimitiveNode(name, repetition, std::move(logical_type),
-                                     primitive_type, primitive_length, field_id));
+                                     primitive_type, primitive_length, field_id,
+                                     vector_length));
   }
 
   bool Equals(const Node* other) const override;
@@ -239,11 +254,13 @@ class PARQUET_EXPORT PrimitiveNode : public Node {
  private:
   PrimitiveNode(const std::string& name, Repetition::type repetition, Type::type type,
                 ConvertedType::type converted_type = ConvertedType::NONE, int length = -1,
-                int precision = -1, int scale = -1, int field_id = -1);
+                int precision = -1, int scale = -1, int field_id = -1,
+                int32_t vector_length = -1);
 
   PrimitiveNode(const std::string& name, Repetition::type repetition,
                 std::shared_ptr<const LogicalType> logical_type,
-                Type::type primitive_type, int primitive_length = -1, int field_id = -1);
+                Type::type primitive_type, int primitive_length = -1, int field_id = -1,
+                int32_t vector_length = -1);
 
   Type::type physical_type_;
   int32_t type_length_;
@@ -270,8 +287,9 @@ class PARQUET_EXPORT GroupNode : public Node {
   static inline NodePtr Make(const std::string& name, Repetition::type repetition,
                              const NodeVector& fields,
                              ConvertedType::type converted_type = ConvertedType::NONE,
-                             int field_id = -1) {
-    return NodePtr(new GroupNode(name, repetition, fields, converted_type, field_id));
+                             int field_id = -1, int32_t vector_length = -1) {
+    return NodePtr(
+        new GroupNode(name, repetition, fields, converted_type, field_id, vector_length));
   }
 
   // If no logical type, pass nullptr
@@ -279,9 +297,9 @@ class PARQUET_EXPORT GroupNode : public Node {
   static inline NodePtr Make(const std::string& name, Repetition::type repetition,
                              const NodeVector& fields,
                              std::shared_ptr<const LogicalType> logical_type,
-                             int field_id = -1) {
-    return NodePtr(
-        new GroupNode(name, repetition, fields, std::move(logical_type), field_id));
+                             int field_id = -1, int32_t vector_length = -1) {
+    return NodePtr(new GroupNode(name, repetition, fields, std::move(logical_type),
+                                 field_id, vector_length));
   }
 
   bool Equals(const Node* other) const override;
@@ -307,11 +325,12 @@ class PARQUET_EXPORT GroupNode : public Node {
  private:
   GroupNode(const std::string& name, Repetition::type repetition,
             const NodeVector& fields,
-            ConvertedType::type converted_type = ConvertedType::NONE, int field_id = -1);
+            ConvertedType::type converted_type = ConvertedType::NONE, int field_id = -1,
+            int32_t vector_length = -1);
 
   GroupNode(const std::string& name, Repetition::type repetition,
             const NodeVector& fields, std::shared_ptr<const LogicalType> logical_type,
-            int field_id = -1);
+            int field_id = -1, int32_t vector_length = -1);
 
   NodeVector fields_;
   bool EqualsInternal(const GroupNode* other) const;
@@ -358,13 +377,24 @@ class PARQUET_EXPORT ColumnDescriptor {
  public:
   ColumnDescriptor(schema::NodePtr node, int16_t max_definition_level,
                    int16_t max_repetition_level,
-                   const SchemaDescriptor* schema_descr = NULLPTR);
+                   const SchemaDescriptor* schema_descr = NULLPTR,
+                   int32_t effective_vector_length = -1);
 
   bool Equals(const ColumnDescriptor& other) const;
 
   int16_t max_definition_level() const { return max_definition_level_; }
 
   int16_t max_repetition_level() const { return max_repetition_level_; }
+
+  /// \brief The fixed number of values per parent record contributed by this
+  /// column, taken from the nearest VECTOR-repeated ancestor (or the leaf
+  /// itself if it is VECTOR-repeated). Returns -1 when the column is not part
+  /// of a VECTOR-repeated subtree.
+  int32_t effective_vector_length() const { return effective_vector_length_; }
+
+  /// \brief True when this column belongs to a VECTOR-repeated subtree
+  /// (either the leaf or some ancestor has Repetition::VECTOR).
+  bool in_vector_column() const { return effective_vector_length_ > 0; }
 
   Type::type physical_type() const { return primitive_node_->physical_type(); }
 
@@ -402,6 +432,7 @@ class PARQUET_EXPORT ColumnDescriptor {
 
   int16_t max_definition_level_;
   int16_t max_repetition_level_;
+  int32_t effective_vector_length_;
 };
 
 // Container for the converted Parquet schema with a computed information from

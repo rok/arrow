@@ -40,4 +40,6 @@ Result<std::shared_ptr<::arrow::DataType>> GetArrowType(
     const ArrowReaderProperties& reader_properties,
     const std::shared_ptr<const ::arrow::KeyValueMetadata>& metadata = nullptr);
 
+bool IsSupportedVectorElementType(const ::arrow::DataType& type);
+
 }  // namespace parquet::arrow

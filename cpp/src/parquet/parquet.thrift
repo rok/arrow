@@ -190,6 +190,12 @@ enum FieldRepetitionType {
 
   /** The field is repeated and can contain 0 or more values */
   REPEATED = 2;
+
+  /**
+   * This field repeats a fixed number of times per parent value without increasing
+   * the maximum definition or repetition level of its descendants.
+   */
+  VECTOR = 3;
 }
 
 /**
@@ -557,6 +563,9 @@ struct SchemaElement {
    * for some logical types to ensure forward-compatibility in format v1.
    */
   10: optional LogicalType logicalType
+
+  /** Required when repetition_type is VECTOR. Must be positive. */
+  12: optional i32 vector_length;
 }
 
 /**

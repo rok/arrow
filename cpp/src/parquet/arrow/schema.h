@@ -96,6 +96,11 @@ struct PARQUET_EXPORT SchemaField {
 
   parquet::internal::LevelInfo level_info;
 
+  // True when this Arrow field is backed by a Parquet VECTOR node.  VECTOR may
+  // be represented either directly as a primitive leaf (non-nullable elements)
+  // or as an intermediate VECTOR group containing a nullable element leaf.
+  bool is_vector = false;
+
   bool is_leaf() const { return column_index != -1; }
 };
 

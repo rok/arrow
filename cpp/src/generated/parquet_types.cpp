@@ -335,7 +335,12 @@ int _kFieldRepetitionTypeValues[] = {
   /**
    * The field is repeated and can contain 0 or more values
    */
-  FieldRepetitionType::REPEATED
+  FieldRepetitionType::REPEATED,
+  /**
+   * This field repeats a fixed number of times per parent value without increasing
+   * the maximum definition or repetition level of its descendants.
+   */
+  FieldRepetitionType::VECTOR
 };
 const char* _kFieldRepetitionTypeNames[] = {
   /**
@@ -349,9 +354,14 @@ const char* _kFieldRepetitionTypeNames[] = {
   /**
    * The field is repeated and can contain 0 or more values
    */
-  "REPEATED"
+  "REPEATED",
+  /**
+   * This field repeats a fixed number of times per parent value without increasing
+   * the maximum definition or repetition level of its descendants.
+   */
+  "VECTOR"
 };
-const std::map<int, const char*> _FieldRepetitionType_VALUES_TO_NAMES(::apache::thrift::TEnumIterator(3, _kFieldRepetitionTypeValues, _kFieldRepetitionTypeNames), ::apache::thrift::TEnumIterator(-1, nullptr, nullptr));
+const std::map<int, const char*> _FieldRepetitionType_VALUES_TO_NAMES(::apache::thrift::TEnumIterator(4, _kFieldRepetitionTypeValues, _kFieldRepetitionTypeNames), ::apache::thrift::TEnumIterator(-1, nullptr, nullptr));
 
 std::ostream& operator<<(std::ostream& out, const FieldRepetitionType::type& val) {
   std::map<int, const char*>::const_iterator it = _FieldRepetitionType_VALUES_TO_NAMES.find(val);
@@ -2565,7 +2575,8 @@ SchemaElement::SchemaElement() noexcept
      converted_type(static_cast<ConvertedType::type>(0)),
      scale(0),
      precision(0),
-     field_id(0) {
+     field_id(0),
+     vector_length(0) {
 }
 
 void SchemaElement::__set_type(const Type::type val) {
@@ -2616,6 +2627,11 @@ void SchemaElement::__set_logicalType(const LogicalType& val) {
   this->logicalType = val;
 __isset.logicalType = true;
 }
+
+void SchemaElement::__set_vector_length(const int32_t val) {
+  this->vector_length = val;
+__isset.vector_length = true;
+}
 std::ostream& operator<<(std::ostream& out, const SchemaElement& obj)
 {
   obj.printTo(out);
@@ -2635,6 +2651,7 @@ void swap(SchemaElement &a, SchemaElement &b) {
   swap(a.precision, b.precision);
   swap(a.field_id, b.field_id);
   swap(a.logicalType, b.logicalType);
+  swap(a.vector_length, b.vector_length);
   swap(a.__isset, b.__isset);
 }
 
@@ -2678,6 +2695,10 @@ bool SchemaElement::operator==(const SchemaElement & rhs) const
     return false;
   else if (__isset.logicalType && !(logicalType == rhs.logicalType))
     return false;
+  if (__isset.vector_length != rhs.__isset.vector_length)
+    return false;
+  else if (__isset.vector_length && !(vector_length == rhs.vector_length))
+    return false;
   return true;
 }
 
@@ -2692,6 +2713,7 @@ SchemaElement::SchemaElement(const SchemaElement& other126) {
   precision = other126.precision;
   field_id = other126.field_id;
   logicalType = other126.logicalType;
+  vector_length = other126.vector_length;
   __isset = other126.__isset;
 }
 SchemaElement::SchemaElement(SchemaElement&& other127) noexcept {
@@ -2705,6 +2727,7 @@ SchemaElement::SchemaElement(SchemaElement&& other127) noexcept {
   precision = other127.precision;
   field_id = other127.field_id;
   logicalType = std::move(other127.logicalType);
+  vector_length = other127.vector_length;
   __isset = other127.__isset;
 }
 SchemaElement& SchemaElement::operator=(const SchemaElement& other128) {
@@ -2718,6 +2741,7 @@ SchemaElement& SchemaElement::operator=(const SchemaElement& other128) {
   precision = other128.precision;
   field_id = other128.field_id;
   logicalType = other128.logicalType;
+  vector_length = other128.vector_length;
   __isset = other128.__isset;
   return *this;
 }
@@ -2732,6 +2756,7 @@ SchemaElement& SchemaElement::operator=(SchemaElement&& other129) noexcept {
   precision = other129.precision;
   field_id = other129.field_id;
   logicalType = std::move(other129.logicalType);
+  vector_length = other129.vector_length;
   __isset = other129.__isset;
   return *this;
 }
@@ -2748,6 +2773,7 @@ void SchemaElement::printTo(std::ostream& out) const {
   out << ", " << "precision="; (__isset.precision ? (out << to_string(precision)) : (out << "<null>"));
   out << ", " << "field_id="; (__isset.field_id ? (out << to_string(field_id)) : (out << "<null>"));
   out << ", " << "logicalType="; (__isset.logicalType ? (out << to_string(logicalType)) : (out << "<null>"));
+  out << ", " << "vector_length="; (__isset.vector_length ? (out << to_string(vector_length)) : (out << "<null>"));
   out << ")";
 }
 

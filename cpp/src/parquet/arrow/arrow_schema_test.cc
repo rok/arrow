@@ -289,6 +289,22 @@ TEST_F(TestConvertParquetSchema, ParquetAnnotatedFields) {
   ASSERT_NO_FATAL_FAILURE(CheckFlatSchema(arrow_schema));
 }
 
+TEST_F(TestConvertParquetSchema, VectorFixedSizeList) {
+  std::vector<NodePtr> parquet_fields;
+  std::vector<std::shared_ptr<Field>> arrow_fields;
+
+  auto element = PrimitiveNode::Make("element", Repetition::VECTOR, ParquetType::FLOAT,
+                                     ConvertedType::NONE, -1, -1, -1, -1, 3);
+  parquet_fields.push_back(GroupNode::Make("embedding", Repetition::OPTIONAL, {element}));
+  arrow_fields.push_back(::arrow::field(
+      "embedding",
+      ::arrow::fixed_size_list(::arrow::field("element", ::arrow::float32(), false), 3),
+      true));
+
+  ASSERT_OK(ConvertSchema(parquet_fields));
+  ASSERT_NO_FATAL_FAILURE(CheckFlatSchema(::arrow::schema(arrow_fields)));
+}
+
 TEST_F(TestConvertParquetSchema, DuplicateFieldNames) {
   std::vector<NodePtr> parquet_fields;
   std::vector<std::shared_ptr<Field>> arrow_fields;
@@ -1746,12 +1762,8 @@ TEST_F(TestConvertArrowSchema, ParquetOtherLists) {
     auto arrow_list = ::arrow::large_list(arrow_element);
     arrow_fields.push_back(::arrow::field("my_list", arrow_list, false));
   }
-  // // FixedSizeList[10]<String> (list-like non-null, elements nullable)
-  // required group my_list (LIST) {
-  //   repeated group list {
-  //     optional binary element (UTF8);
-  //   }
-  // }
+  // FixedSizeList defaults to the legacy LIST encoding unless experimental VECTOR
+  // encoding is explicitly enabled.
   {
     auto element = PrimitiveNode::Make("element", Repetition::OPTIONAL,
                                        ParquetType::BYTE_ARRAY, ConvertedType::UTF8);
@@ -1765,6 +1777,66 @@ TEST_F(TestConvertArrowSchema, ParquetOtherLists) {
 
   ASSERT_OK(ConvertSchema(arrow_fields));
 
+  ASSERT_NO_FATAL_FAILURE(CheckFlatSchema(parquet_fields));
+}
+
+TEST_F(TestConvertArrowSchema, ParquetFixedSizeListVectorUnsupportedElement) {
+  auto arrow_element = ::arrow::field("string", UTF8, true);
+  auto arrow_list = ::arrow::fixed_size_list(arrow_element, 3);
+
+  ArrowWriterProperties::Builder builder;
+  builder.enable_experimental_vector_encoding();
+  ASSERT_RAISES(
+      NotImplemented,
+      ConvertSchema({::arrow::field("embedding", arrow_list, true)}, builder.build()));
+}
+
+TEST_F(TestConvertArrowSchema, ParquetFixedSizeListVectorZeroLengthUnsupported) {
+  auto arrow_element = ::arrow::field("element", FLOAT, false);
+  auto arrow_list = ::arrow::fixed_size_list(arrow_element, 0);
+
+  ArrowWriterProperties::Builder builder;
+  builder.enable_experimental_vector_encoding();
+  ASSERT_RAISES(
+      NotImplemented,
+      ConvertSchema({::arrow::field("embedding", arrow_list, true)}, builder.build()));
+}
+
+TEST_F(TestConvertArrowSchema, ParquetFixedSizeListVectorNullableElement) {
+  std::vector<NodePtr> parquet_fields;
+  std::vector<std::shared_ptr<Field>> arrow_fields;
+
+  auto item = PrimitiveNode::Make("element", Repetition::OPTIONAL, ParquetType::FLOAT,
+                                  ConvertedType::NONE, -1, -1, -1, -1, -1);
+  auto element = GroupNode::Make("element", Repetition::VECTOR, {item},
+                                 /*logical_type=*/nullptr, -1, 3);
+  parquet_fields.push_back(GroupNode::Make("embedding", Repetition::OPTIONAL, {element}));
+
+  auto arrow_element = ::arrow::field("element", FLOAT, true);
+  auto arrow_list = ::arrow::fixed_size_list(arrow_element, 3);
+  arrow_fields.push_back(::arrow::field("embedding", arrow_list, true));
+
+  ArrowWriterProperties::Builder builder;
+  builder.enable_experimental_vector_encoding();
+  ASSERT_OK(ConvertSchema(arrow_fields, builder.build()));
+  ASSERT_NO_FATAL_FAILURE(CheckFlatSchema(parquet_fields));
+}
+
+TEST_F(TestConvertArrowSchema, ParquetFixedSizeListVector) {
+  std::vector<NodePtr> parquet_fields;
+  std::vector<std::shared_ptr<Field>> arrow_fields;
+
+  auto element = PrimitiveNode::Make("element", Repetition::VECTOR, ParquetType::FLOAT,
+                                     ConvertedType::NONE, -1, -1, -1, -1, 3);
+  parquet_fields.push_back(GroupNode::Make("embedding", Repetition::OPTIONAL, {element}));
+
+  auto arrow_element = ::arrow::field("element", FLOAT, false);
+  auto arrow_list = ::arrow::fixed_size_list(arrow_element, 3);
+  arrow_fields.push_back(::arrow::field("embedding", arrow_list, true));
+
+  ArrowWriterProperties::Builder builder;
+  builder.enable_experimental_vector_encoding();
+  ASSERT_OK(ConvertSchema(arrow_fields, builder.build()));
   ASSERT_NO_FATAL_FAILURE(CheckFlatSchema(parquet_fields));
 }
 
