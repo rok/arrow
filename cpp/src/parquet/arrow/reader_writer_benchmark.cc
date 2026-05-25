@@ -296,10 +296,22 @@ struct Examples<bool> {
   return output->Finish();
 }
 
+void SetParquetSizeCounters(::benchmark::State& state, int64_t parquet_size,
+                            int64_t total_bytes) {
+  state.counters["parquet_size_bytes"] = static_cast<double>(parquet_size);
+  if (total_bytes > 0) {
+    state.counters["parquet_to_raw_ratio"] =
+        static_cast<double>(parquet_size) / static_cast<double>(total_bytes);
+  }
+}
+
 static void BenchmarkWriteTable(::benchmark::State& state, const Table& table,
                                 std::shared_ptr<WriterProperties> properties,
                                 std::shared_ptr<ArrowWriterProperties> arrow_properties,
                                 int64_t num_values = -1, int64_t total_bytes = -1) {
+  PARQUET_ASSIGN_OR_THROW(auto sample_buffer,
+                          WriteReadBenchmarkBuffer(table, properties, arrow_properties));
+
   for (auto _ : state) {
     auto output = CreateOutputStream();
     EXIT_NOT_OK(WriteTable(table, ::arrow::default_memory_pool(), output,
@@ -315,6 +327,7 @@ static void BenchmarkWriteTable(::benchmark::State& state, const Table& table,
   state.SetItemsProcessed(num_values * state.iterations());
   if (total_bytes != -1) {
     state.SetBytesProcessed(total_bytes * state.iterations());
+    SetParquetSizeCounters(state, sample_buffer->size(), total_bytes);
   }
 }
 
@@ -323,6 +336,9 @@ static void BenchmarkRoundtripTable(
     std::shared_ptr<WriterProperties> properties,
     std::shared_ptr<ArrowWriterProperties> arrow_properties, int64_t num_values = -1,
     int64_t total_bytes = -1) {
+  PARQUET_ASSIGN_OR_THROW(auto sample_buffer,
+                          WriteReadBenchmarkBuffer(table, properties, arrow_properties));
+
   for (auto _ : state) {
     auto output = CreateOutputStream();
     EXIT_NOT_OK(WriteTable(table, ::arrow::default_memory_pool(), output,
@@ -347,6 +363,7 @@ static void BenchmarkRoundtripTable(
   state.SetItemsProcessed(num_values * state.iterations());
   if (total_bytes != -1) {
     state.SetBytesProcessed(total_bytes * state.iterations());
+    SetParquetSizeCounters(state, sample_buffer->size(), total_bytes);
   }
 }
 
@@ -375,6 +392,7 @@ static void BenchmarkReadTable(::benchmark::State& state, const Table& table,
   state.SetItemsProcessed(num_values * state.iterations());
   if (total_bytes != -1) {
     state.SetBytesProcessed(total_bytes * state.iterations());
+    SetParquetSizeCounters(state, buffer->size(), total_bytes);
   }
 }
 
@@ -872,13 +890,22 @@ std::shared_ptr<Table> MakeFixedSizeListStructTable(int64_t num_rows, int32_t li
   return Table::Make(::arrow::schema({field}), {list_array}, num_rows);
 }
 
-std::shared_ptr<WriterProperties> FixedSizeListVectorWriterProperties() {
+std::shared_ptr<WriterProperties> FixedSizeListWriterProperties(
+    Encoding::type encoding) {
   auto builder = WriterProperties::Builder();
   return builder.disable_dictionary()
       ->disable_statistics()
       ->disable_write_page_index()
-      ->encoding(Encoding::PLAIN)
+      ->encoding(encoding)
       ->build();
+}
+
+std::shared_ptr<WriterProperties> FixedSizeListVectorWriterProperties() {
+  return FixedSizeListWriterProperties(Encoding::PLAIN);
+}
+
+std::shared_ptr<WriterProperties> FixedSizeListVectorByteStreamSplitWriterProperties() {
+  return FixedSizeListWriterProperties(Encoding::BYTE_STREAM_SPLIT);
 }
 
 // ArrowWriterProperties used by the LIST side. Same as VECTOR side except the
@@ -927,6 +954,40 @@ static void BM_RoundtripFixedSizeListFloatAsList(::benchmark::State& state) {
                           total_bytes);
 }
 
+static void BM_WriteFixedSizeListFloatAsListByteStreamSplit(
+    ::benchmark::State& state) {
+  const int32_t list_size = static_cast<int32_t>(state.range(0));
+  const int64_t num_rows = BENCHMARK_SIZE / list_size;
+  auto table = MakeFixedSizeListFloatTable(num_rows, list_size, /*nullable=*/false);
+  const int64_t total_bytes = num_rows * list_size * static_cast<int64_t>(sizeof(float));
+
+  BenchmarkWriteTable(state, *table, FixedSizeListVectorByteStreamSplitWriterProperties(),
+                      FixedSizeListAsListArrowWriterProperties(), num_rows, total_bytes);
+}
+
+static void BM_ReadFixedSizeListFloatAsListByteStreamSplit(::benchmark::State& state) {
+  const int32_t list_size = static_cast<int32_t>(state.range(0));
+  const int64_t num_rows = BENCHMARK_SIZE / list_size;
+  auto table = MakeFixedSizeListFloatTable(num_rows, list_size, /*nullable=*/false);
+  const int64_t total_bytes = num_rows * list_size * static_cast<int64_t>(sizeof(float));
+
+  BenchmarkReadTable(state, *table, FixedSizeListVectorByteStreamSplitWriterProperties(),
+                     FixedSizeListAsListArrowWriterProperties(), num_rows, total_bytes);
+}
+
+static void BM_RoundtripFixedSizeListFloatAsListByteStreamSplit(
+    ::benchmark::State& state) {
+  const int32_t list_size = static_cast<int32_t>(state.range(0));
+  const int64_t num_rows = BENCHMARK_SIZE / list_size;
+  auto table = MakeFixedSizeListFloatTable(num_rows, list_size, /*nullable=*/false);
+  const int64_t total_bytes = num_rows * list_size * static_cast<int64_t>(sizeof(float));
+
+  BenchmarkRoundtripTable(state, *table,
+                          FixedSizeListVectorByteStreamSplitWriterProperties(),
+                          FixedSizeListAsListArrowWriterProperties(), num_rows,
+                          total_bytes);
+}
+
 static void BM_WriteFixedSizeListFloatVector(::benchmark::State& state) {
   const int32_t list_size = static_cast<int32_t>(state.range(0));
   const int64_t num_rows = BENCHMARK_SIZE / list_size;
@@ -954,6 +1015,41 @@ static void BM_RoundtripFixedSizeListFloatVector(::benchmark::State& state) {
   const int64_t total_bytes = num_rows * list_size * static_cast<int64_t>(sizeof(float));
 
   BenchmarkRoundtripTable(state, *table, FixedSizeListVectorWriterProperties(),
+                          FixedSizeListVectorArrowWriterProperties(), num_rows,
+                          total_bytes);
+}
+
+static void BM_WriteFixedSizeListFloatVectorByteStreamSplit(
+    ::benchmark::State& state) {
+  const int32_t list_size = static_cast<int32_t>(state.range(0));
+  const int64_t num_rows = BENCHMARK_SIZE / list_size;
+  auto table = MakeFixedSizeListFloatTable(num_rows, list_size, /*nullable=*/false);
+  const int64_t total_bytes = num_rows * list_size * static_cast<int64_t>(sizeof(float));
+
+  BenchmarkWriteTable(state, *table, FixedSizeListVectorByteStreamSplitWriterProperties(),
+                      FixedSizeListVectorArrowWriterProperties(), num_rows, total_bytes);
+}
+
+static void BM_ReadFixedSizeListFloatVectorByteStreamSplit(
+    ::benchmark::State& state) {
+  const int32_t list_size = static_cast<int32_t>(state.range(0));
+  const int64_t num_rows = BENCHMARK_SIZE / list_size;
+  auto table = MakeFixedSizeListFloatTable(num_rows, list_size, /*nullable=*/false);
+  const int64_t total_bytes = num_rows * list_size * static_cast<int64_t>(sizeof(float));
+
+  BenchmarkReadTable(state, *table, FixedSizeListVectorByteStreamSplitWriterProperties(),
+                     FixedSizeListVectorArrowWriterProperties(), num_rows, total_bytes);
+}
+
+static void BM_RoundtripFixedSizeListFloatVectorByteStreamSplit(
+    ::benchmark::State& state) {
+  const int32_t list_size = static_cast<int32_t>(state.range(0));
+  const int64_t num_rows = BENCHMARK_SIZE / list_size;
+  auto table = MakeFixedSizeListFloatTable(num_rows, list_size, /*nullable=*/false);
+  const int64_t total_bytes = num_rows * list_size * static_cast<int64_t>(sizeof(float));
+
+  BenchmarkRoundtripTable(state, *table,
+                          FixedSizeListVectorByteStreamSplitWriterProperties(),
                           FixedSizeListVectorArrowWriterProperties(), num_rows,
                           total_bytes);
 }
@@ -1147,9 +1243,33 @@ static void BM_RoundtripRealisticEmbeddingRowVector(::benchmark::State& state) {
 BENCHMARK(BM_WriteFixedSizeListFloatAsList)->Arg(80)->Arg(768)->Arg(10000);
 BENCHMARK(BM_ReadFixedSizeListFloatAsList)->Arg(80)->Arg(768)->Arg(10000);
 BENCHMARK(BM_RoundtripFixedSizeListFloatAsList)->Arg(80)->Arg(768)->Arg(10000);
+BENCHMARK(BM_WriteFixedSizeListFloatAsListByteStreamSplit)
+    ->Arg(80)
+    ->Arg(768)
+    ->Arg(10000);
+BENCHMARK(BM_ReadFixedSizeListFloatAsListByteStreamSplit)
+    ->Arg(80)
+    ->Arg(768)
+    ->Arg(10000);
+BENCHMARK(BM_RoundtripFixedSizeListFloatAsListByteStreamSplit)
+    ->Arg(80)
+    ->Arg(768)
+    ->Arg(10000);
 BENCHMARK(BM_WriteFixedSizeListFloatVector)->Arg(80)->Arg(768)->Arg(10000);
 BENCHMARK(BM_ReadFixedSizeListFloatVector)->Arg(80)->Arg(768)->Arg(10000);
 BENCHMARK(BM_RoundtripFixedSizeListFloatVector)->Arg(80)->Arg(768)->Arg(10000);
+BENCHMARK(BM_WriteFixedSizeListFloatVectorByteStreamSplit)
+    ->Arg(80)
+    ->Arg(768)
+    ->Arg(10000);
+BENCHMARK(BM_ReadFixedSizeListFloatVectorByteStreamSplit)
+    ->Arg(80)
+    ->Arg(768)
+    ->Arg(10000);
+BENCHMARK(BM_RoundtripFixedSizeListFloatVectorByteStreamSplit)
+    ->Arg(80)
+    ->Arg(768)
+    ->Arg(10000);
 BENCHMARK(BM_WriteFixedSizeListFloatVectorNullable)->Arg(80)->Arg(768)->Arg(10000);
 BENCHMARK(BM_ReadFixedSizeListFloatVectorNullable)->Arg(80)->Arg(768)->Arg(10000);
 BENCHMARK(BM_RoundtripFixedSizeListFloatVectorNullable)->Arg(80)->Arg(768)->Arg(10000);

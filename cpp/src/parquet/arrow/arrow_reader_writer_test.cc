@@ -433,6 +433,15 @@ std::shared_ptr<WriterProperties> VectorWriterProperties() {
       ->build();
 }
 
+std::shared_ptr<WriterProperties> VectorByteStreamSplitWriterProperties() {
+  auto builder = WriterProperties::Builder();
+  return builder.disable_dictionary()
+      ->disable_statistics()
+      ->disable_write_page_index()
+      ->encoding(Encoding::BYTE_STREAM_SPLIT)
+      ->build();
+}
+
 void DoRoundtrip(const std::shared_ptr<Table>& table, int64_t row_group_size,
                  std::shared_ptr<Table>* out,
                  const std::shared_ptr<::parquet::WriterProperties>& writer_properties =
@@ -458,6 +467,13 @@ std::shared_ptr<::arrow::DataType> VectorFixedSizeListType(
     bool element_nullable = false) {
   return ::arrow::fixed_size_list(
       ::arrow::field("item", ::arrow::int16(), element_nullable),
+      /*size=*/3);
+}
+
+std::shared_ptr<::arrow::DataType> VectorFloatFixedSizeListType(
+    bool element_nullable = false) {
+  return ::arrow::fixed_size_list(
+      ::arrow::field("item", ::arrow::float32(), element_nullable),
       /*size=*/3);
 }
 
@@ -3726,27 +3742,60 @@ TEST(ArrowWriteOnly, FixedSizeListVectorRejectsDefaultWriterProperties) {
                                    default_writer_properties(), builder.build()));
 }
 
-TEST(ArrowWriteOnly, FixedSizeListVectorRejectsNonPlainEncoding) {
+TEST(ArrowReadWrite, FixedSizeListVectorByteStreamSplitRoundTrip) {
   using ::arrow::field;
   using ::arrow::fixed_size_list;
 
-  auto type = fixed_size_list(field("item", ::arrow::int16(), false), /*size=*/3);
+  auto type = fixed_size_list(field("item", ::arrow::float32(), false), /*size=*/3);
   auto array = ::arrow::ArrayFromJSON(type, R"([
-      [1, 2, 3],
-      [4, 5, 6]])");
+      [1.0, 2.0, 3.0],
+      [4.0, 5.0, 6.0],
+      [7.0, 8.0, 9.0]])");
   auto table =
       ::arrow::Table::Make(::arrow::schema({field("root", type, false)}), {array});
 
   ArrowWriterProperties::Builder builder;
   builder.enable_experimental_vector_encoding();
-  auto invalid_props_builder = WriterProperties::Builder();
-  auto invalid_props = invalid_props_builder.disable_dictionary()
-                           ->disable_statistics()
-                           ->disable_write_page_index()
-                           ->encoding(Encoding::DELTA_BINARY_PACKED)
-                           ->build();
-  ASSERT_RAISES(Invalid, WriteTableToBuffer(table, /*row_group_size=*/2, invalid_props,
-                                            builder.build()));
+  ASSERT_OK_AND_ASSIGN(auto buffer,
+                       WriteTableToBuffer(table, /*row_group_size=*/2,
+                                          VectorByteStreamSplitWriterProperties(),
+                                          builder.build()));
+
+  auto parquet_reader = ParquetFileReader::Open(std::make_shared<BufferReader>(buffer));
+  const auto encodings = parquet_reader->metadata()->RowGroup(0)->ColumnChunk(0)->encodings();
+  ASSERT_NE(std::find(encodings.begin(), encodings.end(), Encoding::BYTE_STREAM_SPLIT),
+            encodings.end());
+
+  FileReaderBuilder reader_builder;
+  ASSERT_OK(reader_builder.Open(std::make_shared<BufferReader>(buffer)));
+  std::unique_ptr<FileReader> reader;
+  ASSERT_OK(reader_builder.Build(&reader));
+  std::shared_ptr<Table> result;
+  ASSERT_OK(reader->ReadTable(&result));
+  ::arrow::AssertSchemaEqual(*table->schema(), *result->schema(), false);
+  ::arrow::AssertTablesEqual(*table, *result, false);
+}
+
+TEST(ArrowReadWrite, FixedSizeListVectorByteStreamSplitNullableRoundTrip) {
+  using ::arrow::field;
+  using ::arrow::fixed_size_list;
+
+  auto type = fixed_size_list(field("item", ::arrow::float32(), false), /*size=*/3);
+  auto array = ::arrow::ArrayFromJSON(type, R"([
+      [1.0, 2.0, 3.0],
+      null,
+      [7.0, 8.0, 9.0]])");
+  auto table =
+      ::arrow::Table::Make(::arrow::schema({field("root", type, true)}), {array});
+
+  ArrowWriterProperties::Builder builder;
+  builder.enable_experimental_vector_encoding();
+  std::shared_ptr<Table> result;
+  ASSERT_NO_FATAL_FAILURE(DoRoundtrip(table, 3, &result,
+                                      VectorByteStreamSplitWriterProperties(),
+                                      builder.build()));
+  ::arrow::AssertSchemaEqual(*table->schema(), *result->schema(), false);
+  ::arrow::AssertTablesEqual(*table, *result, false);
 }
 
 TEST(ArrowReadWrite, ListOfStructOfList2) {

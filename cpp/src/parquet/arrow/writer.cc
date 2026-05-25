@@ -202,11 +202,6 @@ Status ValidateVectorColumnProperties(const SchemaDescriptor* schema,
           "encoding for column '",
           path->ToDotString(), "'");
     }
-    if (properties.encoding(path) != Encoding::PLAIN) {
-      return Status::Invalid(
-          "Experimental VECTOR encoding currently requires PLAIN encoding for column '",
-          path->ToDotString(), "'");
-    }
     if (properties.statistics_enabled(path)) {
       return Status::Invalid(
           "Experimental VECTOR encoding does not support statistics "
