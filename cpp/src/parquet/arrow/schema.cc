@@ -112,6 +112,34 @@ Status ListToNode(const std::shared_ptr<::arrow::BaseListType>& type,
   return Status::OK();
 }
 
+bool IsSupportedVectorStructNode(const Node& node) {
+  if (node.is_primitive()) {
+    return true;
+  }
+  if (!node.is_group() || node.is_repeated() || node.is_vector()) {
+    return false;
+  }
+  const auto& group = checked_cast<const GroupNode&>(node);
+  if (group.logical_type() != nullptr && !group.logical_type()->is_none()) {
+    return false;
+  }
+  for (int i = 0; i < group.field_count(); ++i) {
+    if (!IsSupportedVectorStructNode(*group.field(i))) {
+      return false;
+    }
+  }
+  return true;
+}
+
+Status ValidateSupportedVectorStructNode(const Node& node) {
+  if (IsSupportedVectorStructNode(node)) {
+    return Status::OK();
+  }
+  return Status::NotImplemented(
+      "VECTOR struct elements only support primitive or nested struct fields in the "
+      "current prototype; repeated/list/map descendants are deferred");
+}
+
 Status FixedSizeListToNode(const std::shared_ptr<::arrow::FixedSizeListType>& type,
                            const std::string& name, bool nullable, int field_id,
                            const WriterProperties& properties,
@@ -148,25 +176,28 @@ Status FixedSizeListToNode(const std::shared_ptr<::arrow::FixedSizeListType>& ty
                               primitive.physical_type(), primitive.type_length(),
                               primitive.field_id(), type->list_size());
     }
-  } else if (value_field->type()->id() == ::arrow::Type::STRUCT && element->is_group() &&
-             !value_field->nullable()) {
+  } else if (value_field->type()->id() == ::arrow::Type::STRUCT && element->is_group()) {
     const auto& group = checked_cast<const GroupNode&>(*element);
     schema::NodeVector fields;
     fields.reserve(group.field_count());
     for (int i = 0; i < group.field_count(); ++i) {
-      if (!group.field(i)->is_primitive()) {
-        return Status::NotImplemented(
-            "VECTOR struct elements only support primitive fields in MVP");
-      }
+      RETURN_NOT_OK(ValidateSupportedVectorStructNode(*group.field(i)));
       fields.push_back(group.field(i));
     }
-    vector_element =
-        GroupNode::Make(value_name, Repetition::VECTOR, fields,
-                        /*logical_type=*/nullptr, group.field_id(), type->list_size());
+    if (value_field->nullable()) {
+      // Nullable struct elements need an inner OPTIONAL group so element nullability is
+      // distinct from the VECTOR row nullability carried by the outer field.
+      vector_element = GroupNode::Make(value_name, Repetition::VECTOR, {element},
+                                       /*logical_type=*/nullptr, group.field_id(),
+                                       type->list_size());
+    } else {
+      vector_element = GroupNode::Make(value_name, Repetition::VECTOR, fields,
+                                       /*logical_type=*/nullptr, group.field_id(),
+                                       type->list_size());
+    }
   } else {
     return Status::NotImplemented(
-        "VECTOR repetition only supports primitive or non-null struct FixedSizeList "
-        "elements");
+        "VECTOR repetition only supports primitive or struct FixedSizeList elements");
   }
   *out = GroupNode::Make(name, RepetitionFromNullable(nullable), {vector_element},
                          /*logical_type=*/nullptr, field_id);
@@ -706,7 +737,8 @@ Status VectorToSchemaField(const GroupNode& group, LevelInfo current_levels,
                            SchemaTreeContext* ctx, const SchemaField* parent,
                            SchemaField* out) {
   if (group.is_repeated()) {
-    return Status::NotImplemented("VECTOR groups must not be repeated in MVP");
+    return Status::NotImplemented("VECTOR groups must not be repeated in the current "
+                                  "prototype");
   }
   if (group.field_count() != 1) {
     return Status::Invalid("VECTOR groups must have a single child");
@@ -740,24 +772,37 @@ Status VectorToSchemaField(const GroupNode& group, LevelInfo current_levels,
         PopulateLeaf(column_index, item_field, current_levels, ctx, out, child_field));
   } else {
     const auto& vector_group = static_cast<const GroupNode&>(child);
-    if (vector_group.field_count() == 1 && vector_group.field(0)->is_primitive()) {
+    if (vector_group.field_count() == 1) {
       const Node& element = *vector_group.field(0);
       if (element.is_repeated() || element.is_vector()) {
         return Status::Invalid("VECTOR element children must not be REPEATED or VECTOR");
       }
-      bool element_nullable = element.is_optional();
-      if (element_nullable) {
-        current_levels.IncrementOptional();
+      if (element.is_primitive()) {
+        bool element_nullable = element.is_optional();
+        if (element_nullable) {
+          current_levels.IncrementOptional();
+        }
+        const auto& primitive_node = static_cast<const PrimitiveNode&>(element);
+        int column_index = ctx->schema->GetColumnIndex(primitive_node);
+        ARROW_ASSIGN_OR_RAISE(std::shared_ptr<ArrowType> type,
+                              GetTypeForNode(column_index, primitive_node, ctx));
+        auto item_field = ::arrow::field(element.name(), type, element_nullable,
+                                         FieldIdMetadata(element.field_id()));
+        RETURN_NOT_OK(PopulateLeaf(column_index, item_field, current_levels, ctx, out,
+                                   child_field));
+      } else {
+        const auto& element_group = static_cast<const GroupNode&>(element);
+        RETURN_NOT_OK(ValidateSupportedVectorStructNode(element_group));
+        if (element_group.is_optional()) {
+          current_levels.IncrementOptional();
+        }
+        RETURN_NOT_OK(GroupToStruct(element_group, current_levels, ctx, out,
+                                    child_field));
       }
-      const auto& primitive_node = static_cast<const PrimitiveNode&>(element);
-      int column_index = ctx->schema->GetColumnIndex(primitive_node);
-      ARROW_ASSIGN_OR_RAISE(std::shared_ptr<ArrowType> type,
-                            GetTypeForNode(column_index, primitive_node, ctx));
-      auto item_field = ::arrow::field(element.name(), type, element_nullable,
-                                       FieldIdMetadata(element.field_id()));
-      RETURN_NOT_OK(
-          PopulateLeaf(column_index, item_field, current_levels, ctx, out, child_field));
     } else {
+      for (int i = 0; i < vector_group.field_count(); ++i) {
+        RETURN_NOT_OK(ValidateSupportedVectorStructNode(*vector_group.field(i)));
+      }
       RETURN_NOT_OK(GroupToStruct(vector_group, current_levels, ctx, out, child_field));
     }
   }

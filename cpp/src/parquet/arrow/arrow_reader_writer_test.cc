@@ -463,18 +463,20 @@ void DoRoundtrip(const std::shared_ptr<Table>& table, int64_t row_group_size,
   ASSERT_OK_AND_ASSIGN(*out, reader->ReadTable());
 }
 
+std::shared_ptr<::arrow::DataType> MakeVectorFixedSizeListType(
+    const std::shared_ptr<::arrow::DataType>& item_type, bool element_nullable = false) {
+  return ::arrow::fixed_size_list(::arrow::field("item", item_type, element_nullable),
+                                  /*size=*/3);
+}
+
 std::shared_ptr<::arrow::DataType> VectorFixedSizeListType(
     bool element_nullable = false) {
-  return ::arrow::fixed_size_list(
-      ::arrow::field("item", ::arrow::int16(), element_nullable),
-      /*size=*/3);
+  return MakeVectorFixedSizeListType(::arrow::int16(), element_nullable);
 }
 
 std::shared_ptr<::arrow::DataType> VectorFloatFixedSizeListType(
     bool element_nullable = false) {
-  return ::arrow::fixed_size_list(
-      ::arrow::field("item", ::arrow::float32(), element_nullable),
-      /*size=*/3);
+  return MakeVectorFixedSizeListType(::arrow::float32(), element_nullable);
 }
 
 std::shared_ptr<Table> MakeVectorFixedSizeListTable(
@@ -492,6 +494,15 @@ std::shared_ptr<Table> MakeVectorFixedSizeListTable(std::string_view json,
   auto type = VectorFixedSizeListType(element_nullable);
   return MakeVectorFixedSizeListTable({::arrow::ArrayFromJSON(type, std::string(json))},
                                       nullable, element_nullable);
+}
+
+std::shared_ptr<Table> MakeVectorFixedSizeListTable(
+    const std::shared_ptr<::arrow::DataType>& item_type, std::string_view json,
+    bool nullable = true, bool element_nullable = false) {
+  auto type = MakeVectorFixedSizeListType(item_type, element_nullable);
+  auto field = ::arrow::field("root", type, nullable);
+  auto array = ::arrow::ArrayFromJSON(type, std::string(json));
+  return ::arrow::Table::Make(::arrow::schema({field}), {array});
 }
 
 void CheckVectorFixedSizeListRoundtrip(
@@ -3585,6 +3596,168 @@ TEST(ArrowReadWrite, FixedSizeListVectorNullableRowsAndElementsRoundTrip) {
   ASSERT_NO_FATAL_FAILURE(CheckVectorFixedSizeListRoundtrip(table, /*row_group_size=*/4));
 }
 
+struct VectorPrimitiveRoundTripCase {
+  std::string name;
+  std::shared_ptr<::arrow::DataType> item_type;
+  std::shared_ptr<::arrow::DataType> expected_item_type;
+  std::string required_json;
+  std::string nullable_rows_json;
+  std::string nullable_rows_and_elements_json;
+};
+
+class VectorPrimitiveRoundTripTest
+    : public ::testing::TestWithParam<VectorPrimitiveRoundTripCase> {};
+
+TEST_P(VectorPrimitiveRoundTripTest, RequiredRows) {
+  const auto& param = GetParam();
+  auto table = MakeVectorFixedSizeListTable(param.item_type, param.required_json,
+                                            /*nullable=*/false,
+                                            /*element_nullable=*/false);
+  auto expected = param.expected_item_type
+                      ? MakeVectorFixedSizeListTable(param.expected_item_type,
+                                                     param.required_json,
+                                                     /*nullable=*/false,
+                                                     /*element_nullable=*/false)
+                      : nullptr;
+  ArrowWriterProperties::Builder builder;
+  builder.enable_experimental_vector_encoding();
+  ASSERT_NO_FATAL_FAILURE(
+      CheckConfiguredRoundtrip(table, expected, VectorWriterProperties(),
+                               builder.build()));
+}
+
+TEST_P(VectorPrimitiveRoundTripTest, NullableRows) {
+  const auto& param = GetParam();
+  auto table = MakeVectorFixedSizeListTable(param.item_type, param.nullable_rows_json,
+                                            /*nullable=*/true,
+                                            /*element_nullable=*/false);
+  auto expected = param.expected_item_type
+                      ? MakeVectorFixedSizeListTable(param.expected_item_type,
+                                                     param.nullable_rows_json,
+                                                     /*nullable=*/true,
+                                                     /*element_nullable=*/false)
+                      : nullptr;
+  ArrowWriterProperties::Builder builder;
+  builder.enable_experimental_vector_encoding();
+  ASSERT_NO_FATAL_FAILURE(
+      CheckConfiguredRoundtrip(table, expected, VectorWriterProperties(),
+                               builder.build()));
+}
+
+TEST_P(VectorPrimitiveRoundTripTest, NullableRowsAndElements) {
+  const auto& param = GetParam();
+  auto table = MakeVectorFixedSizeListTable(param.item_type,
+                                            param.nullable_rows_and_elements_json,
+                                            /*nullable=*/true,
+                                            /*element_nullable=*/true);
+  auto expected = param.expected_item_type
+                      ? MakeVectorFixedSizeListTable(param.expected_item_type,
+                                                     param.nullable_rows_and_elements_json,
+                                                     /*nullable=*/true,
+                                                     /*element_nullable=*/true)
+                      : nullptr;
+  ArrowWriterProperties::Builder builder;
+  builder.enable_experimental_vector_encoding();
+  ASSERT_NO_FATAL_FAILURE(
+      CheckConfiguredRoundtrip(table, expected, VectorWriterProperties(),
+                               builder.build()));
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    PrimitiveElements, VectorPrimitiveRoundTripTest,
+    ::testing::Values(
+        VectorPrimitiveRoundTripCase{"Boolean", ::arrow::boolean(), nullptr,
+                                     R"([[true, false, true], [false, true, false], [true, true, false]])",
+                                     R"([[true, false, true], null, [false, true, false]])",
+                                     R"([[true, null, true], null, [null, true, false]])"},
+        VectorPrimitiveRoundTripCase{"UInt8", ::arrow::uint8(), nullptr,
+                                     R"([[1, 2, 3], [4, 5, 6], [7, 8, 9]])",
+                                     R"([[1, 2, 3], null, [7, 8, 9]])",
+                                     R"([[1, null, 3], null, [null, 8, 9]])"},
+        VectorPrimitiveRoundTripCase{"Int8", ::arrow::int8(), nullptr,
+                                     R"([[1, -2, 3], [4, -5, 6], [7, -8, 9]])",
+                                     R"([[1, -2, 3], null, [7, -8, 9]])",
+                                     R"([[1, null, 3], null, [null, -8, 9]])"},
+        VectorPrimitiveRoundTripCase{"UInt16", ::arrow::uint16(), nullptr,
+                                     R"([[1, 2, 3], [4, 5, 6], [7, 8, 9]])",
+                                     R"([[1, 2, 3], null, [7, 8, 9]])",
+                                     R"([[1, null, 3], null, [null, 8, 9]])"},
+        VectorPrimitiveRoundTripCase{"Int16", ::arrow::int16(), nullptr,
+                                     R"([[1, -2, 3], [4, -5, 6], [7, -8, 9]])",
+                                     R"([[1, -2, 3], null, [7, -8, 9]])",
+                                     R"([[1, null, 3], null, [null, -8, 9]])"},
+        VectorPrimitiveRoundTripCase{"UInt32", ::arrow::uint32(), nullptr,
+                                     R"([[1, 2, 3], [4, 5, 6], [7, 8, 9]])",
+                                     R"([[1, 2, 3], null, [7, 8, 9]])",
+                                     R"([[1, null, 3], null, [null, 8, 9]])"},
+        VectorPrimitiveRoundTripCase{"Int32", ::arrow::int32(), nullptr,
+                                     R"([[1, 2, 3], [4, 5, 6], [7, 8, 9]])",
+                                     R"([[1, 2, 3], null, [7, 8, 9]])",
+                                     R"([[1, null, 3], null, [null, 8, 9]])"},
+        VectorPrimitiveRoundTripCase{"UInt64", ::arrow::uint64(), nullptr,
+                                     R"([[1, 2, 3], [4, 5, 6], [7, 8, 9]])",
+                                     R"([[1, 2, 3], null, [7, 8, 9]])",
+                                     R"([[1, null, 3], null, [null, 8, 9]])"},
+        VectorPrimitiveRoundTripCase{"Int64", ::arrow::int64(), nullptr,
+                                     R"([[1, 2, 3], [4, 5, 6], [7, 8, 9]])",
+                                     R"([[1, 2, 3], null, [7, 8, 9]])",
+                                     R"([[1, null, 3], null, [null, 8, 9]])"},
+        VectorPrimitiveRoundTripCase{"Float16", ::arrow::float16(), nullptr,
+                                     R"([[1.0, 2.0, 3.0], [4.5, 5.5, 6.5], [7.25, 8.25, 9.25]])",
+                                     R"([[1.0, 2.0, 3.0], null, [7.25, 8.25, 9.25]])",
+                                     R"([[1.0, null, 3.0], null, [null, 8.25, 9.25]])"},
+        VectorPrimitiveRoundTripCase{"Float32", ::arrow::float32(), nullptr,
+                                     R"([[1.0, 2.0, 3.0], [4.5, 5.5, 6.5], [7.25, 8.25, 9.25]])",
+                                     R"([[1.0, 2.0, 3.0], null, [7.25, 8.25, 9.25]])",
+                                     R"([[1.0, null, 3.0], null, [null, 8.25, 9.25]])"},
+        VectorPrimitiveRoundTripCase{"Float64", ::arrow::float64(), nullptr,
+                                     R"([[1.0, 2.0, 3.0], [4.5, 5.5, 6.5], [7.25, 8.25, 9.25]])",
+                                     R"([[1.0, 2.0, 3.0], null, [7.25, 8.25, 9.25]])",
+                                     R"([[1.0, null, 3.0], null, [null, 8.25, 9.25]])"},
+        VectorPrimitiveRoundTripCase{"Date32", ::arrow::date32(), nullptr,
+                                     R"([[1, 2, 3], [4, 5, 6], [7, 8, 9]])",
+                                     R"([[1, 2, 3], null, [7, 8, 9]])",
+                                     R"([[1, null, 3], null, [null, 8, 9]])"},
+        VectorPrimitiveRoundTripCase{"Time32Milli", ::arrow::time32(::arrow::TimeUnit::MILLI), nullptr,
+                                     R"([[1, 2, 3], [4, 5, 6], [7, 8, 9]])",
+                                     R"([[1, 2, 3], null, [7, 8, 9]])",
+                                     R"([[1, null, 3], null, [null, 8, 9]])"},
+        VectorPrimitiveRoundTripCase{"Time64Micro", ::arrow::time64(::arrow::TimeUnit::MICRO), nullptr,
+                                     R"([[1, 2, 3], [4, 5, 6], [7, 8, 9]])",
+                                     R"([[1, 2, 3], null, [7, 8, 9]])",
+                                     R"([[1, null, 3], null, [null, 8, 9]])"},
+        VectorPrimitiveRoundTripCase{"TimestampMilli", ::arrow::timestamp(::arrow::TimeUnit::MILLI), nullptr,
+                                     R"([[1, 2, 3], [4, 5, 6], [7, 8, 9]])",
+                                     R"([[1, 2, 3], null, [7, 8, 9]])",
+                                     R"([[1, null, 3], null, [null, 8, 9]])"},
+        VectorPrimitiveRoundTripCase{"DurationMilli", ::arrow::duration(::arrow::TimeUnit::MILLI), ::arrow::int64(),
+                                     R"([[1, 2, 3], [4, 5, 6], [7, 8, 9]])",
+                                     R"([[1, 2, 3], null, [7, 8, 9]])",
+                                     R"([[1, null, 3], null, [null, 8, 9]])"},
+        VectorPrimitiveRoundTripCase{"FixedSizeBinary", ::arrow::fixed_size_binary(4), nullptr,
+                                     R"([["ab01", "cd02", "ef03"], ["gh04", "ij05", "kl06"], ["mn07", "op08", "qr09"]])",
+                                     R"([["ab01", "cd02", "ef03"], null, ["mn07", "op08", "qr09"]])",
+                                     R"([["ab01", null, "ef03"], null, [null, "op08", "qr09"]])"},
+        VectorPrimitiveRoundTripCase{"Decimal32", ::arrow::decimal32(6, 3), ::arrow::decimal128(6, 3),
+                                     R"([["1.234", "2.345", "3.456"], ["4.567", "5.678", "6.789"], ["7.890", "8.901", "9.012"]])",
+                                     R"([["1.234", "2.345", "3.456"], null, ["7.890", "8.901", "9.012"]])",
+                                     R"([["1.234", null, "3.456"], null, [null, "8.901", "9.012"]])"},
+        VectorPrimitiveRoundTripCase{"Decimal64", ::arrow::decimal64(16, 3), ::arrow::decimal128(16, 3),
+                                     R"([["1.234", "2.345", "3.456"], ["4.567", "5.678", "6.789"], ["7.890", "8.901", "9.012"]])",
+                                     R"([["1.234", "2.345", "3.456"], null, ["7.890", "8.901", "9.012"]])",
+                                     R"([["1.234", null, "3.456"], null, [null, "8.901", "9.012"]])"},
+        VectorPrimitiveRoundTripCase{"Decimal128", ::arrow::decimal128(20, 3), nullptr,
+                                     R"([["1.234", "2.345", "3.456"], ["4.567", "5.678", "6.789"], ["7.890", "8.901", "9.012"]])",
+                                     R"([["1.234", "2.345", "3.456"], null, ["7.890", "8.901", "9.012"]])",
+                                     R"([["1.234", null, "3.456"], null, [null, "8.901", "9.012"]])"},
+        VectorPrimitiveRoundTripCase{"Decimal256", ::arrow::decimal256(40, 3), nullptr,
+                                     R"([["1.234", "2.345", "3.456"], ["4.567", "5.678", "6.789"], ["7.890", "8.901", "9.012"]])",
+                                     R"([["1.234", "2.345", "3.456"], null, ["7.890", "8.901", "9.012"]])",
+                                     R"([["1.234", null, "3.456"], null, [null, "8.901", "9.012"]])"}),
+    [](const ::testing::TestParamInfo<VectorPrimitiveRoundTripCase>& info) {
+      return info.param.name;
+    });
+
 TEST(ArrowReadWrite, FixedSizeListVectorMixedColumnsRoundTripAcrossRowGroups) {
   auto vector_type =
       ::arrow::fixed_size_list(::arrow::field("item", ::arrow::int16(), true),
@@ -3687,18 +3860,46 @@ TEST(ArrowReadWrite, FixedSizeListVectorMixedColumnsRoundtripEqualsOriginal) {
   ::arrow::AssertTablesEqual(*table, *out, false);
 }
 
-std::shared_ptr<::arrow::DataType> VectorFixedSizeListStructType() {
+std::shared_ptr<::arrow::DataType> VectorFixedSizeListStructType(
+    bool element_nullable = false, bool field_nullable = false) {
   return ::arrow::fixed_size_list(
       ::arrow::field("item",
                      ::arrow::struct_({::arrow::field("x", ::arrow::float32(), false),
-                                       ::arrow::field("y", ::arrow::int32(), false)}),
-                     false),
+                                       ::arrow::field("y", ::arrow::int32(),
+                                                      field_nullable)}),
+                     element_nullable),
       /*size=*/2);
 }
 
 std::shared_ptr<Table> MakeVectorFixedSizeListStructTable(std::string_view json,
-                                                          bool nullable = true) {
-  auto type = VectorFixedSizeListStructType();
+                                                          bool nullable = true,
+                                                          bool element_nullable = false,
+                                                          bool field_nullable = false) {
+  auto type = VectorFixedSizeListStructType(element_nullable, field_nullable);
+  auto field = ::arrow::field("root", type, nullable);
+  auto array = ::arrow::ArrayFromJSON(type, std::string(json));
+  return ::arrow::Table::Make(::arrow::schema({field}), {array});
+}
+
+std::shared_ptr<::arrow::DataType> VectorFixedSizeListNestedStructType(
+    bool element_nullable = false) {
+  return ::arrow::fixed_size_list(
+      ::arrow::field(
+          "item",
+          ::arrow::struct_({::arrow::field(
+                               "point",
+                               ::arrow::struct_({::arrow::field("x", ::arrow::float32(), false),
+                                                 ::arrow::field("y", ::arrow::int32(),
+                                                                true)}),
+                               false),
+                           ::arrow::field("z", ::arrow::int16(), true)}),
+          element_nullable),
+      /*size=*/2);
+}
+
+std::shared_ptr<Table> MakeVectorFixedSizeListNestedStructTable(
+    std::string_view json, bool nullable = true, bool element_nullable = false) {
+  auto type = VectorFixedSizeListNestedStructType(element_nullable);
   auto field = ::arrow::field("root", type, nullable);
   auto array = ::arrow::ArrayFromJSON(type, std::string(json));
   return ::arrow::Table::Make(::arrow::schema({field}), {array});
@@ -3720,6 +3921,58 @@ TEST(ArrowReadWrite, FixedSizeListVectorStructNullableRoundTrip) {
       null,
       [{"x": 5.0, "y": 5}, {"x": 6.0, "y": 6}],
       null])");
+
+  ASSERT_NO_FATAL_FAILURE(CheckVectorFixedSizeListRoundtrip(table, /*row_group_size=*/2));
+}
+
+TEST(ArrowReadWrite, FixedSizeListVectorStructNullableFieldsRoundTrip) {
+  auto table = MakeVectorFixedSizeListStructTable(R"([
+      [{"x": 1.0, "y": 1}, {"x": 2.0, "y": null}],
+      null,
+      [{"x": 5.0, "y": null}, {"x": 6.0, "y": 6}]])",
+                                                  /*nullable=*/true,
+                                                  /*element_nullable=*/false,
+                                                  /*field_nullable=*/true);
+
+  ASSERT_NO_FATAL_FAILURE(CheckVectorFixedSizeListRoundtrip(table, /*row_group_size=*/2));
+}
+
+TEST(ArrowReadWrite, FixedSizeListVectorNullableStructElementsRoundTrip) {
+  auto table = MakeVectorFixedSizeListStructTable(R"([
+      [{"x": 1.0, "y": 1}, null],
+      null,
+      [null, {"x": 6.0, "y": null}],
+      [{"x": 7.0, "y": 7}, {"x": 8.0, "y": 8}]])",
+                                                  /*nullable=*/true,
+                                                  /*element_nullable=*/true,
+                                                  /*field_nullable=*/true);
+
+  ASSERT_NO_FATAL_FAILURE(CheckVectorFixedSizeListRoundtrip(table, /*row_group_size=*/2));
+}
+
+TEST(ArrowReadWrite, FixedSizeListVectorNestedStructRoundTrip) {
+  auto table = MakeVectorFixedSizeListNestedStructTable(R"([
+      [{"point": {"x": 1.0, "y": 1}, "z": 10},
+       {"point": {"x": 2.0, "y": null}, "z": null}],
+      [{"point": {"x": 3.0, "y": 3}, "z": 30},
+       {"point": {"x": 4.0, "y": 4}, "z": 40}],
+      [{"point": {"x": 5.0, "y": null}, "z": 50},
+       {"point": {"x": 6.0, "y": 6}, "z": 60}]])",
+                                                      /*nullable=*/false,
+                                                      /*element_nullable=*/false);
+
+  ASSERT_NO_FATAL_FAILURE(CheckVectorFixedSizeListRoundtrip(table, /*row_group_size=*/2));
+}
+
+TEST(ArrowReadWrite, FixedSizeListVectorNullableNestedStructElementsRoundTrip) {
+  auto table = MakeVectorFixedSizeListNestedStructTable(R"([
+      [{"point": {"x": 1.0, "y": 1}, "z": 10}, null],
+      null,
+      [null, {"point": {"x": 4.0, "y": 4}, "z": 40}],
+      [{"point": {"x": 5.0, "y": null}, "z": null},
+       {"point": {"x": 6.0, "y": 6}, "z": 60}]])",
+                                                      /*nullable=*/true,
+                                                      /*element_nullable=*/true);
 
   ASSERT_NO_FATAL_FAILURE(CheckVectorFixedSizeListRoundtrip(table, /*row_group_size=*/2));
 }
