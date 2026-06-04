@@ -1620,8 +1620,44 @@ void swap(GeographyType &a, GeographyType &b);
 
 std::ostream& operator<<(std::ostream& out, const GeographyType& obj);
 
+/**
+ * Fixed-size list logical type annotation
+ */
+class FixedSizeListType {
+ public:
+
+  FixedSizeListType(const FixedSizeListType&) noexcept;
+  FixedSizeListType(FixedSizeListType&&) noexcept;
+  FixedSizeListType& operator=(const FixedSizeListType&) noexcept;
+  FixedSizeListType& operator=(FixedSizeListType&&) noexcept;
+  FixedSizeListType() noexcept;
+
+  virtual ~FixedSizeListType() noexcept;
+  int32_t num_values;
+
+  void __set_num_values(const int32_t val);
+
+  bool operator == (const FixedSizeListType & rhs) const;
+  bool operator != (const FixedSizeListType &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const FixedSizeListType & ) const;
+
+  template <class Protocol_>
+  uint32_t read(Protocol_* iprot);
+  template <class Protocol_>
+  uint32_t write(Protocol_* oprot) const;
+
+  virtual void printTo(std::ostream& out) const;
+};
+
+void swap(FixedSizeListType &a, FixedSizeListType &b);
+
+std::ostream& operator<<(std::ostream& out, const FixedSizeListType& obj);
+
 typedef struct _LogicalType__isset {
-  _LogicalType__isset() : STRING(false), MAP(false), LIST(false), ENUM(false), DECIMAL(false), DATE(false), TIME(false), TIMESTAMP(false), INTEGER(false), UNKNOWN(false), JSON(false), BSON(false), UUID(false), FLOAT16(false), VARIANT(false), GEOMETRY(false), GEOGRAPHY(false) {}
+  _LogicalType__isset() : STRING(false), MAP(false), LIST(false), ENUM(false), DECIMAL(false), DATE(false), TIME(false), TIMESTAMP(false), INTEGER(false), UNKNOWN(false), JSON(false), BSON(false), UUID(false), FLOAT16(false), VARIANT(false), GEOMETRY(false), GEOGRAPHY(false), FIXED_SIZE_LIST(false) {}
   bool STRING :1;
   bool MAP :1;
   bool LIST :1;
@@ -1639,6 +1675,7 @@ typedef struct _LogicalType__isset {
   bool VARIANT :1;
   bool GEOMETRY :1;
   bool GEOGRAPHY :1;
+  bool FIXED_SIZE_LIST :1;
 } _LogicalType__isset;
 
 /**
@@ -1675,6 +1712,7 @@ class LogicalType {
   VariantType VARIANT;
   GeometryType GEOMETRY;
   GeographyType GEOGRAPHY;
+  FixedSizeListType FIXED_SIZE_LIST;
 
   _LogicalType__isset __isset;
 
@@ -1711,6 +1749,8 @@ class LogicalType {
   void __set_GEOMETRY(const GeometryType& val);
 
   void __set_GEOGRAPHY(const GeographyType& val);
+
+  void __set_FIXED_SIZE_LIST(const FixedSizeListType& val);
 
   bool operator == (const LogicalType & rhs) const;
   bool operator != (const LogicalType &rhs) const {

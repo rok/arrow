@@ -69,6 +69,7 @@ cdef extern from "parquet/api/schema.h" namespace "parquet" nogil:
         ParquetLogicalType_UUID" parquet::LogicalType::Type::UUID"
         ParquetLogicalType_GEOMETRY" parquet::LogicalType::Type::GEOMETRY"
         ParquetLogicalType_GEOGRAPHY" parquet::LogicalType::Type::GEOGRAPHY"
+        ParquetLogicalType_FIXED_SIZE_LIST" parquet::LogicalType::Type::FIXED_SIZE_LIST"
         ParquetLogicalType_NONE" parquet::LogicalType::Type::NONE"
 
     enum ParquetTimeUnit" parquet::LogicalType::TimeUnit::unit":

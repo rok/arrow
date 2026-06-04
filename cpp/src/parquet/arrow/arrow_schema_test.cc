@@ -748,6 +748,24 @@ TEST_F(TestConvertParquetSchema, ParquetLists) {
   }
 }
 
+TEST_F(TestConvertParquetSchema, ParquetFixedSizeList) {
+  std::vector<NodePtr> parquet_fields;
+  std::vector<std::shared_ptr<Field>> arrow_fields;
+
+  auto element = PrimitiveNode::Make("string", Repetition::OPTIONAL,
+                                     ParquetType::BYTE_ARRAY, ConvertedType::UTF8);
+  auto list = GroupNode::Make("list", Repetition::REPEATED, {element});
+  parquet_fields.push_back(GroupNode::Make("my_fixed_size_list", Repetition::OPTIONAL,
+                                           {list}, LogicalType::FixedSizeList(10)));
+
+  auto arrow_element = ::arrow::field("string", UTF8, true);
+  auto arrow_list = ::arrow::fixed_size_list(arrow_element, 10);
+  arrow_fields.push_back(::arrow::field("my_fixed_size_list", arrow_list, true));
+
+  ASSERT_OK(ConvertSchema(parquet_fields));
+  ASSERT_NO_FATAL_FAILURE(CheckFlatSchema(arrow_fields));
+}
+
 TEST_F(TestConvertParquetSchema, UnsupportedThings) {
   std::vector<NodePtr> unsupported_nodes;
 
@@ -1747,7 +1765,7 @@ TEST_F(TestConvertArrowSchema, ParquetOtherLists) {
     arrow_fields.push_back(::arrow::field("my_list", arrow_list, false));
   }
   // // FixedSizeList[10]<String> (list-like non-null, elements nullable)
-  // required group my_list (LIST) {
+  // required group my_list (FIXED_SIZE_LIST(10)) {
   //   repeated group list {
   //     optional binary element (UTF8);
   //   }
@@ -1756,8 +1774,8 @@ TEST_F(TestConvertArrowSchema, ParquetOtherLists) {
     auto element = PrimitiveNode::Make("element", Repetition::OPTIONAL,
                                        ParquetType::BYTE_ARRAY, ConvertedType::UTF8);
     auto list = GroupNode::Make("list", Repetition::REPEATED, {element});
-    parquet_fields.push_back(
-        GroupNode::Make("my_list", Repetition::REQUIRED, {list}, ConvertedType::LIST));
+    parquet_fields.push_back(GroupNode::Make("my_list", Repetition::REQUIRED, {list},
+                                             LogicalType::FixedSizeList(10)));
     auto arrow_element = ::arrow::field("string", UTF8, true);
     auto arrow_list = ::arrow::fixed_size_list(arrow_element, 10);
     arrow_fields.push_back(::arrow::field("my_list", arrow_list, false));

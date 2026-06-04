@@ -1582,6 +1582,8 @@ TEST(TestLogicalTypeOperation, LogicalTypeRepresentation) {
        R"({"Type": "Geography", "crs": "srid:1234", "algorithm": "karney"})"},
       {LogicalType::Variant(), "Variant(1)", R"({"Type": "Variant", "SpecVersion": 1})"},
       {LogicalType::Variant(2), "Variant(2)", R"({"Type": "Variant", "SpecVersion": 2})"},
+      {LogicalType::FixedSizeList(10), "FixedSizeList(10)",
+       R"({"Type": "FixedSizeList", "NumValues": 10})"},
       {LogicalType::None(), "None", R"({"Type": "None"})"},
   };
 
@@ -1635,6 +1637,7 @@ TEST(TestLogicalTypeOperation, LogicalTypeSortOrder) {
       {LogicalType::Geometry(), SortOrder::UNKNOWN},
       {LogicalType::Geography(), SortOrder::UNKNOWN},
       {LogicalType::Variant(), SortOrder::UNKNOWN},
+      {LogicalType::FixedSizeList(10), SortOrder::UNKNOWN},
       {LogicalType::None(), SortOrder::UNKNOWN}};
 
   for (const ExpectedSortOrder& c : cases) {
@@ -2354,7 +2357,38 @@ TEST(TestLogicalTypeSerialization, Roundtrips) {
   // Group nodes ...
   ConfirmGroupNodeRoundtrip("map", LogicalType::Map());
   ConfirmGroupNodeRoundtrip("list", LogicalType::List());
+  ConfirmGroupNodeRoundtrip("fixed_size_list", LogicalType::FixedSizeList(10));
   ConfirmGroupNodeRoundtrip("variant", LogicalType::Variant());
+}
+
+TEST(TestLogicalTypeSerialization, FixedSizeListNumValues) {
+  constexpr int32_t num_values = 10;
+  auto element = PrimitiveNode::Make("element", Repetition::REQUIRED, Type::INT32);
+  auto list = GroupNode::Make("list", Repetition::REPEATED, {element});
+  NodePtr fixed_size_list_node =
+      GroupNode::Make("fixed_size_list", Repetition::OPTIONAL, {list},
+                      LogicalType::FixedSizeList(num_values));
+
+  auto logical_type = fixed_size_list_node->logical_type();
+  ASSERT_TRUE(logical_type->is_fixed_size_list());
+  const auto& fixed_size_list_type =
+      checked_cast<const FixedSizeListLogicalType&>(*logical_type);
+  ASSERT_EQ(fixed_size_list_type.num_values(), num_values);
+  ASSERT_EQ(fixed_size_list_node->converted_type(), ConvertedType::LIST);
+
+  std::vector<format::SchemaElement> elements;
+  ToParquet(reinterpret_cast<GroupNode*>(fixed_size_list_node.get()), &elements);
+  ASSERT_TRUE(elements[0].__isset.logicalType);
+  ASSERT_TRUE(elements[0].logicalType.__isset.FIXED_SIZE_LIST);
+  ASSERT_EQ(elements[0].logicalType.FIXED_SIZE_LIST.num_values, num_values);
+  ASSERT_TRUE(elements[0].__isset.converted_type);
+  ASSERT_EQ(elements[0].converted_type, format::ConvertedType::LIST);
+
+  auto roundtripped = LogicalType::FromThrift(elements[0].logicalType);
+  ASSERT_TRUE(roundtripped->is_fixed_size_list());
+  const auto& roundtripped_fixed_size_list_type =
+      checked_cast<const FixedSizeListLogicalType&>(*roundtripped);
+  ASSERT_EQ(roundtripped_fixed_size_list_type.num_values(), num_values);
 }
 
 TEST(TestLogicalTypeSerialization, VariantSpecificationVersion) {

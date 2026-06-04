@@ -1464,6 +1464,7 @@ cdef logical_type_name_from_enum(ParquetLogicalTypeId type_):
         ParquetLogicalType_JSON: 'JSON',
         ParquetLogicalType_BSON: 'BSON',
         ParquetLogicalType_UUID: 'UUID',
+        ParquetLogicalType_FIXED_SIZE_LIST: 'FIXED_SIZE_LIST',
         ParquetLogicalType_NONE: 'NONE',
     }.get(type_, 'UNKNOWN')
 
