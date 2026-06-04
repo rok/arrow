@@ -545,6 +545,62 @@ class LeafReader : public ColumnReaderImpl {
 };
 
 // Column reader for extension arrays
+class FixedSizeListFLBAReader : public ColumnReaderImpl {
+ public:
+  FixedSizeListFLBAReader(std::shared_ptr<Field> field,
+                          std::unique_ptr<ColumnReaderImpl> storage_reader)
+      : field_(std::move(field)), storage_reader_(std::move(storage_reader)) {}
+
+  Status GetDefLevels(const int16_t** data, int64_t* length) override {
+    return storage_reader_->GetDefLevels(data, length);
+  }
+
+  Status GetRepLevels(const int16_t** data, int64_t* length) override {
+    return storage_reader_->GetRepLevels(data, length);
+  }
+
+  Status LoadBatch(int64_t number_of_records) final {
+    return storage_reader_->LoadBatch(number_of_records);
+  }
+
+  Status BuildArray(int64_t length_upper_bound,
+                    std::shared_ptr<ChunkedArray>* out) override {
+    std::shared_ptr<ChunkedArray> storage;
+    RETURN_NOT_OK(storage_reader_->BuildArray(length_upper_bound, &storage));
+
+    const auto& list_type =
+        checked_cast<const ::arrow::FixedSizeListType&>(*field_->type());
+    std::vector<std::shared_ptr<Array>> chunks;
+    chunks.reserve(storage->num_chunks());
+    for (const auto& storage_chunk : storage->chunks()) {
+      const auto& storage_data = *storage_chunk->data();
+      if (storage_data.offset != 0) {
+        return Status::NotImplemented(
+            "Reading sliced FIXED_SIZE_LIST FIXED_LEN_BYTE_ARRAY chunks is not "
+            "implemented");
+      }
+      const int64_t child_length = storage_data.length * list_type.list_size();
+      auto child_data = ::arrow::ArrayData::Make(
+          list_type.value_type(), child_length, {nullptr, storage_data.buffers[1]},
+          /*null_count=*/0);
+      auto data = ::arrow::ArrayData::Make(
+          field_->type(), storage_data.length, {storage_data.buffers[0]},
+          {std::move(child_data)}, storage_data.null_count);
+      chunks.push_back(::arrow::MakeArray(std::move(data)));
+    }
+    *out = std::make_shared<ChunkedArray>(std::move(chunks), field_->type());
+    return Status::OK();
+  }
+
+  bool IsOrHasRepeatedChild() const final { return false; }
+
+  const std::shared_ptr<Field> field() override { return field_; }
+
+ private:
+  std::shared_ptr<Field> field_;
+  std::unique_ptr<ColumnReaderImpl> storage_reader_;
+};
+
 class ExtensionReader : public ColumnReaderImpl {
  public:
   ExtensionReader(std::shared_ptr<Field> field,
@@ -884,8 +940,20 @@ Status GetReader(const SchemaField& field, const std::shared_ptr<Field>& arrow_f
     }
     std::unique_ptr<FileColumnIterator> input(
         ctx->iterator_factory(field.column_index, ctx->reader));
-    *out = std::make_unique<LeafReader>(ctx, arrow_field, std::move(input),
-                                        field.level_info);
+    if (arrow_field->type()->id() == ::arrow::Type::FIXED_SIZE_LIST) {
+      const auto& list_type =
+          checked_cast<const ::arrow::FixedSizeListType&>(*arrow_field->type());
+      const auto& value_type =
+          checked_cast<const ::arrow::FixedWidthType&>(*list_type.value_type());
+      auto storage_field = arrow_field->WithType(
+          ::arrow::fixed_size_binary(list_type.list_size() * value_type.bit_width() / 8));
+      *out = std::make_unique<FixedSizeListFLBAReader>(
+          arrow_field, std::make_unique<LeafReader>(ctx, storage_field, std::move(input),
+                                                    field.level_info));
+    } else {
+      *out = std::make_unique<LeafReader>(ctx, arrow_field, std::move(input),
+                                          field.level_info);
+    }
   } else if (type_id == ::arrow::Type::LIST || type_id == ::arrow::Type::MAP ||
              type_id == ::arrow::Type::FIXED_SIZE_LIST ||
              type_id == ::arrow::Type::LARGE_LIST) {

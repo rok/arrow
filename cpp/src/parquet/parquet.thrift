@@ -463,6 +463,18 @@ struct GeographyType {
 }
 
 /**
+ * Fixed-size list logical type annotation for FIXED_LEN_BYTE_ARRAY columns.
+ *
+ * The annotated value stores num_values fixed-width primitive elements packed
+ * contiguously. The SchemaElement type_length must equal num_values multiplied
+ * by the byte width of the element physical type.
+ */
+struct FixedSizeListType {
+  1: required Type type;
+  2: required i32 num_values;
+}
+
+/**
  * LogicalType annotations to replace ConvertedType.
  *
  * To maintain compatibility, implementations using LogicalType for a
@@ -495,6 +507,7 @@ union LogicalType {
   16: VariantType VARIANT     // no compatible ConvertedType
   17: GeometryType GEOMETRY   // no compatible ConvertedType
   18: GeographyType GEOGRAPHY // no compatible ConvertedType
+  19: FixedSizeListType FIXED_SIZE_LIST // no compatible ConvertedType
 }
 
 /**

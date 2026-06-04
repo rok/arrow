@@ -1625,6 +1625,86 @@ uint32_t GeographyType::write(Protocol_* oprot) const {
   return xfer;
 }
 
+
+template <class Protocol_>
+uint32_t FixedSizeListType::read(Protocol_* iprot) {
+
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
+
+  xfer += iprot->readStructBegin(fname);
+
+  using ::apache::thrift::protocol::TProtocolException;
+
+  bool isset_type = false;
+  bool isset_num_values = false;
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 1:
+        if (ftype == ::apache::thrift::protocol::T_I32) {
+          int32_t ecast_fixed_size_list_type;
+          xfer += iprot->readI32(ecast_fixed_size_list_type);
+          this->type = static_cast<Type::type>(ecast_fixed_size_list_type);
+          this->__isset.type = true;
+          isset_type = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 2:
+        if (ftype == ::apache::thrift::protocol::T_I32) {
+          xfer += iprot->readI32(this->num_values);
+          this->__isset.num_values = true;
+          isset_num_values = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
+    }
+    xfer += iprot->readFieldEnd();
+  }
+
+  xfer += iprot->readStructEnd();
+
+  if (!isset_type)
+    throw TProtocolException(TProtocolException::INVALID_DATA);
+  if (!isset_num_values)
+    throw TProtocolException(TProtocolException::INVALID_DATA);
+  return xfer;
+}
+
+template <class Protocol_>
+uint32_t FixedSizeListType::write(Protocol_* oprot) const {
+  uint32_t xfer = 0;
+  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("FixedSizeListType");
+
+  xfer += oprot->writeFieldBegin("type", ::apache::thrift::protocol::T_I32, 1);
+  xfer += oprot->writeI32(static_cast<int32_t>(this->type));
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("num_values", ::apache::thrift::protocol::T_I32, 2);
+  xfer += oprot->writeI32(this->num_values);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
+
 template <class Protocol_>
 uint32_t LogicalType::read(Protocol_* iprot) {
 
@@ -1783,6 +1863,14 @@ uint32_t LogicalType::read(Protocol_* iprot) {
           xfer += iprot->skip(ftype);
         }
         break;
+      case 19:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->FIXED_SIZE_LIST.read(iprot);
+          this->__isset.FIXED_SIZE_LIST = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
       default:
         xfer += iprot->skip(ftype);
         break;
@@ -1884,6 +1972,11 @@ uint32_t LogicalType::write(Protocol_* oprot) const {
   if (this->__isset.GEOGRAPHY) {
     xfer += oprot->writeFieldBegin("GEOGRAPHY", ::apache::thrift::protocol::T_STRUCT, 18);
     xfer += this->GEOGRAPHY.write(oprot);
+    xfer += oprot->writeFieldEnd();
+  }
+  if (this->__isset.FIXED_SIZE_LIST) {
+    xfer += oprot->writeFieldBegin("FIXED_SIZE_LIST", ::apache::thrift::protocol::T_STRUCT, 19);
+    xfer += this->FIXED_SIZE_LIST.write(oprot);
     xfer += oprot->writeFieldEnd();
   }
   xfer += oprot->writeFieldStop();
