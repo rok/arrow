@@ -603,7 +603,7 @@ class ListReader : public ColumnReaderImpl {
 
   bool IsOrHasRepeatedChild() const final { return true; }
 
-  Status LoadBatch(int64_t number_of_records) final {
+  Status LoadBatch(int64_t number_of_records) override {
     return item_reader_->LoadBatch(number_of_records);
   }
 
@@ -673,7 +673,7 @@ class ListReader : public ColumnReaderImpl {
 
   const std::shared_ptr<Field> field() override { return field_; }
 
- private:
+ protected:
   std::shared_ptr<ReaderContext> ctx_;
   std::shared_ptr<Field> field_;
   ::parquet::internal::LevelInfo level_info_;
@@ -684,9 +684,92 @@ class PARQUET_NO_EXPORT FixedSizeListReader : public ListReader<int32_t> {
  public:
   FixedSizeListReader(std::shared_ptr<ReaderContext> ctx, std::shared_ptr<Field> field,
                       ::parquet::internal::LevelInfo level_info,
-                      std::unique_ptr<ColumnReaderImpl> child_reader)
-      : ListReader(std::move(ctx), std::move(field), level_info,
-                   std::move(child_reader)) {}
+                      std::unique_ptr<ColumnReaderImpl> child_reader,
+                      bool use_fixed_size_list_fast_path)
+      : ListReader(std::move(ctx), std::move(field), level_info, std::move(child_reader)),
+        use_fixed_size_list_fast_path_(use_fixed_size_list_fast_path) {}
+
+  Status BuildArray(int64_t length_upper_bound,
+                    std::shared_ptr<ChunkedArray>* out) override {
+    DCHECK_EQ(field_->type()->id(), ::arrow::Type::FIXED_SIZE_LIST);
+    const auto& type = checked_cast<const ::arrow::FixedSizeListType&>(*field_->type());
+    const int32_t list_size = type.list_size();
+
+    // The fast path applies to dense fixed-size lists with the Parquet
+    // FIXED_SIZE_LIST annotation. Nullable elements and zero-length lists still
+    // use the regular LIST reconstruction path because they require interpreting
+    // inner definition levels or empty-list sentinels.
+    if (!use_fixed_size_list_fast_path_ || list_size == 0 ||
+        type.value_field()->nullable()) {
+      return ListReader<int32_t>::BuildArray(length_upper_bound, out);
+    }
+
+    const int16_t* def_levels = nullptr;
+    int64_t num_levels = 0;
+    RETURN_NOT_OK(item_reader_->GetDefLevels(&def_levels, &num_levels));
+
+    std::shared_ptr<ResizableBuffer> validity_buffer;
+    int64_t values_read = 0;
+    int64_t null_count = 0;
+    int64_t child_values = 0;
+
+    if (field_->nullable()) {
+      ARROW_ASSIGN_OR_RAISE(validity_buffer,
+                            AllocateResizableBuffer(
+                                bit_util::BytesForBits(length_upper_bound), ctx_->pool));
+      uint8_t* valid_bits = validity_buffer->mutable_data();
+
+      const int16_t null_list_def_level = level_info_.def_level - 1;
+      int64_t level_index = 0;
+      while (level_index < num_levels && values_read < length_upper_bound) {
+        if (def_levels[level_index] < null_list_def_level) {
+          bit_util::ClearBit(valid_bits, values_read);
+          ++null_count;
+          ++values_read;
+          ++level_index;
+        } else if (def_levels[level_index] < level_info_.def_level) {
+          return Status::Invalid(
+              "Encountered non-null FIXED_SIZE_LIST value with fewer than ", list_size,
+              " children");
+        } else {
+          bit_util::SetBit(valid_bits, values_read);
+          ++values_read;
+          child_values += list_size;
+          level_index += list_size;
+        }
+      }
+
+      if (level_index != num_levels) {
+        return Status::Invalid("FIXED_SIZE_LIST column ended in the middle of a list");
+      }
+      RETURN_NOT_OK(validity_buffer->Resize(bit_util::BytesForBits(values_read)));
+      validity_buffer->ZeroPadding();
+    } else {
+      values_read = std::min(length_upper_bound, num_levels / list_size);
+      child_values = values_read * list_size;
+      if (num_levels % list_size != 0) {
+        return Status::Invalid("FIXED_SIZE_LIST column ended in the middle of a list");
+      }
+    }
+
+    RETURN_NOT_OK(item_reader_->BuildArray(child_values, out));
+    ARROW_ASSIGN_OR_RAISE(std::shared_ptr<ArrayData> item_chunk, ChunksToSingle(**out));
+    if (item_chunk->length != child_values) {
+      return Status::Invalid("Expected ", child_values,
+                             " child values for FIXED_SIZE_LIST but got ",
+                             item_chunk->length);
+    }
+
+    std::vector<std::shared_ptr<Buffer>> buffers{null_count > 0 ? validity_buffer
+                                                                : nullptr};
+    auto data = std::make_shared<ArrayData>(
+        field_->type(), /*length=*/values_read, std::move(buffers),
+        std::vector<std::shared_ptr<ArrayData>>{std::move(item_chunk)}, null_count);
+    std::shared_ptr<Array> result = ::arrow::MakeArray(data);
+    *out = std::make_shared<ChunkedArray>(result);
+    return Status::OK();
+  }
+
   ::arrow::Result<std::shared_ptr<ChunkedArray>> AssembleArray(
       std::shared_ptr<ArrayData> data) final {
     DCHECK_EQ(data->buffers.size(), 2);
@@ -704,6 +787,9 @@ class PARQUET_NO_EXPORT FixedSizeListReader : public ListReader<int32_t> {
     std::shared_ptr<Array> result = ::arrow::MakeArray(data);
     return std::make_shared<ChunkedArray>(result);
   }
+
+ private:
+  bool use_fixed_size_list_fast_path_;
 };
 
 class PARQUET_NO_EXPORT StructReader : public ColumnReaderImpl {
@@ -951,7 +1037,8 @@ Status GetReader(const SchemaField& field, const std::shared_ptr<Field>& arrow_f
       }
 
       *out = std::make_unique<FixedSizeListReader>(ctx, list_field, field.level_info,
-                                                   std::move(child_reader));
+                                                   std::move(child_reader),
+                                                   field.is_fixed_size_list);
     } else {
       return Status::UnknownError("Unknown list type: ", field.field->ToString());
     }

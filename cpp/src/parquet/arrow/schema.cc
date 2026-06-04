@@ -107,7 +107,8 @@ Status ListToNode(const std::shared_ptr<::arrow::BaseListType>& type,
 
   NodePtr list = GroupNode::Make("list", Repetition::REPEATED, {element});
   std::shared_ptr<const LogicalType> logical_type = LogicalType::List();
-  if (type->id() == ::arrow::Type::FIXED_SIZE_LIST) {
+  if (type->id() == ::arrow::Type::FIXED_SIZE_LIST &&
+      arrow_properties.write_fixed_size_list_logical_type()) {
     const auto& fixed_size_list_type =
         checked_cast<const ::arrow::FixedSizeListType&>(*type);
     logical_type = LogicalType::FixedSizeList(fixed_size_list_type.list_size());
@@ -849,6 +850,7 @@ Status ListToSchemaField(const GroupNode& group, LevelInfo current_levels,
   }
   out->field = ::arrow::field(group.name(), std::move(list_type), group.is_optional(),
                               FieldIdMetadata(group.field_id()));
+  out->is_fixed_size_list = group.logical_type()->is_fixed_size_list();
   out->level_info = current_levels;
   // At this point current levels contains the def level for this list,
   // we need to reset to the prior parent.
