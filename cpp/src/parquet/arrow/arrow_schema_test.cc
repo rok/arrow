@@ -763,7 +763,7 @@ TEST_F(TestConvertParquetSchema, ParquetFixedSizeList) {
   arrow_fields.push_back(::arrow::field("my_fixed_size_list", arrow_list, true));
 
   ASSERT_OK(ConvertSchema(parquet_fields));
-  ASSERT_NO_FATAL_FAILURE(CheckFlatSchema(arrow_fields));
+  ASSERT_NO_FATAL_FAILURE(CheckFlatSchema(::arrow::schema(arrow_fields)));
 }
 
 TEST_F(TestConvertParquetSchema, UnsupportedThings) {
