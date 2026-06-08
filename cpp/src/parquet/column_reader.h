@@ -293,6 +293,20 @@ class PARQUET_EXPORT RecordReader {
   /// \brief Pre-allocate space for data. Results in better flat read performance
   virtual void Reserve(int64_t num_values) = 0;
 
+  /// \brief Set a multiplier used to size repeated-field level batches.
+  ///
+  /// Dense fixed-size repeated fields may contain many physical values per
+  /// logical record.  Hinting this ratio avoids repeatedly decoding tiny level
+  /// batches when reading such columns.
+  virtual void SetReadBatchSizeMultiplier(int64_t multiplier) = 0;
+
+  /// \brief Read dense fixed-size-list records without materializing levels.
+  ///
+  /// This is only valid when the caller has established that every logical
+  /// record contains exactly list_size non-null physical values.
+  virtual int64_t ReadDenseFixedSizeListRecords(int64_t num_records,
+                                                int64_t list_size) = 0;
+
   /// \brief Clear consumed values and repetition/definition levels as the
   /// result of calling ReadRecords
   /// For FLBA and ByteArray types, call GetBuilderChunks() to reset them.
@@ -430,6 +444,8 @@ class PARQUET_EXPORT RecordReader {
   // If read_dense_for_nullable_ is true, the BinaryRecordReader/DictionaryRecordReader
   // might still populate the validity bitmap buffer.
   bool read_dense_for_nullable_ = false;
+
+  int64_t read_batch_size_multiplier_ = 1;
 };
 
 class BinaryRecordReader : virtual public RecordReader {

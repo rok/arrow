@@ -22,6 +22,7 @@
 #include <cstring>
 #include <exception>
 #include <iostream>
+#include <limits>
 #include <memory>
 #include <string>
 #include <type_traits>
@@ -1281,6 +1282,15 @@ class TypedRecordReader : public TypedColumnReaderImpl<DType>,
     }
 
     int64_t level_batch_size = std::max<int64_t>(kMinLevelBatchSize, num_records);
+    if (this->max_rep_level_ > 0 && read_batch_size_multiplier_ > 1) {
+      const int64_t max_safe_records =
+          std::numeric_limits<int64_t>::max() / read_batch_size_multiplier_;
+      if (num_records <= max_safe_records) {
+        level_batch_size =
+            std::max<int64_t>(level_batch_size,
+                              num_records * read_batch_size_multiplier_);
+      }
+    }
 
     // If we are in the middle of a record, we continue until reaching the
     // desired number of records or the end of the current record if we've found
@@ -1644,6 +1654,44 @@ class TypedRecordReader : public TypedColumnReaderImpl<DType>,
   void Reserve(int64_t capacity) override {
     ReserveLevels(capacity);
     ReserveValues(capacity);
+  }
+
+  void SetReadBatchSizeMultiplier(int64_t multiplier) override {
+    read_batch_size_multiplier_ = std::max<int64_t>(1, multiplier);
+  }
+
+  int64_t ReadDenseFixedSizeListRecords(int64_t num_records,
+                                        int64_t list_size) override {
+    if (num_records == 0) return 0;
+    if (list_size <= 0) {
+      throw ParquetException("Invalid fixed-size-list size");
+    }
+    const int64_t max_safe_records = std::numeric_limits<int64_t>::max() / list_size;
+    if (num_records > max_safe_records) {
+      throw ParquetException("Total size of fixed-size-list values too large");
+    }
+
+    int64_t values_remaining = num_records * list_size;
+    int64_t values_read_total = 0;
+    ReserveValues(values_remaining);
+
+    while (values_remaining > 0) {
+      if (!this->HasNextInternal()) {
+        break;
+      }
+      const int64_t batch_size =
+          std::min<int64_t>(values_remaining, this->available_values_current_page());
+      if (batch_size == 0) {
+        break;
+      }
+      ReadValuesDense(batch_size);
+      values_written_ += batch_size;
+      this->ConsumeBufferedValues(batch_size);
+      values_remaining -= batch_size;
+      values_read_total += batch_size;
+    }
+
+    return values_read_total / list_size;
   }
 
   int64_t UpdateCapacity(int64_t capacity, int64_t size, int64_t extra_size) {

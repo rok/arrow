@@ -19,6 +19,7 @@
 
 #include <algorithm>
 #include <cstring>
+#include <limits>
 #include <memory>
 #include <random>
 #include <unordered_set>
@@ -122,6 +123,16 @@ class ColumnReaderImpl : public ColumnReader {
   }
 
   virtual ::arrow::Status LoadBatch(int64_t num_records) = 0;
+
+  virtual ::arrow::Status LoadBatchWithValueHint(int64_t num_records,
+                                                 int64_t values_per_record) {
+    return LoadBatch(num_records);
+  }
+
+  virtual ::arrow::Status LoadDenseFixedSizeListBatch(int64_t num_records,
+                                                      int64_t list_size) {
+    return LoadBatchWithValueHint(num_records, list_size);
+  }
 
   virtual ::arrow::Status BuildArray(int64_t length_upper_bound,
                                      std::shared_ptr<::arrow::ChunkedArray>* out) = 0;
@@ -488,11 +499,28 @@ class LeafReader : public ColumnReaderImpl {
   bool IsOrHasRepeatedChild() const final { return false; }
 
   Status LoadBatch(int64_t records_to_read) final {
+    return LoadBatchWithValueHint(records_to_read, /*values_per_record=*/1);
+  }
+
+  Status LoadBatchWithValueHint(int64_t records_to_read,
+                                int64_t values_per_record) final {
     BEGIN_PARQUET_CATCH_EXCEPTIONS
     out_ = nullptr;
     record_reader_->Reset();
-    // Pre-allocation gives much better performance for flat columns
-    record_reader_->Reserve(records_to_read);
+    record_reader_->SetReadBatchSizeMultiplier(values_per_record);
+
+    int64_t values_to_reserve = records_to_read;
+    if (values_per_record > 1) {
+      const int64_t max_safe_records =
+          std::numeric_limits<int64_t>::max() / values_per_record;
+      if (records_to_read <= max_safe_records) {
+        values_to_reserve = records_to_read * values_per_record;
+      }
+    }
+    // Pre-allocation gives much better performance for flat columns and dense
+    // fixed-size repeated columns.
+    record_reader_->Reserve(values_to_reserve);
+
     const bool should_load_statistics = ctx_->reader_properties->should_load_statistics();
     int64_t num_target_row_groups = 0;
     while (records_to_read > 0) {
@@ -509,6 +537,37 @@ class LeafReader : public ColumnReaderImpl {
         // because statistics are associated with a row group. If we
         // want to mix multiple row groups and keep valid statistics,
         // we need to implement a statistics merge logic.
+        if (should_load_statistics) {
+          break;
+        }
+      }
+    }
+    RETURN_NOT_OK(TransferColumnData(
+        record_reader_.get(),
+        num_target_row_groups == 1 ? input_->column_chunk_metadata() : nullptr, field_,
+        descr_, ctx_.get(), &out_));
+    return Status::OK();
+    END_PARQUET_CATCH_EXCEPTIONS
+  }
+
+  Status LoadDenseFixedSizeListBatch(int64_t records_to_read,
+                                     int64_t list_size) final {
+    BEGIN_PARQUET_CATCH_EXCEPTIONS
+    out_ = nullptr;
+    record_reader_->Reset();
+    const bool should_load_statistics = ctx_->reader_properties->should_load_statistics();
+    int64_t num_target_row_groups = 0;
+    while (records_to_read > 0) {
+      if (!record_reader_->HasMoreData()) {
+        break;
+      }
+      int64_t records_read =
+          record_reader_->ReadDenseFixedSizeListRecords(records_to_read, list_size);
+      records_to_read -= records_read;
+      if (records_read == 0) {
+        NextRowGroup();
+      } else {
+        num_target_row_groups++;
         if (should_load_statistics) {
           break;
         }
@@ -689,6 +748,22 @@ class PARQUET_NO_EXPORT FixedSizeListReader : public ListReader<int32_t> {
       : ListReader(std::move(ctx), std::move(field), level_info, std::move(child_reader)),
         use_fixed_size_list_fast_path_(use_fixed_size_list_fast_path) {}
 
+  Status LoadBatch(int64_t number_of_records) override {
+    DCHECK_EQ(field_->type()->id(), ::arrow::Type::FIXED_SIZE_LIST);
+    const auto& type = checked_cast<const ::arrow::FixedSizeListType&>(*field_->type());
+    const int32_t list_size = type.list_size();
+
+    if (!use_fixed_size_list_fast_path_ || list_size <= 0 ||
+        type.value_field()->nullable()) {
+      return ListReader<int32_t>::LoadBatch(number_of_records);
+    }
+
+    if (!field_->nullable()) {
+      return item_reader_->LoadDenseFixedSizeListBatch(number_of_records, list_size);
+    }
+    return item_reader_->LoadBatchWithValueHint(number_of_records, list_size);
+  }
+
   Status BuildArray(int64_t length_upper_bound,
                     std::shared_ptr<ChunkedArray>* out) override {
     DCHECK_EQ(field_->type()->id(), ::arrow::Type::FIXED_SIZE_LIST);
@@ -702,6 +777,26 @@ class PARQUET_NO_EXPORT FixedSizeListReader : public ListReader<int32_t> {
     if (!use_fixed_size_list_fast_path_ || list_size == 0 ||
         type.value_field()->nullable()) {
       return ListReader<int32_t>::BuildArray(length_upper_bound, out);
+    }
+
+    if (!field_->nullable()) {
+      RETURN_NOT_OK(item_reader_->BuildArray(length_upper_bound * list_size, out));
+      ARROW_ASSIGN_OR_RAISE(std::shared_ptr<ArrayData> item_chunk, ChunksToSingle(**out));
+      if (item_chunk->length % list_size != 0) {
+        return Status::Invalid("FIXED_SIZE_LIST column ended in the middle of a list");
+      }
+      const int64_t values_read = item_chunk->length / list_size;
+      if (values_read > length_upper_bound) {
+        return Status::Invalid("Read more FIXED_SIZE_LIST values than requested");
+      }
+      std::vector<std::shared_ptr<Buffer>> buffers{nullptr};
+      auto data = std::make_shared<ArrayData>(
+          field_->type(), /*length=*/values_read, std::move(buffers),
+          std::vector<std::shared_ptr<ArrayData>>{std::move(item_chunk)},
+          /*null_count=*/0);
+      std::shared_ptr<Array> result = ::arrow::MakeArray(data);
+      *out = std::make_shared<ChunkedArray>(result);
+      return Status::OK();
     }
 
     const int16_t* def_levels = nullptr;
@@ -744,12 +839,6 @@ class PARQUET_NO_EXPORT FixedSizeListReader : public ListReader<int32_t> {
       }
       RETURN_NOT_OK(validity_buffer->Resize(bit_util::BytesForBits(values_read)));
       validity_buffer->ZeroPadding();
-    } else {
-      values_read = std::min(length_upper_bound, num_levels / list_size);
-      child_values = values_read * list_size;
-      if (num_levels % list_size != 0) {
-        return Status::Invalid("FIXED_SIZE_LIST column ended in the middle of a list");
-      }
     }
 
     RETURN_NOT_OK(item_reader_->BuildArray(child_values, out));
