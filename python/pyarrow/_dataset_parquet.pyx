@@ -678,6 +678,8 @@ cdef class ParquetFileWriteOptions(FileWriteOptions):
             use_compliant_nested_type=(
                 self._properties["use_compliant_nested_type"]
             ),
+            store_schema=True,
+            write_time_adjusted_to_utc=False,
             write_fixed_size_list_logical_type=(
                 self._properties["write_fixed_size_list_logical_type"]
             )
