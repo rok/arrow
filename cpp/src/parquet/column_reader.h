@@ -307,6 +307,15 @@ class PARQUET_EXPORT RecordReader {
   virtual int64_t ReadDenseFixedSizeListRecords(int64_t num_records,
                                                 int64_t list_size) = 0;
 
+  /// \brief Enable/disable the nullable FIXED_SIZE_LIST repetition-level-skip
+  /// path for subsequent ReadRecords calls.
+  ///
+  /// When enabled with list_size > 0, repeated records are delimited from
+  /// definition levels and the fixed multiplicity instead of decoded repetition
+  /// levels. This is only valid for dense fixed-size lists where the caller does
+  /// not need to read child repetition levels back.
+  virtual void SetFixedSizeListRepSkipLength(int64_t list_size) = 0;
+
   /// \brief Clear consumed values and repetition/definition levels as the
   /// result of calling ReadRecords
   /// For FLBA and ByteArray types, call GetBuilderChunks() to reset them.
@@ -446,6 +455,13 @@ class PARQUET_EXPORT RecordReader {
   bool read_dense_for_nullable_ = false;
 
   int64_t read_batch_size_multiplier_ = 1;
+
+  // When > 0, ReadRecords delimits FIXED_SIZE_LIST records from definition
+  // levels + this fixed multiplicity and skips repetition-level decoding.
+  int64_t fixed_size_list_rep_skip_length_ = 0;
+  // Remaining child entries of a present FIXED_SIZE_LIST record split across
+  // level batches/pages.
+  int64_t fixed_size_list_levels_remaining_ = 0;
 };
 
 class BinaryRecordReader : virtual public RecordReader {

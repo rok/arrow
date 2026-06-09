@@ -134,6 +134,14 @@ class ColumnReaderImpl : public ColumnReader {
     return LoadBatchWithValueHint(num_records, list_size);
   }
 
+  // Load a nullable dense FIXED_SIZE_LIST. Definition levels are still needed to
+  // locate null rows, but repetition levels are redundant for top-level fixed
+  // multiplicity, so leaf readers may skip decoding them.
+  virtual ::arrow::Status LoadNullableFixedSizeListBatch(int64_t num_records,
+                                                         int64_t list_size) {
+    return LoadBatchWithValueHint(num_records, list_size);
+  }
+
   virtual ::arrow::Status BuildArray(int64_t length_upper_bound,
                                      std::shared_ptr<::arrow::ChunkedArray>* out) = 0;
   virtual bool IsOrHasRepeatedChild() const = 0;
@@ -550,6 +558,14 @@ class LeafReader : public ColumnReaderImpl {
     END_PARQUET_CATCH_EXCEPTIONS
   }
 
+  Status LoadNullableFixedSizeListBatch(int64_t records_to_read,
+                                        int64_t list_size) final {
+    record_reader_->SetFixedSizeListRepSkipLength(list_size);
+    Status status = LoadBatchWithValueHint(records_to_read, list_size);
+    record_reader_->SetFixedSizeListRepSkipLength(0);
+    return status;
+  }
+
   Status LoadDenseFixedSizeListBatch(int64_t records_to_read,
                                      int64_t list_size) final {
     BEGIN_PARQUET_CATCH_EXCEPTIONS
@@ -761,7 +777,7 @@ class PARQUET_NO_EXPORT FixedSizeListReader : public ListReader<int32_t> {
     if (!field_->nullable()) {
       return item_reader_->LoadDenseFixedSizeListBatch(number_of_records, list_size);
     }
-    return item_reader_->LoadBatchWithValueHint(number_of_records, list_size);
+    return item_reader_->LoadNullableFixedSizeListBatch(number_of_records, list_size);
   }
 
   Status BuildArray(int64_t length_upper_bound,

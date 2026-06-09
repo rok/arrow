@@ -1328,7 +1328,7 @@ class TypedRecordReader : public TypedColumnReaderImpl<DType>,
                                 batch_size)) {
           throw ParquetException(kErrorRepDefLevelNotMatchesNumValues);
         }
-        if (this->max_rep_level_ > 0) {
+        if (this->max_rep_level_ > 0 && fixed_size_list_rep_skip_length_ <= 0) {
           int64_t rep_levels_read = this->ReadRepetitionLevels(batch_size, rep_levels);
           if (ARROW_PREDICT_FALSE(rep_levels_read != batch_size)) {
             throw ParquetException(kErrorRepDefLevelNotMatchesNumValues);
@@ -1660,6 +1660,11 @@ class TypedRecordReader : public TypedColumnReaderImpl<DType>,
     read_batch_size_multiplier_ = std::max<int64_t>(1, multiplier);
   }
 
+  void SetFixedSizeListRepSkipLength(int64_t list_size) override {
+    fixed_size_list_rep_skip_length_ = std::max<int64_t>(0, list_size);
+    fixed_size_list_levels_remaining_ = 0;
+  }
+
   int64_t ReadDenseFixedSizeListRecords(int64_t num_records,
                                         int64_t list_size) override {
     if (num_records == 0) return 0;
@@ -1771,6 +1776,7 @@ class TypedRecordReader : public TypedColumnReaderImpl<DType>,
 
   void SetPageReader(std::unique_ptr<PageReader> reader) override {
     at_record_start_ = true;
+    fixed_size_list_levels_remaining_ = 0;
     this->pager_ = std::move(reader);
     ResetDecoders();
   }
@@ -1810,7 +1816,10 @@ class TypedRecordReader : public TypedColumnReaderImpl<DType>,
     // nullable. Even if they are required, we may have to read ahead and
     // delimit the records to get the right number of values and they will
     // have associated levels.
-    int64_t records_read = DelimitRecords(num_records, values_to_read);
+    int64_t records_read =
+        fixed_size_list_rep_skip_length_ > 0
+            ? DelimitFixedSizeListRecords(num_records, values_to_read)
+            : DelimitRecords(num_records, values_to_read);
     if (!nullable_values() || read_dense_for_nullable_) {
       ReadValuesDense(*values_to_read);
       // null_count is always 0 for required.
@@ -1818,6 +1827,61 @@ class TypedRecordReader : public TypedColumnReaderImpl<DType>,
     } else {
       ReadSpacedForOptionalOrRepeated(start_levels_position, values_to_read, null_count);
     }
+    return records_read;
+  }
+
+  // Delimit records of an annotated dense FIXED_SIZE_LIST column from
+  // definition levels + fixed multiplicity, without consulting repetition
+  // levels. For valid annotated data this yields the same records_read,
+  // values_seen, and levels_position_ as DelimitRecords:
+  //   - a present parent row has exactly `list_size` max-def-level entries;
+  //   - a null parent row is represented by a single sub-max-def-level entry.
+  // fixed_size_list_levels_remaining_ carries an unfinished present record
+  // across level batches/pages, mirroring at_record_start_ in the
+  // repetition-level path.
+  int64_t DelimitFixedSizeListRecords(int64_t num_records, int64_t* values_seen) {
+    const int16_t* const def_levels = this->def_levels();
+    const int16_t max_def_level = this->max_def_level_;
+    const int64_t list_size = fixed_size_list_rep_skip_length_;
+    ARROW_DCHECK_GT(list_size, 0);
+    int64_t records_read = 0;
+    int64_t values = 0;
+
+    if (!at_record_start_) {
+      const int64_t take = std::min<int64_t>(fixed_size_list_levels_remaining_,
+                                             levels_written_ - levels_position_);
+      levels_position_ += take;
+      values += take;
+      fixed_size_list_levels_remaining_ -= take;
+      if (fixed_size_list_levels_remaining_ > 0) {
+        *values_seen = values;
+        return records_read;
+      }
+      at_record_start_ = true;
+      ++records_read;
+    }
+
+    while (levels_position_ < levels_written_ && records_read < num_records) {
+      if (def_levels[levels_position_] == max_def_level) {
+        const int64_t available = levels_written_ - levels_position_;
+        if (available >= list_size) {
+          levels_position_ += list_size;
+          values += list_size;
+          ++records_read;
+        } else {
+          levels_position_ += available;
+          values += available;
+          fixed_size_list_levels_remaining_ = list_size - available;
+          at_record_start_ = false;
+          break;
+        }
+      } else {
+        ++levels_position_;
+        ++records_read;
+      }
+    }
+
+    *values_seen = values;
     return records_read;
   }
 
