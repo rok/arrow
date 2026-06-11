@@ -112,7 +112,13 @@ class LogicalType;
 
 // Mirrors parquet::FieldRepetitionType
 struct Repetition {
-  enum type { REQUIRED = 0, OPTIONAL = 1, REPEATED = 2, /*Always last*/ UNDEFINED = 3 };
+  enum type {
+    REQUIRED = 0,
+    OPTIONAL = 1,
+    REPEATED = 2,
+    VECTOR = 3,
+    /*Always last*/ UNDEFINED = 4
+  };
 };
 
 // Reference:
@@ -162,6 +168,7 @@ class PARQUET_EXPORT LogicalType {
       GEOMETRY,
       GEOGRAPHY,
       VARIANT,
+      VECTOR,
       NONE  // Not a real logical type; should always be last element
     };
   };
@@ -231,6 +238,10 @@ class PARQUET_EXPORT LogicalType {
   static std::shared_ptr<const LogicalType> Variant(
       int8_t specVersion = kVariantSpecVersion);
 
+  /// \brief Create an experimental Vector logical type, annotating a group
+  /// node whose single child has VECTOR repetition.
+  static std::shared_ptr<const LogicalType> Vector();
+
   static std::shared_ptr<const LogicalType> Geometry(std::string crs = "");
 
   static std::shared_ptr<const LogicalType> Geography(
@@ -293,6 +304,7 @@ class PARQUET_EXPORT LogicalType {
   bool is_geometry() const;
   bool is_geography() const;
   bool is_variant() const;
+  bool is_vector() const;
   bool is_none() const;
   /// \brief Return true if this logical type is of a known type.
   bool is_valid() const;
@@ -340,6 +352,16 @@ class PARQUET_EXPORT ListLogicalType : public LogicalType {
 
  private:
   ListLogicalType() = default;
+};
+
+/// \brief Allowed for group nodes only. EXPERIMENTAL: annotates a group whose
+/// single child has VECTOR repetition.
+class PARQUET_EXPORT VectorLogicalType : public LogicalType {
+ public:
+  static std::shared_ptr<const LogicalType> Make();
+
+ private:
+  VectorLogicalType() = default;
 };
 
 /// \brief Allowed for physical type BYTE_ARRAY, must be encoded as UTF-8.

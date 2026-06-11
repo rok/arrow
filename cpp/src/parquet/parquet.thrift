@@ -190,6 +190,63 @@ enum FieldRepetitionType {
 
   /** The field is repeated and can contain 0 or more values */
   REPEATED = 2;
+
+  // EXPERIMENTAL VECTOR layout rules (kept out of the doc comment so they are
+  // not copied into generated code):
+  //
+  // A VECTOR field repeats exactly vector_length times for every parent value
+  // and, unlike REPEATED, does not increase the maximum definition or
+  // repetition level of its descendants: readers reconstruct vector values
+  // from the fixed multiplicity declared in the schema instead of decoding
+  // repetition levels.
+  //
+  // Vector fields MUST use the following 3-level structure, mirroring LIST:
+  //
+  //   <required|optional> group <name> (VECTOR) {
+  //     vector group list [vector_length] {
+  //       <required|optional> <element-type> element;
+  //     }
+  //   }
+  //
+  // - The outer group MUST be REQUIRED or OPTIONAL and carries the
+  //   nullability of the vector value itself.  It MUST be annotated with the
+  //   VECTOR logical type and MUST have exactly one child: the
+  //   VECTOR-repeated group.
+  // - The VECTOR-repeated middle group carries vector_length and MUST have
+  //   exactly one child: the element field.
+  // - The element field MUST be REQUIRED or OPTIONAL and MAY be a primitive
+  //   type, a group of fields (a struct), or another vector group in the same
+  //   form.  For nested vectors a leaf stores the product of the
+  //   vector_length values of its VECTOR ancestors physical values per parent
+  //   record.
+  //
+  // Data layout rules:
+  // - Writers MUST emit exactly vector_length child slots for every parent
+  //   record in which the vector value is present or null; null vector values
+  //   emit vector_length slots carrying the definition level of the null
+  //   vector.  Ancestors that make the vector value absent altogether (for
+  //   example an empty or null list) contribute a single level entry with
+  //   their usual definition level and no slots.  Column chunk num_values and
+  //   null counts therefore include the padding slots of null vector values.
+  // - Every slot of an existing vector occupies one position in both level
+  //   streams.  The repetition level of the first slot encodes record
+  //   structure as usual; the repetition levels of the remaining
+  //   vector_length - 1 slots MUST be written as the column's maximum
+  //   repetition level and MUST be ignored by readers.  Stream consumption is
+  //   definition-driven: after reading a position whose definition level
+  //   indicates an existing vector, a reader consumes that position and the
+  //   following vector_length - 1 positions as one vector value.
+  // - Writers MUST NOT split the slots of one vector value across data pages;
+  //   pages begin and end on whole-vector boundaries.
+  // - vector_length MUST be positive: a zero-length vector value would
+  //   contribute no slots at all, leaving row counts and row nullability
+  //   unrepresentable in this layout.  Writers MUST represent zero-length
+  //   fixed-size lists with the LIST encoding instead.
+  //
+  // Readers that do not understand VECTOR are expected to reject the file.
+
+  // EXPERIMENTAL: fixed-size repetition.
+  VECTOR = 3;
 }
 
 /**
@@ -469,6 +526,17 @@ struct GeographyType {
   2: optional EdgeInterpolationAlgorithm algorithm;
 }
 
+// The VECTOR annotation marks the outer group of a fixed-size vector field;
+// see FieldRepetitionType.VECTOR for the full structure and data layout
+// rules.  The annotated group MUST be REQUIRED or OPTIONAL and MUST have
+// exactly one child: a VECTOR-repeated group whose
+// SchemaElement.vector_length carries the fixed multiplicity.  The annotation
+// is required so that readers can distinguish a vector field from a
+// struct-like group that happens to contain a VECTOR-repeated child.
+
+// EXPERIMENTAL: Embedded Vector logical type annotation.
+struct VectorType {}  // allowed for group nodes only
+
 /**
  * LogicalType annotations to replace ConvertedType.
  *
@@ -502,6 +570,7 @@ union LogicalType {
   16: VariantType VARIANT     // no compatible ConvertedType
   17: GeometryType GEOMETRY   // no compatible ConvertedType
   18: GeographyType GEOGRAPHY // no compatible ConvertedType
+  19: VectorType VECTOR       // no compatible ConvertedType
 }
 
 /**
@@ -564,6 +633,16 @@ struct SchemaElement {
    * for some logical types to ensure forward-compatibility in format v1.
    */
   10: optional LogicalType logicalType
+
+  // vector_length MUST be set, and positive, when repetition_type is VECTOR
+  // and MUST NOT be set otherwise.  Zero-length vectors are not representable
+  // as VECTOR and use the LIST encoding (see FieldRepetitionType.VECTOR).
+  // For nested VECTOR fields the number of physical leaf values per parent
+  // record is the product of vector_length over the leaf's VECTOR ancestors.
+
+  // EXPERIMENTAL: The fixed number of times the field repeats per parent
+  // value when repetition_type is VECTOR.
+  12: optional i32 vector_length;
 }
 
 /**
