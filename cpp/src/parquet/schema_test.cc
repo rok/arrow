@@ -43,7 +43,8 @@ namespace schema {
 
 static inline SchemaElement NewPrimitive(const std::string& name,
                                          FieldRepetitionType::type repetition,
-                                         Type::type type, int field_id = -1) {
+                                         Type::type type, int field_id = -1,
+                                         int32_t vector_length = -1) {
   SchemaElement result;
   result.__set_name(name);
   result.__set_repetition_type(repetition);
@@ -51,12 +52,16 @@ static inline SchemaElement NewPrimitive(const std::string& name,
   if (field_id >= 0) {
     result.__set_field_id(field_id);
   }
+  if (vector_length >= 0) {
+    result.__set_vector_length(vector_length);
+  }
   return result;
 }
 
 static inline SchemaElement NewGroup(const std::string& name,
                                      FieldRepetitionType::type repetition,
-                                     int num_children, int field_id = -1) {
+                                     int num_children, int field_id = -1,
+                                     int32_t vector_length = -1) {
   SchemaElement result;
   result.__set_name(name);
   result.__set_repetition_type(repetition);
@@ -64,6 +69,9 @@ static inline SchemaElement NewGroup(const std::string& name,
 
   if (field_id >= 0) {
     result.__set_field_id(field_id);
+  }
+  if (vector_length >= 0) {
+    result.__set_vector_length(vector_length);
   }
 
   return result;
@@ -217,6 +225,24 @@ TEST_F(TestPrimitiveNode, FromParquet) {
   ASSERT_EQ(12, prim_node_->decimal_metadata().precision);
 }
 
+TEST_F(TestPrimitiveNode, VectorFromParquetRejected) {
+  SchemaElement elt =
+      NewPrimitive(name_, FieldRepetitionType::VECTOR, Type::FLOAT, field_id_, 8);
+
+  ASSERT_THROW(Convert(&elt), ParquetException);
+}
+
+TEST_F(TestPrimitiveNode, VectorValidation) {
+  ASSERT_THROW(PrimitiveNode::Make("vec", Repetition::VECTOR, Type::FLOAT),
+               ParquetException);
+  ASSERT_THROW(PrimitiveNode::Make("scalar", Repetition::REQUIRED, Type::FLOAT,
+                                   ConvertedType::NONE, -1, -1, -1, -1, 4),
+               ParquetException);
+  ASSERT_THROW(PrimitiveNode::Make("empty", Repetition::VECTOR, Type::FLOAT,
+                                   ConvertedType::NONE, -1, -1, -1, -1, 0),
+               ParquetException);
+}
+
 TEST_F(TestPrimitiveNode, Equals) {
   PrimitiveNode node1("foo", Repetition::REQUIRED, Type::INT32);
   PrimitiveNode node2("foo", Repetition::REQUIRED, Type::INT64);
@@ -363,6 +389,59 @@ TEST_F(TestGroupNode, Attrs) {
   // logical types
   ASSERT_EQ(ConvertedType::NONE, node1.converted_type());
   ASSERT_EQ(ConvertedType::LIST, node2.converted_type());
+}
+
+TEST_F(TestGroupNode, VectorAttrs) {
+  auto node = GroupNode::Make("vec", Repetition::VECTOR, Fields1(), ConvertedType::NONE,
+                              /*field_id=*/-1,
+                              /*vector_length=*/4);
+
+  ASSERT_TRUE(node->is_vector());
+  ASSERT_EQ(Repetition::VECTOR, node->repetition());
+  ASSERT_EQ(4, node->vector_length());
+}
+
+TEST_F(TestGroupNode, VectorValidation) {
+  ASSERT_THROW(GroupNode::Make("vec", Repetition::VECTOR, Fields1()), ParquetException);
+  ASSERT_THROW(GroupNode::Make("empty", Repetition::VECTOR, Fields1(),
+                               ConvertedType::NONE, /*field_id=*/-1,
+                               /*vector_length=*/0),
+               ParquetException);
+  ASSERT_THROW(GroupNode::Make("scalar", Repetition::REQUIRED, Fields1(),
+                               ConvertedType::NONE, /*field_id=*/-1,
+                               /*vector_length=*/4),
+               ParquetException);
+}
+
+TEST_F(TestGroupNode, VectorLogicalTypeRoundTrip) {
+  // A canonical 3-level vector group annotated with the Vector logical type
+  // round-trips through the Thrift intermediary.
+  auto element = PrimitiveNode::Make("element", Repetition::REQUIRED, Type::FLOAT);
+  auto list = GroupNode::Make("list", Repetition::VECTOR, {element},
+                              /*logical_type=*/nullptr, /*field_id=*/-1,
+                              /*vector_length=*/3);
+  auto group =
+      GroupNode::Make("embedding", Repetition::OPTIONAL, {list}, LogicalType::Vector());
+
+  ASSERT_TRUE(group->logical_type()->is_vector());
+  ASSERT_TRUE(group->logical_type()->is_nested());
+  ASSERT_EQ(ConvertedType::NONE, group->converted_type());
+
+  format::SchemaElement group_element;
+  group->ToParquet(&group_element);
+  ASSERT_TRUE(group_element.__isset.logicalType);
+  ASSERT_TRUE(group_element.logicalType.__isset.VECTOR);
+
+  format::SchemaElement list_element;
+  list->ToParquet(&list_element);
+  format::SchemaElement element_element;
+  element->ToParquet(&element_element);
+  std::unique_ptr<Node> roundtripped = GroupNode::FromParquet(
+      &group_element,
+      {GroupNode::FromParquet(&list_element,
+                              {PrimitiveNode::FromParquet(&element_element)})});
+  ASSERT_TRUE(roundtripped->logical_type()->is_vector());
+  ASSERT_TRUE(group->Equals(roundtripped.get()));
 }
 
 TEST_F(TestGroupNode, Equals) {
@@ -825,6 +904,56 @@ TEST_F(TestSchemaDescriptor, BuildTree) {
   ASSERT_EQ(nleaves, descr_.num_columns());
 }
 
+TEST_F(TestSchemaDescriptor, BuildTreeVector) {
+  NodePtr element = PrimitiveNode::Make("element", Repetition::REQUIRED, Type::FLOAT);
+  NodePtr vector = GroupNode::Make("list", Repetition::VECTOR, {element},
+                                   /*converted_type=*/ConvertedType::NONE,
+                                   /*field_id=*/-1, /*vector_length=*/3);
+  NodePtr embedding = GroupNode::Make("embedding", Repetition::OPTIONAL, {vector});
+
+  descr_.Init(GroupNode::Make("schema", Repetition::REPEATED, {embedding}));
+
+  ASSERT_EQ(1, descr_.num_columns());
+  const ColumnDescriptor* col = descr_.Column(0);
+  EXPECT_EQ(1, col->max_definition_level());
+  EXPECT_EQ(0, col->max_repetition_level());
+  EXPECT_FALSE(col->schema_node()->is_vector());
+  EXPECT_EQ(3, col->effective_vector_length());
+}
+
+TEST_F(TestSchemaDescriptor, BuildTreeNestedVector) {
+  NodePtr element = PrimitiveNode::Make("element", Repetition::REQUIRED, Type::FLOAT);
+  NodePtr inner = GroupNode::Make("inner", Repetition::VECTOR, {element},
+                                  /*converted_type=*/ConvertedType::NONE,
+                                  /*field_id=*/-1, /*vector_length=*/4);
+  NodePtr outer = GroupNode::Make("outer", Repetition::VECTOR, {inner},
+                                  /*converted_type=*/ConvertedType::NONE,
+                                  /*field_id=*/-1, /*vector_length=*/3);
+  NodePtr embedding = GroupNode::Make("embedding", Repetition::OPTIONAL, {outer});
+
+  descr_.Init(GroupNode::Make("schema", Repetition::REPEATED, {embedding}));
+
+  ASSERT_EQ(1, descr_.num_columns());
+  const ColumnDescriptor* col = descr_.Column(0);
+  EXPECT_EQ(1, col->max_definition_level());
+  EXPECT_EQ(0, col->max_repetition_level());
+  EXPECT_EQ(12, col->effective_vector_length());
+}
+
+TEST_F(TestSchemaDescriptor, BuildTreeNestedVectorLengthOverflow) {
+  NodePtr element = PrimitiveNode::Make("element", Repetition::REQUIRED, Type::FLOAT);
+  NodePtr inner = GroupNode::Make("inner", Repetition::VECTOR, {element},
+                                  /*converted_type=*/ConvertedType::NONE,
+                                  /*field_id=*/-1, /*vector_length=*/46341);
+  NodePtr outer = GroupNode::Make("outer", Repetition::VECTOR, {inner},
+                                  /*converted_type=*/ConvertedType::NONE,
+                                  /*field_id=*/-1, /*vector_length=*/46341);
+  NodePtr embedding = GroupNode::Make("embedding", Repetition::OPTIONAL, {outer});
+
+  ASSERT_THROW(descr_.Init(GroupNode::Make("schema", Repetition::REPEATED, {embedding})),
+               ParquetException);
+}
+
 TEST_F(TestSchemaDescriptor, HasRepeatedFields) {
   NodeVector fields;
   NodePtr schema;
@@ -910,6 +1039,28 @@ TEST(TestSchemaPrinter, Examples) {
 }
 )";
   ASSERT_EQ(expected, result);
+}
+
+TEST(TestSchemaPrinter, Vector) {
+  NodePtr schema = GroupNode::Make(
+      "schema", Repetition::REPEATED,
+      {GroupNode::Make(
+          "embedding", Repetition::OPTIONAL,
+          {GroupNode::Make(
+              "vector", Repetition::VECTOR,
+              {PrimitiveNode::Make("element", Repetition::REQUIRED, Type::FLOAT)},
+              /*logical_type=*/nullptr, -1, 3)},
+          LogicalType::Vector())});
+
+  std::string expected = R"(repeated group field_id=-1 schema {
+  optional group field_id=-1 embedding (Vector) {
+    vector group field_id=-1 vector [3] {
+      required float field_id=-1 element;
+    }
+  }
+}
+)";
+  ASSERT_EQ(expected, Print(schema));
 }
 
 static void ConfirmFactoryEquivalence(
