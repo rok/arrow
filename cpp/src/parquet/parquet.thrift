@@ -200,7 +200,9 @@ enum FieldRepetitionType {
   // from the fixed multiplicity declared in the schema instead of decoding
   // repetition levels.
   //
-  // Vector fields MUST use the following 3-level structure, mirroring LIST:
+  // Vector fields MUST use the following 3-level structure, mirroring LIST.
+  // The VECTOR-repeated group is shown with the canonical writer name "list";
+  // readers SHOULD NOT depend on the group name.
   //
   //   <required|optional> group <name> (VECTOR) {
   //     vector group list [vector_length] {

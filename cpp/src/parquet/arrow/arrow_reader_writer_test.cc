@@ -3878,6 +3878,24 @@ TEST(ArrowReadWrite, FixedSizeListVectorListOfNullableVectorsRoundTrip) {
                                                             /*row_group_size=*/3));
 }
 
+TEST(ArrowReadWrite, FixedSizeListVectorListOfOnlyNullVectorsRoundTrip) {
+  // A row group containing only null VECTOR items still has physical null
+  // slots but no visited value ranges.
+  auto vector_type = ::arrow::fixed_size_list(
+      ::arrow::field("element", ::arrow::int32(), /*nullable=*/false), 2);
+  auto type = ::arrow::list(::arrow::field("item", vector_type, /*nullable=*/true));
+  auto array = ::arrow::ArrayFromJSON(type, R"([
+      [null],
+      [null, null],
+      [],
+      null,
+      [[1, 2]]])");
+  auto table =
+      ::arrow::Table::Make(::arrow::schema({::arrow::field("root", type)}), {array});
+  ASSERT_NO_FATAL_FAILURE(CheckVectorFixedSizeListRoundtrip(table,
+                                                            /*row_group_size=*/1));
+}
+
 TEST(ArrowReadWrite, FixedSizeListVectorNestedVectorsUnderListRoundTrip) {
   auto inner = ::arrow::fixed_size_list(
       ::arrow::field("value", ::arrow::int32(), /*nullable=*/false), 2);

@@ -459,6 +459,17 @@ TEST_F(TestConvertParquetSchema, VectorFixedSizeListStructWithListRejected) {
   ASSERT_RAISES(NotImplemented, ConvertSchema(parquet_fields));
 }
 
+TEST_F(TestConvertParquetSchema, VectorFixedSizeListStructWithRepeatedPrimitiveRejected) {
+  auto values = PrimitiveNode::Make("values", Repetition::REPEATED, ParquetType::INT32);
+  auto item = GroupNode::Make("element", Repetition::REQUIRED, {values});
+  auto vector = GroupNode::Make("list", Repetition::VECTOR, {item},
+                                /*logical_type=*/nullptr, -1, 3);
+  std::vector<NodePtr> parquet_fields = {GroupNode::Make(
+      "embedding", Repetition::OPTIONAL, {vector}, LogicalType::Vector())};
+
+  ASSERT_RAISES(NotImplemented, ConvertSchema(parquet_fields));
+}
+
 TEST_F(TestConvertParquetSchema, DuplicateFieldNames) {
   std::vector<NodePtr> parquet_fields;
   std::vector<std::shared_ptr<Field>> arrow_fields;

@@ -119,10 +119,13 @@ Status ListToNode(const std::shared_ptr<::arrow::BaseListType>& type,
 }
 
 bool IsSupportedVectorStructNode(const Node& node) {
+  if (node.is_repeated() || node.is_vector()) {
+    return false;
+  }
   if (node.is_primitive()) {
     return true;
   }
-  if (!node.is_group() || node.is_repeated()) {
+  if (!node.is_group()) {
     return false;
   }
   const auto& group = checked_cast<const GroupNode&>(node);

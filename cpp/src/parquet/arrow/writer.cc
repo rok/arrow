@@ -162,6 +162,12 @@ Result<std::shared_ptr<Array>> MaterializeVectorLeafArray(
     }
     return Status::OK();
   };
+  auto skip_empty_ranges = [&]() {
+    while (range_idx < visited_elements.size() && range_used == 0 &&
+           visited_elements[range_idx].Empty()) {
+      ++range_idx;
+    }
+  };
   int64_t i = 0;
   while (i < result.def_rep_level_count) {
     const int16_t def_level = def_levels[i];
@@ -175,6 +181,7 @@ Result<std::shared_ptr<Array>> MaterializeVectorLeafArray(
       continue;
     }
     // Batch a run of value slots from the current visited range.
+    skip_empty_ranges();
     int64_t run = 1;
     while (i + run < result.def_rep_level_count &&
            def_levels[i + run] >= values_def_level &&
@@ -197,6 +204,7 @@ Result<std::shared_ptr<Array>> MaterializeVectorLeafArray(
     i += run;
   }
   RETURN_NOT_OK(flush_nulls());
+  skip_empty_ranges();
   if (range_idx != visited_elements.size() || range_used != 0) {
     return Status::Invalid("VECTOR leaf values out of sync with definition levels");
   }
