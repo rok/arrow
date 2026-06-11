@@ -86,6 +86,7 @@
 
 #include <atomic>
 #include <cstddef>
+#include <limits>
 #include <memory>
 #include <type_traits>
 #include <utility>
@@ -106,6 +107,7 @@
 #include "arrow/util/macros.h"
 #include "arrow/visit_array_inline.h"
 
+#include "parquet/arrow/schema_internal.h"
 #include "parquet/properties.h"
 
 namespace parquet::arrow {
@@ -207,6 +209,29 @@ struct PathWriteContext {
       return;
     }
     visited_elements.push_back(range);
+  }
+
+  void RecordVectorPostListVisit(const ElementRange& logical_range,
+                                 const ElementRange& physical_range) {
+    if (!visited_elements.empty() &&
+        visited_elements.back().start == logical_range.start &&
+        visited_elements.back().end == logical_range.end) {
+      visited_elements.back() = physical_range;
+      return;
+    }
+    RecordPostListVisit(physical_range);
+  }
+
+  // The enclosing list machinery records the logical (vector-index) child
+  // range before delegating to a VectorNullableNode, which then records the
+  // physical (slot-index) ranges of its present runs itself.  Remove the
+  // logical range so only physical ranges remain.
+  void TrimVectorLogicalVisit(const ElementRange& logical_range) {
+    if (!visited_elements.empty() &&
+        visited_elements.back().start == logical_range.start &&
+        visited_elements.back().end == logical_range.end) {
+      visited_elements.pop_back();
+    }
   }
 
   Status last_status;
@@ -475,6 +500,120 @@ struct FixedSizedRangeSelector {
   int list_size;
 };
 
+struct NoLevelTerminalNode {
+  IterationResult Run(const ElementRange&, PathWriteContext*) { return kDone; }
+};
+
+IterationResult ExpandLastRepLevels(int64_t logical_count, int32_t multiplier,
+                                    int16_t filler_rep_level, PathWriteContext* context);
+
+class VectorNullableNode {
+ public:
+  VectorNullableNode(const uint8_t* null_bitmap, int64_t entry_offset,
+                     int32_t vector_length, int32_t child_slot_multiplier,
+                     int16_t def_level_if_present, int16_t filler_rep_level,
+                     bool child_emits_present_def_levels,
+                     bool child_records_visited_elements, bool expand_rep_levels)
+      : null_bitmap_(null_bitmap),
+        entry_offset_(entry_offset),
+        vector_length_(vector_length),
+        child_slot_multiplier_(child_slot_multiplier),
+        valid_bits_reader_(MakeReader(ElementRange{0, 0})),
+        def_level_if_present_(def_level_if_present),
+        def_level_if_null_(def_level_if_present - 1),
+        filler_rep_level_(filler_rep_level),
+        child_emits_present_def_levels_(child_emits_present_def_levels),
+        child_records_visited_elements_(child_records_visited_elements),
+        expand_rep_levels_(expand_rep_levels),
+        new_range_(true) {}
+
+  ::arrow::internal::BitRunReader MakeReader(const ElementRange& range) {
+    return ::arrow::internal::BitRunReader(null_bitmap_, entry_offset_ + range.start,
+                                           range.Size());
+  }
+
+  IterationResult Run(ElementRange* range, ElementRange* child_range,
+                      PathWriteContext* context) {
+    if (range->Empty()) {
+      new_range_ = true;
+      return kDone;
+    }
+    if (new_range_) {
+      context->TrimVectorLogicalVisit(*range);
+    }
+    if (expand_rep_levels_ && new_range_) {
+      // Expand the trailing repetition levels (one per logical vector in this
+      // delegation, appended by the enclosing list machinery) once, before
+      // any run processing.  Every vector contributes
+      // vector_length * child_slot_multiplier leaf slots regardless of
+      // validity, so the multiplier is constant and per-run expansion (which
+      // would expand positionally wrong entries for interleaved null and
+      // present runs) is not needed.  Only the outermost vector node of a
+      // nested chain expands.
+      RETURN_IF_ERROR(ExpandLastRepLevels(range->Size(),
+                                          vector_length_ * child_slot_multiplier_,
+                                          filler_rep_level_, context));
+    }
+    if (null_bitmap_ == nullptr) {
+      ElementRange logical_range = *range;
+      child_range->start = range->start * vector_length_;
+      child_range->end = child_range->start + range->Size() * vector_length_;
+      if (!child_records_visited_elements_) {
+        context->RecordVectorPostListVisit(logical_range, *child_range);
+      }
+      if (!child_emits_present_def_levels_) {
+        RETURN_IF_ERROR(
+            context->AppendDefLevels(child_range->Size(), def_level_if_present_));
+      }
+      range->start = range->end;
+      new_range_ = false;
+      return kNext;
+    }
+    if (new_range_) {
+      valid_bits_reader_ = MakeReader(*range);
+    }
+    ::arrow::internal::BitRun run = valid_bits_reader_.NextRun();
+    new_range_ = false;
+    while (!range->Empty() && !run.set) {
+      range->start += run.length;
+      RETURN_IF_ERROR(context->AppendDefLevels(
+          run.length * vector_length_ * child_slot_multiplier_, def_level_if_null_));
+      run = valid_bits_reader_.NextRun();
+    }
+    if (range->Empty()) {
+      new_range_ = true;
+      return kDone;
+    }
+
+    ElementRange logical_range{range->start, range->start + run.length};
+    child_range->start = range->start * vector_length_;
+    child_range->end = child_range->start + run.length * vector_length_;
+    if (!child_records_visited_elements_) {
+      context->RecordVectorPostListVisit(logical_range, *child_range);
+    }
+    if (!child_emits_present_def_levels_) {
+      RETURN_IF_ERROR(
+          context->AppendDefLevels(run.length * vector_length_, def_level_if_present_));
+    }
+    range->start += run.length;
+    return kNext;
+  }
+
+ private:
+  const uint8_t* null_bitmap_;
+  int64_t entry_offset_;
+  int32_t vector_length_;
+  int32_t child_slot_multiplier_;
+  ::arrow::internal::BitRunReader valid_bits_reader_;
+  int16_t def_level_if_present_;
+  int16_t def_level_if_null_;
+  int16_t filler_rep_level_;
+  bool child_emits_present_def_levels_;
+  bool child_records_visited_elements_;
+  bool expand_rep_levels_;
+  bool new_range_ = true;
+};
+
 // An intermediate node that handles null values.
 class NullableNode {
  public:
@@ -546,7 +685,8 @@ struct PathInfo {
   // Note index order matters here.
   using Node = std::variant<NullableTerminalNode, ListNode, LargeListNode, ListViewNode,
                             LargeListViewNode, FixedSizeListNode, NullableNode,
-                            AllPresentTerminalNode, AllNullsTerminalNode>;
+                            VectorNullableNode, AllPresentTerminalNode,
+                            AllNullsTerminalNode, NoLevelTerminalNode>;
 
   std::vector<Node> path;
   std::shared_ptr<Array> primitive_array;
@@ -554,6 +694,18 @@ struct PathInfo {
   int16_t max_rep_level = 0;
   bool has_dictionary = false;
   bool leaf_is_nullable = false;
+  bool leaf_is_vector = false;
+  int32_t leaf_vector_length = 1;
+  // Definition level after the last repeated ancestor (0 when there is none).
+  // For VECTOR leaves, definition levels below it mark ancestors that made
+  // the vector value absent (empty or null lists); they occupy one level
+  // entry with no slots, while levels at or above it occupy fixed strides of
+  // leaf_vector_length slots.
+  int16_t repeated_ancestor_def_level = 0;
+  // Definition level at or above which a leaf slot carries a value from the
+  // leaf array (all vector ancestors present); slots below it (but at or
+  // above the stride level) belong to null vector values.
+  int16_t vector_values_def_level = 0;
 };
 
 struct WritePathVisitor {
@@ -567,6 +719,12 @@ struct WritePathVisitor {
     return node.Run(*stack_position, context);
   }
   IterationResult operator()(AllNullsTerminalNode& node) {
+    return node.Run(*stack_position, context);
+  }
+  IterationResult operator()(VectorNullableNode& node) {
+    return node.Run(stack_position, stack_position + 1, context);
+  }
+  IterationResult operator()(NoLevelTerminalNode& node) {
     return node.Run(*stack_position, context);
   }
   template <typename RangeSelector>
@@ -585,6 +743,53 @@ struct WritePathVisitor {
 /// values have been calculated for root_range with the calculated
 /// values. It is intended to abstract the complexity of writing
 /// the levels and values to parquet.
+// Counts the physical leaf slots of a VECTOR leaf: definition levels at or
+// above the stride definition level.  Entries below it are absent-ancestor
+// markers carrying no slot.
+int64_t CountVectorSlots(const int16_t* def_levels, int64_t def_count,
+                         int16_t repeated_ancestor_def_level) {
+  if (repeated_ancestor_def_level <= 0) {
+    return def_count;
+  }
+  int64_t slots = 0;
+  for (int64_t i = 0; i < def_count; ++i) {
+    slots += def_levels[i] >= repeated_ancestor_def_level;
+  }
+  return slots;
+}
+
+IterationResult ExpandLastRepLevels(int64_t logical_count, int32_t multiplier,
+                                    int16_t filler_rep_level, PathWriteContext* context) {
+  if (multiplier <= 1 || logical_count == 0 || context->rep_levels.length() == 0) {
+    return kDone;
+  }
+  const int64_t old_length = context->rep_levels.length();
+  if (ARROW_PREDICT_FALSE(old_length < logical_count)) {
+    context->last_status =
+        Status::Invalid("VECTOR repetition level expansion needed ", logical_count,
+                        " source levels but only ", old_length, " were available");
+    return kError;
+  }
+  const int64_t prefix_length = old_length - logical_count;
+  // Grow the buffer by the filler entries, then rewrite the trailing
+  // logical_count entries in place.  Entry i moves from prefix_length + i to
+  // prefix_length + i * multiplier, so a backward walk never overwrites an
+  // unread source entry and the cost stays linear in the slots written.
+  context->last_status =
+      context->rep_levels.Append((multiplier - 1) * logical_count, filler_rep_level);
+  if (ARROW_PREDICT_FALSE(!context->last_status.ok())) {
+    return kError;
+  }
+  int16_t* data = context->rep_levels.mutable_data();
+  for (int64_t i = logical_count - 1; i >= 0; --i) {
+    const int16_t source = data[prefix_length + i];
+    int16_t* destination = data + prefix_length + i * multiplier;
+    destination[0] = source;
+    std::fill_n(destination + 1, multiplier - 1, filler_rep_level);
+  }
+  return kDone;
+}
+
 Status WritePath(ElementRange root_range, PathInfo* path_info,
                  ArrowWriteContext* arrow_context,
                  MultipathLevelBuilder::CallbackFunction writer) {
@@ -592,12 +797,18 @@ Status WritePath(ElementRange root_range, PathInfo* path_info,
   MultipathLevelBuilderResult builder_result;
   builder_result.leaf_array = path_info->primitive_array;
   builder_result.leaf_is_nullable = path_info->leaf_is_nullable;
+  builder_result.leaf_is_vector = path_info->leaf_is_vector;
+  builder_result.leaf_vector_length = path_info->leaf_vector_length;
+  builder_result.vector_repeated_ancestor_def_level =
+      path_info->repeated_ancestor_def_level;
+  builder_result.vector_values_def_level = path_info->vector_values_def_level;
 
   if (path_info->max_def_level == 0) {
     // This case only occurs when there are no nullable or repeated
     // columns in the path from the root to leaf.
     int64_t leaf_length = builder_result.leaf_array->length();
     builder_result.def_rep_level_count = leaf_length;
+    builder_result.leaf_slot_count = leaf_length;
     builder_result.post_list_visited_elements.push_back({0, leaf_length});
     return writer(builder_result);
   }
@@ -640,6 +851,11 @@ Status WritePath(ElementRange root_range, PathInfo* path_info,
     // This case only occurs when there was a repeated element that needs to be
     // processed.
     builder_result.rep_levels = context.rep_levels.data();
+    if (path_info->leaf_is_vector) {
+      builder_result.leaf_slot_count =
+          CountVectorSlots(context.def_levels.data(), context.def_levels.length(),
+                           path_info->repeated_ancestor_def_level);
+    }
     std::swap(builder_result.post_list_visited_elements, context.visited_elements);
     // If it is possible when processing lists that all lists where empty. In this
     // case no elements would have been added to post_list_visited_elements. By
@@ -648,9 +864,18 @@ Status WritePath(ElementRange root_range, PathInfo* path_info,
       builder_result.post_list_visited_elements.push_back({0, 0});
     }
   } else {
-    builder_result.post_list_visited_elements.push_back(
-        {0, builder_result.leaf_array->length()});
+    if (!context.visited_elements.empty()) {
+      std::swap(builder_result.post_list_visited_elements, context.visited_elements);
+    } else {
+      builder_result.post_list_visited_elements.push_back(
+          {0, builder_result.leaf_array->length()});
+    }
     builder_result.rep_levels = nullptr;
+    if (path_info->leaf_is_vector) {
+      builder_result.leaf_slot_count =
+          CountVectorSlots(context.def_levels.data(), context.def_levels.length(),
+                           path_info->repeated_ancestor_def_level);
+    }
   }
 
   builder_result.def_levels = context.def_levels.data();
@@ -682,6 +907,7 @@ struct FixupVisitor {
   }
 
   void operator()(NullableNode& arg) { HandleIntermediateNode(arg); }
+  void operator()(VectorNullableNode&) {}
 
   void operator()(AllNullsTerminalNode& arg) {
     // Even though no processing happens past this point we
@@ -692,6 +918,7 @@ struct FixupVisitor {
 
   void operator()(NullableTerminalNode&) {}
   void operator()(AllPresentTerminalNode&) {}
+  void operator()(NoLevelTerminalNode&) {}
 };
 
 PathInfo Fixup(PathInfo info) {
@@ -713,7 +940,9 @@ PathInfo Fixup(PathInfo info) {
 
 class PathBuilder {
  public:
-  explicit PathBuilder(bool start_nullable) : nullable_in_parent_(start_nullable) {}
+  PathBuilder(bool start_nullable, bool write_fixed_size_list_as_vector)
+      : nullable_in_parent_(start_nullable),
+        write_fixed_size_list_as_vector_(write_fixed_size_list_as_vector) {}
   template <typename T>
   void AddTerminalInfo(const T& array) {
     info_.leaf_is_nullable = nullable_in_parent_;
@@ -752,13 +981,18 @@ class PathBuilder {
     // Increment necessary due to empty lists.
     info_.max_def_level++;
     info_.max_rep_level++;
+    info_.repeated_ancestor_def_level = info_.max_def_level;
     // raw_value_offsets() accounts for any slice offset.
     ListPathNode<VarRangeSelector<typename T::offset_type>> node(
         VarRangeSelector<typename T::offset_type>{array.raw_value_offsets()},
         info_.max_rep_level, info_.max_def_level - 1);
     info_.path.emplace_back(std::move(node));
     nullable_in_parent_ = array.list_type()->value_field()->nullable();
-    return VisitInline(*array.values());
+    const bool saved_nullable_group = nullable_group_since_repeated_;
+    nullable_group_since_repeated_ = false;
+    Status status = VisitInline(*array.values());
+    nullable_group_since_repeated_ = saved_nullable_group;
+    return status;
   }
 
   template <typename T>
@@ -828,31 +1062,105 @@ class PathBuilder {
   }
 
   Status Visit(const ::arrow::StructArray& array) {
+    const bool struct_nullable = nullable_in_parent_;
     MaybeAddNullable(array);
     PathInfo info_backup = info_;
+    const bool saved_nullable_group = nullable_group_since_repeated_;
+    nullable_group_since_repeated_ = nullable_group_since_repeated_ || struct_nullable;
     for (int x = 0; x < array.num_fields(); x++) {
       nullable_in_parent_ = array.type()->field(x)->nullable();
       RETURN_NOT_OK(VisitInline(*array.field(x)));
       info_ = info_backup;
     }
+    nullable_group_since_repeated_ = saved_nullable_group;
     return Status::OK();
   }
 
   Status Visit(const ::arrow::FixedSizeListArray& array) {
-    MaybeAddNullable(array);
     int32_t list_size = array.list_type()->list_size();
+    auto vector_leaf_slot_multiplier = VectorLeafSlotMultiplier(*array.type());
+    if (write_fixed_size_list_as_vector_ && list_size > 0 &&
+        !nullable_group_since_repeated_ && vector_leaf_slot_multiplier.ok() &&
+        IsSupportedVectorElementType(*array.value_type())) {
+      const bool element_nullable = array.list_type()->value_field()->nullable();
+      const bool nested_vector_path = info_.leaf_is_vector;
+      info_.leaf_is_vector = true;
+      if (info_.leaf_vector_length > std::numeric_limits<int32_t>::max() / list_size) {
+        return Status::Invalid("Nested VECTOR leaf slot multiplier overflow");
+      }
+      info_.leaf_vector_length *= list_size;
+      const bool parent_nullable = nullable_in_parent_;
+      if (parent_nullable) {
+        info_.max_def_level++;
+      }
+      // Overwritten by nested vectors so that the final value is the present
+      // level of the innermost vector.
+      info_.vector_values_def_level = info_.max_def_level;
+      const bool value_type_is_struct = array.value_type()->id() == ::arrow::Type::STRUCT;
+      const bool value_type_is_nested_vector =
+          array.value_type()->id() == ::arrow::Type::FIXED_SIZE_LIST;
+      const bool child_emits_present_def_levels =
+          element_nullable || value_type_is_struct || value_type_is_nested_vector ||
+          nested_vector_path;
+      const bool child_records_visited_elements = value_type_is_nested_vector;
+      const bool has_vector_node = parent_nullable || element_nullable ||
+                                   value_type_is_struct || value_type_is_nested_vector ||
+                                   nested_vector_path || info_.max_rep_level > 0;
+      const bool vector_node_emits_def_levels =
+          has_vector_node && !child_emits_present_def_levels;
+      if (has_vector_node) {
+        ARROW_ASSIGN_OR_RAISE(int32_t child_slot_multiplier,
+                              VectorLeafSlotMultiplier(*array.value_type()));
+        info_.path.emplace_back(VectorNullableNode(
+            parent_nullable ? array.null_bitmap_data() : nullptr, array.offset(),
+            list_size, child_slot_multiplier, info_.max_def_level, info_.max_rep_level,
+            child_emits_present_def_levels, child_records_visited_elements,
+            /*expand_rep_levels=*/!nested_vector_path));
+      }
+      auto values =
+          array.values()->Slice(array.value_offset(0), array.length() * list_size);
+      if (!nested_vector_path && !element_nullable &&
+          !::arrow::is_nested(*array.value_type())) {
+        info_.leaf_is_nullable = false;
+        info_.primitive_array = values;
+        if (!vector_node_emits_def_levels && info_.max_rep_level > 0 &&
+            info_.max_def_level > 0) {
+          info_.path.emplace_back(AllPresentTerminalNode{info_.max_def_level});
+        } else {
+          info_.path.emplace_back(NoLevelTerminalNode{});
+        }
+        paths_.push_back(Fixup(info_));
+        return Status::OK();
+      }
+      nullable_in_parent_ = element_nullable;
+      const bool saved_nullable_group = nullable_group_since_repeated_;
+      nullable_group_since_repeated_ = false;
+      Status status = VisitInline(*values);
+      nullable_group_since_repeated_ = saved_nullable_group;
+      return status;
+    }
+
+    MaybeAddNullable(array);
     // Technically we could encode fixed size lists with two level encodings
     // but since we always use 3 level encoding we increment def levels as
     // well.
     info_.max_def_level++;
     info_.max_rep_level++;
+    info_.repeated_ancestor_def_level = info_.max_def_level;
+    // def_level_if_empty is max_def_level - 1 ("list present but empty"), not
+    // max_def_level ("element present"); it is only reachable for zero-length
+    // fixed-size lists, where every present value is an empty list.
     info_.path.emplace_back(FixedSizeListNode(FixedSizedRangeSelector{list_size},
-                                              info_.max_rep_level, info_.max_def_level));
+                                              info_.max_rep_level,
+                                              info_.max_def_level - 1));
     nullable_in_parent_ = array.list_type()->value_field()->nullable();
-    if (array.offset() > 0) {
-      return VisitInline(*array.values()->Slice(array.value_offset(0)));
-    }
-    return VisitInline(*array.values());
+    const bool saved_nullable_group = nullable_group_since_repeated_;
+    nullable_group_since_repeated_ = false;
+    Status status = array.offset() > 0
+                        ? VisitInline(*array.values()->Slice(array.value_offset(0)))
+                        : VisitInline(*array.values());
+    nullable_group_since_repeated_ = saved_nullable_group;
+    return status;
   }
 
   Status Visit(const ::arrow::ExtensionArray& array) {
@@ -876,6 +1184,12 @@ class PathBuilder {
   PathInfo info_;
   std::vector<PathInfo> paths_;
   bool nullable_in_parent_;
+  bool write_fixed_size_list_as_vector_;
+  // True when a nullable group (struct) sits between the nearest repeated
+  // ancestor (or the root) and the current position.  The writer uses LIST for
+  // such FixedSizeList fields so it does not have to expand null struct markers
+  // to vector_length leaf slots.
+  bool nullable_group_since_repeated_ = false;
 };
 
 Status PathBuilder::VisitInline(const Array& array) {
@@ -919,8 +1233,10 @@ class MultipathLevelBuilderImpl : public MultipathLevelBuilder {
 
 // static
 ::arrow::Result<std::unique_ptr<MultipathLevelBuilder>> MultipathLevelBuilder::Make(
-    const ::arrow::Array& array, bool array_field_nullable) {
-  auto constructor = std::make_unique<PathBuilder>(array_field_nullable);
+    const ::arrow::Array& array, bool array_field_nullable,
+    bool write_fixed_size_list_as_vector) {
+  auto constructor = std::make_unique<PathBuilder>(array_field_nullable,
+                                                   write_fixed_size_list_as_vector);
   RETURN_NOT_OK(VisitArrayInline(array, constructor.get()));
   return std::make_unique<MultipathLevelBuilderImpl>(array.data(),
                                                      std::move(constructor));
@@ -930,8 +1246,12 @@ class MultipathLevelBuilderImpl : public MultipathLevelBuilder {
 Status MultipathLevelBuilder::Write(const Array& array, bool array_field_nullable,
                                     ArrowWriteContext* context,
                                     MultipathLevelBuilder::CallbackFunction callback) {
+  const bool write_fixed_size_list_as_vector =
+      context->properties != nullptr &&
+      context->properties->write_fixed_size_list_as_vector();
   ARROW_ASSIGN_OR_RAISE(std::unique_ptr<MultipathLevelBuilder> builder,
-                        MultipathLevelBuilder::Make(array, array_field_nullable));
+                        MultipathLevelBuilder::Make(array, array_field_nullable,
+                                                    write_fixed_size_list_as_vector));
   for (int leaf_idx = 0; leaf_idx < builder->GetLeafCount(); leaf_idx++) {
     RETURN_NOT_OK(builder->Write(leaf_idx, context, callback));
   }
