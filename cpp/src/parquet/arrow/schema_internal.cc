@@ -195,6 +195,30 @@ Result<std::shared_ptr<ArrowType>> FromFLBA(
     const LogicalType& logical_type, int32_t physical_length,
     const ArrowReaderProperties& reader_properties) {
   switch (logical_type.type()) {
+    case LogicalType::Type::FIXED_SIZE_LIST: {
+      const auto& fixed_size_list =
+          ::arrow::internal::checked_cast<const FixedSizeListLogicalType&>(logical_type);
+      std::shared_ptr<ArrowType> value_type;
+      switch (fixed_size_list.element_type()) {
+        case ParquetType::INT32:
+          value_type = ::arrow::int32();
+          break;
+        case ParquetType::INT64:
+          value_type = ::arrow::int64();
+          break;
+        case ParquetType::FLOAT:
+          value_type = ::arrow::float32();
+          break;
+        case ParquetType::DOUBLE:
+          value_type = ::arrow::float64();
+          break;
+        default:
+          return Status::NotImplemented("Unsupported FIXED_SIZE_LIST element type");
+      }
+      return ::arrow::fixed_size_list(
+          ::arrow::field("element", std::move(value_type), /*nullable=*/false),
+          fixed_size_list.num_values());
+    }
     case LogicalType::Type::DECIMAL:
       return MakeArrowDecimal(logical_type, reader_properties.smallest_decimal_enabled());
     case LogicalType::Type::FLOAT16:

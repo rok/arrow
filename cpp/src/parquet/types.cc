@@ -602,6 +602,10 @@ std::shared_ptr<const LogicalType> LogicalType::FromThrift(
     }
 
     return VariantLogicalType::Make(spec_version);
+  } else if (type.__isset.FIXED_SIZE_LIST) {
+    return FixedSizeListLogicalType::Make(
+        static_cast<parquet::Type::type>(type.FIXED_SIZE_LIST.type),
+        type.FIXED_SIZE_LIST.num_values);
   } else {
     // Sentinel type for one we do not recognize
     return UndefinedLogicalType::Make();
@@ -671,6 +675,11 @@ std::shared_ptr<const LogicalType> LogicalType::Geography(
 
 std::shared_ptr<const LogicalType> LogicalType::Variant(int8_t spec_version) {
   return VariantLogicalType::Make(spec_version);
+}
+
+std::shared_ptr<const LogicalType> LogicalType::FixedSizeList(
+    parquet::Type::type element_type, int32_t num_values) {
+  return FixedSizeListLogicalType::Make(element_type, num_values);
 }
 
 std::shared_ptr<const LogicalType> LogicalType::None() { return NoLogicalType::Make(); }
@@ -758,6 +767,7 @@ class LogicalType::Impl {
   class Geometry;
   class Geography;
   class Variant;
+  class FixedSizeList;
   class No;
   class Undefined;
 
@@ -838,6 +848,9 @@ bool LogicalType::is_geography() const {
 }
 bool LogicalType::is_variant() const {
   return impl_->type() == LogicalType::Type::VARIANT;
+}
+bool LogicalType::is_fixed_size_list() const {
+  return impl_->type() == LogicalType::Type::FIXED_SIZE_LIST;
 }
 bool LogicalType::is_none() const { return impl_->type() == LogicalType::Type::NONE; }
 bool LogicalType::is_valid() const {
@@ -2013,6 +2026,113 @@ format::LogicalType LogicalType::Impl::Variant::ToThrift() const {
 std::shared_ptr<const LogicalType> VariantLogicalType::Make(const int8_t spec_version) {
   auto logical_type = std::shared_ptr<VariantLogicalType>(new VariantLogicalType());
   logical_type->impl_.reset(new LogicalType::Impl::Variant(spec_version));
+  return logical_type;
+}
+
+namespace {
+
+int32_t FixedSizeListElementByteWidth(parquet::Type::type element_type) {
+  switch (element_type) {
+    case Type::INT32:
+    case Type::FLOAT:
+      return 4;
+    case Type::INT64:
+    case Type::DOUBLE:
+      return 8;
+    case Type::INT96:
+      return 12;
+    default:
+      return 0;
+  }
+}
+
+}  // namespace
+
+class LogicalType::Impl::FixedSizeList final : public LogicalType::Impl::Incompatible,
+                                               public LogicalType::Impl::Applicable {
+ public:
+  friend class FixedSizeListLogicalType;
+
+  bool is_applicable(parquet::Type::type primitive_type,
+                     int32_t primitive_length = -1) const override;
+  std::string ToString() const override;
+  std::string ToJSON() const override;
+  format::LogicalType ToThrift() const override;
+  bool Equals(const LogicalType& other) const override;
+
+  parquet::Type::type element_type() const { return element_type_; }
+  int32_t num_values() const { return num_values_; }
+
+ private:
+  FixedSizeList(parquet::Type::type element_type, int32_t num_values)
+      : LogicalType::Impl(LogicalType::Type::FIXED_SIZE_LIST, SortOrder::UNKNOWN),
+        element_type_(element_type),
+        num_values_(num_values) {}
+
+  parquet::Type::type element_type_;
+  int32_t num_values_;
+};
+
+bool LogicalType::Impl::FixedSizeList::is_applicable(parquet::Type::type primitive_type,
+                                                     int32_t primitive_length) const {
+  const int32_t element_width = FixedSizeListElementByteWidth(element_type_);
+  return primitive_type == parquet::Type::FIXED_LEN_BYTE_ARRAY && element_width > 0 &&
+         primitive_length == num_values_ * element_width;
+}
+
+parquet::Type::type FixedSizeListLogicalType::element_type() const {
+  return (dynamic_cast<const LogicalType::Impl::FixedSizeList&>(*impl_)).element_type();
+}
+
+int32_t FixedSizeListLogicalType::num_values() const {
+  return (dynamic_cast<const LogicalType::Impl::FixedSizeList&>(*impl_)).num_values();
+}
+
+std::string LogicalType::Impl::FixedSizeList::ToString() const {
+  std::stringstream type;
+  type << "FixedSizeList(element_type=" << TypeToString(element_type_)
+       << ", num_values=" << num_values_ << ")";
+  return type.str();
+}
+
+std::string LogicalType::Impl::FixedSizeList::ToJSON() const {
+  std::stringstream json;
+  json << R"({"Type": "FixedSizeList", "element_type": ")" << TypeToString(element_type_)
+       << R"(", "num_values": )" << num_values_ << "}";
+  return json.str();
+}
+
+format::LogicalType LogicalType::Impl::FixedSizeList::ToThrift() const {
+  format::LogicalType type;
+  format::FixedSizeListType fixed_size_list_type;
+  fixed_size_list_type.__set_type(static_cast<format::Type::type>(element_type_));
+  fixed_size_list_type.__set_num_values(num_values_);
+  type.__set_FIXED_SIZE_LIST(fixed_size_list_type);
+  return type;
+}
+
+bool LogicalType::Impl::FixedSizeList::Equals(const LogicalType& other) const {
+  if (other.type() != LogicalType::Type::FIXED_SIZE_LIST) {
+    return false;
+  }
+  const auto& fixed_size_list = dynamic_cast<const FixedSizeListLogicalType&>(other);
+  return fixed_size_list.element_type() == element_type_ &&
+         fixed_size_list.num_values() == num_values_;
+}
+
+std::shared_ptr<const LogicalType> FixedSizeListLogicalType::Make(
+    parquet::Type::type element_type, int32_t num_values) {
+  if (num_values <= 0) {
+    throw ParquetException("FixedSizeList logical type requires positive num_values");
+  }
+  if (FixedSizeListElementByteWidth(element_type) == 0) {
+    throw ParquetException("Unsupported FixedSizeList element type: ",
+                           TypeToString(element_type));
+  }
+  auto logical_type =
+      std::shared_ptr<FixedSizeListLogicalType>(new FixedSizeListLogicalType());
+  logical_type->impl_.reset(
+      new LogicalType::Impl::FixedSizeList(element_type, num_values));
   return logical_type;
 }
 

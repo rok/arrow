@@ -78,6 +78,24 @@ Repetition::type RepetitionFromNullable(bool is_nullable) {
   return is_nullable ? Repetition::OPTIONAL : Repetition::REQUIRED;
 }
 
+Result<std::pair<ParquetType::type, int32_t>> FixedSizeListElementStorage(
+    const ::arrow::DataType& type) {
+  switch (type.id()) {
+    case ArrowTypeId::INT32:
+      return std::make_pair(ParquetType::INT32, 4);
+    case ArrowTypeId::INT64:
+      return std::make_pair(ParquetType::INT64, 8);
+    case ArrowTypeId::FLOAT:
+      return std::make_pair(ParquetType::FLOAT, 4);
+    case ArrowTypeId::DOUBLE:
+      return std::make_pair(ParquetType::DOUBLE, 8);
+    default:
+      return Status::NotImplemented(
+          "FIXED_SIZE_LIST as FIXED_LEN_BYTE_ARRAY is only implemented for int32, "
+          "int64, float, and double elements");
+  }
+}
+
 Result<std::shared_ptr<::arrow::DataType>> MakeArrowList(
     std::shared_ptr<Field> field, const ArrowReaderProperties& props) {
   switch (props.list_type()) {
@@ -453,7 +471,23 @@ Status FieldToNode(const std::string& name, const std::shared_ptr<Field>& field,
       return StructToNode(struct_type, name, field->nullable(), field_id, properties,
                           arrow_properties, out);
     }
-    case ArrowTypeId::FIXED_SIZE_LIST:
+    case ArrowTypeId::FIXED_SIZE_LIST: {
+      auto fixed_size_list_type =
+          std::static_pointer_cast<::arrow::FixedSizeListType>(field->type());
+      if (arrow_properties.write_fixed_size_list_as_fixed_len_byte_array() &&
+          !fixed_size_list_type->value_field()->nullable()) {
+        ARROW_ASSIGN_OR_RAISE(
+            auto element_storage,
+            FixedSizeListElementStorage(*fixed_size_list_type->value_type()));
+        type = ParquetType::FIXED_LEN_BYTE_ARRAY;
+        length = element_storage.second * fixed_size_list_type->list_size();
+        logical_type = LogicalType::FixedSizeList(element_storage.first,
+                                                  fixed_size_list_type->list_size());
+        break;
+      }
+      return ListToNode(fixed_size_list_type, name, field->nullable(), field_id,
+                        properties, arrow_properties, out);
+    }
     case ArrowTypeId::LARGE_LIST:
     case ArrowTypeId::LIST: {
       auto list_type = std::static_pointer_cast<::arrow::BaseListType>(field->type());
@@ -1040,8 +1074,19 @@ Result<bool> ApplyOriginalStorageMetadata(const Field& origin_field,
 
   const int num_children = inferred_type->num_fields();
 
-  if (num_children > 0 && origin_type->num_fields() == num_children) {
-    DCHECK_EQ(static_cast<int>(inferred->children.size()), num_children);
+  if (origin_type->id() == ::arrow::Type::FIXED_SIZE_LIST &&
+      inferred_type->id() == ::arrow::Type::FIXED_SIZE_LIST &&
+      inferred->children.empty()) {
+    // Option A FIXED_SIZE_LIST columns are primitive Parquet leaves annotated as
+    // FIXED_LEN_BYTE_ARRAY, so the inferred Arrow type has a child field but the
+    // SchemaField tree has no child SchemaField. Restore the stored Arrow type
+    // directly instead of recursing into absent children.
+    inferred->field = inferred->field->WithType(origin_type);
+    modified = true;
+  }
+
+  if (num_children > 0 && origin_type->num_fields() == num_children &&
+      static_cast<int>(inferred->children.size()) == num_children) {
     const auto factory = GetNestedFactory(*origin_type, *inferred_type);
     if (factory) {
       // The type may be modified (e.g. LargeList) while the children stay the same
