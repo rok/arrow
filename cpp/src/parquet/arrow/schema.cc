@@ -106,8 +106,15 @@ Status ListToNode(const std::shared_ptr<::arrow::BaseListType>& type,
                             &element));
 
   NodePtr list = GroupNode::Make("list", Repetition::REPEATED, {element});
-  *out = GroupNode::Make(name, RepetitionFromNullable(nullable), {list},
-                         LogicalType::List(), field_id);
+  std::shared_ptr<const LogicalType> logical_type = LogicalType::List();
+  if (type->id() == ::arrow::Type::FIXED_SIZE_LIST &&
+      arrow_properties.write_fixed_size_list_logical_type()) {
+    const auto& fixed_size_list_type =
+        checked_cast<const ::arrow::FixedSizeListType&>(*type);
+    logical_type = LogicalType::FixedSizeList(fixed_size_list_type.list_size());
+  }
+  *out = GroupNode::Make(name, RepetitionFromNullable(nullable), {list}, logical_type,
+                         field_id);
   return Status::OK();
 }
 
@@ -626,8 +633,9 @@ Status MapToSchemaField(const GroupNode& group, LevelInfo current_levels,
   }
   // MAP-annotated groups cannot be repeated unless served as an element within a
   // LIST-annotated group with 2-level structure.
-  if (group.is_repeated() &&
-      (group.parent() == nullptr || !group.parent()->logical_type()->is_list())) {
+  if (group.is_repeated() && (group.parent() == nullptr ||
+                              !(group.parent()->logical_type()->is_list() ||
+                                group.parent()->logical_type()->is_fixed_size_list()))) {
     return Status::Invalid("MAP-annotated groups must not be repeated.");
   }
 
@@ -709,7 +717,9 @@ Status ResolveList(const GroupNode& group, LevelInfo current_levels,
     // When it is repeated, the LIST-annotated 2-level structure can only serve as an
     // element within another LIST-annotated 2-level structure.
     if (group.is_repeated() &&
-        (group.parent() == nullptr || !group.parent()->logical_type()->is_list())) {
+        (group.parent() == nullptr ||
+         !(group.parent()->logical_type()->is_list() ||
+           group.parent()->logical_type()->is_fixed_size_list()))) {
       return Status::Invalid("LIST-annotated groups must not be repeated.");
     }
     return {};
@@ -754,7 +764,8 @@ Status ResolveList(const GroupNode& group, LevelInfo current_levels,
     const auto& repeated_field = list_group.field(0);
     if (!list_group.logical_type()->is_none() || repeated_field->is_repeated()) {
       RETURN_NOT_OK(check_two_level_list_repetition(group));
-      if (list_group.logical_type()->is_list()) {
+      if (list_group.logical_type()->is_list() ||
+          list_group.logical_type()->is_fixed_size_list()) {
         // Special case where the inner type might be a list with two-level encoding
         // like below:
         //
@@ -828,10 +839,18 @@ Status ListToSchemaField(const GroupNode& group, LevelInfo current_levels,
   int16_t repeated_ancestor_def_level = current_levels.IncrementRepeated();
   RETURN_NOT_OK(ResolveList(group, current_levels, ctx, out));
 
-  ARROW_ASSIGN_OR_RAISE(auto list_type,
-                        MakeArrowList(child_field->field, ctx->properties));
+  std::shared_ptr<::arrow::DataType> list_type;
+  if (group.logical_type()->is_fixed_size_list()) {
+    const auto& fixed_size_list_type =
+        checked_cast<const FixedSizeListLogicalType&>(*group.logical_type());
+    list_type =
+        ::arrow::fixed_size_list(child_field->field, fixed_size_list_type.num_values());
+  } else {
+    ARROW_ASSIGN_OR_RAISE(list_type, MakeArrowList(child_field->field, ctx->properties));
+  }
   out->field = ::arrow::field(group.name(), std::move(list_type), group.is_optional(),
                               FieldIdMetadata(group.field_id()));
+  out->is_fixed_size_list = group.logical_type()->is_fixed_size_list();
   out->level_info = current_levels;
   // At this point current levels contains the def level for this list,
   // we need to reset to the prior parent.
@@ -842,7 +861,7 @@ Status ListToSchemaField(const GroupNode& group, LevelInfo current_levels,
 Status GroupToSchemaField(const GroupNode& node, LevelInfo current_levels,
                           SchemaTreeContext* ctx, const SchemaField* parent,
                           SchemaField* out) {
-  if (node.logical_type()->is_list()) {
+  if (node.logical_type()->is_list() || node.logical_type()->is_fixed_size_list()) {
     return ListToSchemaField(node, current_levels, ctx, parent, out);
   } else if (node.logical_type()->is_map()) {
     return MapToSchemaField(node, current_levels, ctx, parent, out);

@@ -463,6 +463,17 @@ struct GeographyType {
 }
 
 /**
+ * Fixed-size list logical type annotation
+ *
+ * Annotates a standard list-shaped column whose non-null parent values contain
+ * exactly num_values children written contiguously. Readers that do not
+ * understand this annotation can interpret the column as a regular LIST.
+ */
+struct FixedSizeListType {
+  1: required i32 num_values
+}
+
+/**
  * LogicalType annotations to replace ConvertedType.
  *
  * To maintain compatibility, implementations using LogicalType for a
@@ -495,6 +506,7 @@ union LogicalType {
   16: VariantType VARIANT     // no compatible ConvertedType
   17: GeometryType GEOMETRY   // no compatible ConvertedType
   18: GeographyType GEOGRAPHY // no compatible ConvertedType
+  19: FixedSizeListType FIXED_SIZE_LIST // no compatible ConvertedType
 }
 
 /**

@@ -1329,6 +1329,7 @@ class PARQUET_EXPORT ArrowWriterProperties {
           truncated_timestamps_allowed_(false),
           store_schema_(false),
           compliant_nested_types_(true),
+          write_fixed_size_list_logical_type_(false),
           engine_version_(V2),
           use_threads_(kArrowDefaultUseThreads),
           executor_(NULLPTR),
@@ -1398,6 +1399,22 @@ class PARQUET_EXPORT ArrowWriterProperties {
       return this;
     }
 
+    /// \brief EXPERIMENTAL: Write Arrow FixedSizeList as a Parquet
+    /// FIXED_SIZE_LIST logical type annotation.
+    ///
+    /// When disabled, Arrow FixedSizeList is written as a regular Parquet LIST.
+    /// This is disabled by default while the logical type is experimental.
+    Builder* enable_fixed_size_list_logical_type() {
+      write_fixed_size_list_logical_type_ = true;
+      return this;
+    }
+
+    /// \brief Disable writing the experimental FIXED_SIZE_LIST logical type.
+    Builder* disable_fixed_size_list_logical_type() {
+      write_fixed_size_list_logical_type_ = false;
+      return this;
+    }
+
     /// Set the version of the Parquet writer engine.
     Builder* set_engine_version(EngineVersion version) {
       engine_version_ = version;
@@ -1440,7 +1457,8 @@ class PARQUET_EXPORT ArrowWriterProperties {
       return std::shared_ptr<ArrowWriterProperties>(new ArrowWriterProperties(
           write_timestamps_as_int96_, coerce_timestamps_enabled_, coerce_timestamps_unit_,
           truncated_timestamps_allowed_, store_schema_, compliant_nested_types_,
-          engine_version_, use_threads_, executor_, write_time_adjusted_to_utc_));
+          write_fixed_size_list_logical_type_, engine_version_, use_threads_, executor_,
+          write_time_adjusted_to_utc_));
     }
 
    private:
@@ -1452,6 +1470,7 @@ class PARQUET_EXPORT ArrowWriterProperties {
 
     bool store_schema_;
     bool compliant_nested_types_;
+    bool write_fixed_size_list_logical_type_;
     EngineVersion engine_version_;
 
     bool use_threads_;
@@ -1478,6 +1497,12 @@ class PARQUET_EXPORT ArrowWriterProperties {
   /// "element".
   bool compliant_nested_types() const { return compliant_nested_types_; }
 
+  /// \brief Whether to write Arrow FixedSizeList using the experimental Parquet
+  /// FIXED_SIZE_LIST logical type annotation.
+  bool write_fixed_size_list_logical_type() const {
+    return write_fixed_size_list_logical_type_;
+  }
+
   /// \brief The underlying engine version to use when writing Arrow data.
   ///
   /// V2 is currently the latest V1 is considered deprecated but left in
@@ -1502,6 +1527,7 @@ class PARQUET_EXPORT ArrowWriterProperties {
                                  ::arrow::TimeUnit::type coerce_timestamps_unit,
                                  bool truncated_timestamps_allowed, bool store_schema,
                                  bool compliant_nested_types,
+                                 bool write_fixed_size_list_logical_type,
                                  EngineVersion engine_version, bool use_threads,
                                  ::arrow::internal::Executor* executor,
                                  bool write_time_adjusted_to_utc)
@@ -1511,6 +1537,7 @@ class PARQUET_EXPORT ArrowWriterProperties {
         truncated_timestamps_allowed_(truncated_timestamps_allowed),
         store_schema_(store_schema),
         compliant_nested_types_(compliant_nested_types),
+        write_fixed_size_list_logical_type_(write_fixed_size_list_logical_type),
         engine_version_(engine_version),
         use_threads_(use_threads),
         executor_(executor),
@@ -1522,6 +1549,7 @@ class PARQUET_EXPORT ArrowWriterProperties {
   const bool truncated_timestamps_allowed_;
   const bool store_schema_;
   const bool compliant_nested_types_;
+  const bool write_fixed_size_list_logical_type_;
   const EngineVersion engine_version_;
   const bool use_threads_;
   ::arrow::internal::Executor* executor_;

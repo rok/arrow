@@ -2255,6 +2255,58 @@ void GeographyType::printTo(std::ostream& out) const {
 }
 
 
+
+FixedSizeListType::~FixedSizeListType() noexcept {
+}
+
+FixedSizeListType::FixedSizeListType() noexcept
+   : num_values(0) {
+}
+
+void FixedSizeListType::__set_num_values(const int32_t val) {
+  this->num_values = val;
+}
+std::ostream& operator<<(std::ostream& out, const FixedSizeListType& obj)
+{
+  obj.printTo(out);
+  return out;
+}
+
+
+void swap(FixedSizeListType &a, FixedSizeListType &b) {
+  using ::std::swap;
+  swap(a.num_values, b.num_values);
+}
+
+bool FixedSizeListType::operator==(const FixedSizeListType & rhs) const
+{
+  if (!(num_values == rhs.num_values))
+    return false;
+  return true;
+}
+
+FixedSizeListType::FixedSizeListType(const FixedSizeListType& other110) noexcept {
+  num_values = other110.num_values;
+}
+FixedSizeListType::FixedSizeListType(FixedSizeListType&& other111) noexcept {
+  num_values = other111.num_values;
+}
+FixedSizeListType& FixedSizeListType::operator=(const FixedSizeListType& other112) noexcept {
+  num_values = other112.num_values;
+  return *this;
+}
+FixedSizeListType& FixedSizeListType::operator=(FixedSizeListType&& other113) noexcept {
+  num_values = other113.num_values;
+  return *this;
+}
+void FixedSizeListType::printTo(std::ostream& out) const {
+  using ::apache::thrift::to_string;
+  out << "FixedSizeListType(";
+  out << "num_values=" << to_string(num_values);
+  out << ")";
+}
+
+
 LogicalType::~LogicalType() noexcept {
 }
 
@@ -2345,6 +2397,11 @@ void LogicalType::__set_GEOGRAPHY(const GeographyType& val) {
   this->GEOGRAPHY = val;
 __isset.GEOGRAPHY = true;
 }
+
+void LogicalType::__set_FIXED_SIZE_LIST(const FixedSizeListType& val) {
+  this->FIXED_SIZE_LIST = val;
+__isset.FIXED_SIZE_LIST = true;
+}
 std::ostream& operator<<(std::ostream& out, const LogicalType& obj)
 {
   obj.printTo(out);
@@ -2371,6 +2428,7 @@ void swap(LogicalType &a, LogicalType &b) {
   swap(a.VARIANT, b.VARIANT);
   swap(a.GEOMETRY, b.GEOMETRY);
   swap(a.GEOGRAPHY, b.GEOGRAPHY);
+  swap(a.FIXED_SIZE_LIST, b.FIXED_SIZE_LIST);
   swap(a.__isset, b.__isset);
 }
 
@@ -2444,6 +2502,10 @@ bool LogicalType::operator==(const LogicalType & rhs) const
     return false;
   else if (__isset.GEOGRAPHY && !(GEOGRAPHY == rhs.GEOGRAPHY))
     return false;
+  if (__isset.FIXED_SIZE_LIST != rhs.__isset.FIXED_SIZE_LIST)
+    return false;
+  else if (__isset.FIXED_SIZE_LIST && !(FIXED_SIZE_LIST == rhs.FIXED_SIZE_LIST))
+    return false;
   return true;
 }
 
@@ -2465,6 +2527,7 @@ LogicalType::LogicalType(const LogicalType& other119) {
   VARIANT = other119.VARIANT;
   GEOMETRY = other119.GEOMETRY;
   GEOGRAPHY = other119.GEOGRAPHY;
+  FIXED_SIZE_LIST = other119.FIXED_SIZE_LIST;
   __isset = other119.__isset;
 }
 LogicalType::LogicalType(LogicalType&& other120) noexcept {
@@ -2485,6 +2548,7 @@ LogicalType::LogicalType(LogicalType&& other120) noexcept {
   VARIANT = std::move(other120.VARIANT);
   GEOMETRY = std::move(other120.GEOMETRY);
   GEOGRAPHY = std::move(other120.GEOGRAPHY);
+  FIXED_SIZE_LIST = std::move(other120.FIXED_SIZE_LIST);
   __isset = other120.__isset;
 }
 LogicalType& LogicalType::operator=(const LogicalType& other121) {
@@ -2505,6 +2569,7 @@ LogicalType& LogicalType::operator=(const LogicalType& other121) {
   VARIANT = other121.VARIANT;
   GEOMETRY = other121.GEOMETRY;
   GEOGRAPHY = other121.GEOGRAPHY;
+  FIXED_SIZE_LIST = other121.FIXED_SIZE_LIST;
   __isset = other121.__isset;
   return *this;
 }
@@ -2526,6 +2591,7 @@ LogicalType& LogicalType::operator=(LogicalType&& other122) noexcept {
   VARIANT = std::move(other122.VARIANT);
   GEOMETRY = std::move(other122.GEOMETRY);
   GEOGRAPHY = std::move(other122.GEOGRAPHY);
+  FIXED_SIZE_LIST = std::move(other122.FIXED_SIZE_LIST);
   __isset = other122.__isset;
   return *this;
 }
@@ -2549,6 +2615,7 @@ void LogicalType::printTo(std::ostream& out) const {
   out << ", " << "VARIANT="; (__isset.VARIANT ? (out << to_string(VARIANT)) : (out << "<null>"));
   out << ", " << "GEOMETRY="; (__isset.GEOMETRY ? (out << to_string(GEOMETRY)) : (out << "<null>"));
   out << ", " << "GEOGRAPHY="; (__isset.GEOGRAPHY ? (out << to_string(GEOGRAPHY)) : (out << "<null>"));
+  out << ", " << "FIXED_SIZE_LIST="; (__isset.FIXED_SIZE_LIST ? (out << to_string(FIXED_SIZE_LIST)) : (out << "<null>"));
   out << ")";
 }
 

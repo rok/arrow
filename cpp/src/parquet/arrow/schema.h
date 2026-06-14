@@ -96,6 +96,9 @@ struct PARQUET_EXPORT SchemaField {
 
   parquet::internal::LevelInfo level_info;
 
+  // True when the Parquet node was annotated with FIXED_SIZE_LIST.
+  bool is_fixed_size_list = false;
+
   bool is_leaf() const { return column_index != -1; }
 };
 

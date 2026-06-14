@@ -620,6 +620,7 @@ cdef class ParquetFileWriteOptions(FileWriteOptions):
             "coerce_timestamps",
             "allow_truncated_timestamps",
             "use_compliant_nested_type",
+            "write_fixed_size_list_logical_type",
         }
 
         setters = set()
@@ -676,6 +677,11 @@ cdef class ParquetFileWriteOptions(FileWriteOptions):
             writer_engine_version="V2",
             use_compliant_nested_type=(
                 self._properties["use_compliant_nested_type"]
+            ),
+            store_schema=True,
+            write_time_adjusted_to_utc=False,
+            write_fixed_size_list_logical_type=(
+                self._properties["write_fixed_size_list_logical_type"]
             )
         )
 
@@ -705,6 +711,7 @@ cdef class ParquetFileWriteOptions(FileWriteOptions):
             coerce_timestamps=None,
             allow_truncated_timestamps=False,
             use_compliant_nested_type=True,
+            write_fixed_size_list_logical_type=False,
             encryption_properties=None,
             write_batch_size=None,
             dictionary_pagesize_limit=None,

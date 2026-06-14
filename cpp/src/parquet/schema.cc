@@ -339,6 +339,13 @@ GroupNode::GroupNode(const std::string& name, Repetition::type repetition,
   if (logical_type_) {
     // Check for logical type <=> node type consistency
     if (logical_type_->is_nested()) {
+      if (logical_type_->is_fixed_size_list()) {
+        if (fields_.size() != 1 || !fields_[0]->is_repeated()) {
+          throw ParquetException(
+              "FIXED_SIZE_LIST logical type must annotate a group with a single "
+              "repeated child");
+        }
+      }
       // For backward compatibility, assign equivalent legacy converted type (if possible)
       converted_type_ = logical_type_->ToConvertedType(nullptr);
     } else {
@@ -716,8 +723,7 @@ struct SchemaPrinter : public Node::ConstVisitor {
 
   void Visit(const GroupNode* node) {
     PrintRepLevel(node->repetition(), stream_);
-    stream_ << " group "
-            << "field_id=" << node->field_id() << " " << node->name();
+    stream_ << " group " << "field_id=" << node->field_id() << " " << node->name();
     auto lt = node->converted_type();
     const auto& la = node->logical_type();
     if (la && la->is_valid() && !la->is_none()) {

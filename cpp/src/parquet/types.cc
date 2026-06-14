@@ -602,6 +602,8 @@ std::shared_ptr<const LogicalType> LogicalType::FromThrift(
     }
 
     return VariantLogicalType::Make(spec_version);
+  } else if (type.__isset.FIXED_SIZE_LIST) {
+    return FixedSizeListLogicalType::Make(type.FIXED_SIZE_LIST.num_values);
   } else {
     // Sentinel type for one we do not recognize
     return UndefinedLogicalType::Make();
@@ -671,6 +673,10 @@ std::shared_ptr<const LogicalType> LogicalType::Geography(
 
 std::shared_ptr<const LogicalType> LogicalType::Variant(int8_t spec_version) {
   return VariantLogicalType::Make(spec_version);
+}
+
+std::shared_ptr<const LogicalType> LogicalType::FixedSizeList(int32_t num_values) {
+  return FixedSizeListLogicalType::Make(num_values);
 }
 
 std::shared_ptr<const LogicalType> LogicalType::None() { return NoLogicalType::Make(); }
@@ -758,6 +764,7 @@ class LogicalType::Impl {
   class Geometry;
   class Geography;
   class Variant;
+  class FixedSizeList;
   class No;
   class Undefined;
 
@@ -839,6 +846,9 @@ bool LogicalType::is_geography() const {
 bool LogicalType::is_variant() const {
   return impl_->type() == LogicalType::Type::VARIANT;
 }
+bool LogicalType::is_fixed_size_list() const {
+  return impl_->type() == LogicalType::Type::FIXED_SIZE_LIST;
+}
 bool LogicalType::is_none() const { return impl_->type() == LogicalType::Type::NONE; }
 bool LogicalType::is_valid() const {
   return impl_->type() != LogicalType::Type::UNDEFINED;
@@ -847,7 +857,8 @@ bool LogicalType::is_invalid() const { return !is_valid(); }
 bool LogicalType::is_nested() const {
   return impl_->type() == LogicalType::Type::LIST ||
          impl_->type() == LogicalType::Type::MAP ||
-         impl_->type() == LogicalType::Type::VARIANT;
+         impl_->type() == LogicalType::Type::VARIANT ||
+         impl_->type() == LogicalType::Type::FIXED_SIZE_LIST;
 }
 bool LogicalType::is_nonnested() const { return !is_nested(); }
 bool LogicalType::is_serialized() const { return impl_->is_serialized(); }
@@ -2013,6 +2024,67 @@ format::LogicalType LogicalType::Impl::Variant::ToThrift() const {
 std::shared_ptr<const LogicalType> VariantLogicalType::Make(const int8_t spec_version) {
   auto logical_type = std::shared_ptr<VariantLogicalType>(new VariantLogicalType());
   logical_type->impl_.reset(new LogicalType::Impl::Variant(spec_version));
+  return logical_type;
+}
+
+class LogicalType::Impl::FixedSizeList final : public LogicalType::Impl::SimpleCompatible,
+                                               public LogicalType::Impl::Inapplicable {
+ public:
+  friend class FixedSizeListLogicalType;
+
+  std::string ToString() const override;
+  std::string ToJSON() const override;
+  format::LogicalType ToThrift() const override;
+  bool Equals(const LogicalType& other) const override;
+
+  int32_t num_values() const { return num_values_; }
+
+ private:
+  explicit FixedSizeList(int32_t num_values)
+      : LogicalType::Impl(LogicalType::Type::FIXED_SIZE_LIST, SortOrder::UNKNOWN),
+        LogicalType::Impl::SimpleCompatible(ConvertedType::LIST),
+        LogicalType::Impl::Inapplicable(),
+        num_values_(num_values) {}
+
+  int32_t num_values_;
+};
+
+int32_t FixedSizeListLogicalType::num_values() const {
+  return (dynamic_cast<const LogicalType::Impl::FixedSizeList&>(*impl_)).num_values();
+}
+
+std::string LogicalType::Impl::FixedSizeList::ToString() const {
+  std::stringstream type;
+  type << "FixedSizeList(" << num_values_ << ")";
+  return type.str();
+}
+
+std::string LogicalType::Impl::FixedSizeList::ToJSON() const {
+  std::stringstream json;
+  json << R"({"Type": "FixedSizeList", "NumValues": )" << num_values_ << "}";
+  return json.str();
+}
+
+format::LogicalType LogicalType::Impl::FixedSizeList::ToThrift() const {
+  format::LogicalType type;
+  format::FixedSizeListType fixed_size_list_type;
+  fixed_size_list_type.__set_num_values(num_values_);
+  type.__set_FIXED_SIZE_LIST(fixed_size_list_type);
+  return type;
+}
+
+bool LogicalType::Impl::FixedSizeList::Equals(const LogicalType& other) const {
+  return other.type() == LogicalType::Type::FIXED_SIZE_LIST &&
+         dynamic_cast<const FixedSizeListLogicalType&>(other).num_values() == num_values_;
+}
+
+std::shared_ptr<const LogicalType> FixedSizeListLogicalType::Make(int32_t num_values) {
+  if (num_values < 0) {
+    throw ParquetException("FixedSizeList logical type requires non-negative num_values");
+  }
+  auto logical_type =
+      std::shared_ptr<FixedSizeListLogicalType>(new FixedSizeListLogicalType());
+  logical_type->impl_.reset(new LogicalType::Impl::FixedSizeList(num_values));
   return logical_type;
 }
 

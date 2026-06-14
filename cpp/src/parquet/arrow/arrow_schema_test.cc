@@ -748,6 +748,24 @@ TEST_F(TestConvertParquetSchema, ParquetLists) {
   }
 }
 
+TEST_F(TestConvertParquetSchema, ParquetFixedSizeList) {
+  std::vector<NodePtr> parquet_fields;
+  std::vector<std::shared_ptr<Field>> arrow_fields;
+
+  auto element = PrimitiveNode::Make("string", Repetition::OPTIONAL,
+                                     ParquetType::BYTE_ARRAY, ConvertedType::UTF8);
+  auto list = GroupNode::Make("list", Repetition::REPEATED, {element});
+  parquet_fields.push_back(GroupNode::Make("my_fixed_size_list", Repetition::OPTIONAL,
+                                           {list}, LogicalType::FixedSizeList(10)));
+
+  auto arrow_element = ::arrow::field("string", UTF8, true);
+  auto arrow_list = ::arrow::fixed_size_list(arrow_element, 10);
+  arrow_fields.push_back(::arrow::field("my_fixed_size_list", arrow_list, true));
+
+  ASSERT_OK(ConvertSchema(parquet_fields));
+  ASSERT_NO_FATAL_FAILURE(CheckFlatSchema(::arrow::schema(arrow_fields)));
+}
+
 TEST_F(TestConvertParquetSchema, UnsupportedThings) {
   std::vector<NodePtr> unsupported_nodes;
 
@@ -1764,6 +1782,26 @@ TEST_F(TestConvertArrowSchema, ParquetOtherLists) {
   }
 
   ASSERT_OK(ConvertSchema(arrow_fields));
+
+  ASSERT_NO_FATAL_FAILURE(CheckFlatSchema(parquet_fields));
+}
+
+TEST_F(TestConvertArrowSchema, ParquetFixedSizeListLogicalTypeEnabled) {
+  std::vector<NodePtr> parquet_fields;
+  std::vector<std::shared_ptr<Field>> arrow_fields;
+
+  auto element = PrimitiveNode::Make("element", Repetition::OPTIONAL,
+                                     ParquetType::BYTE_ARRAY, ConvertedType::UTF8);
+  auto list = GroupNode::Make("list", Repetition::REPEATED, {element});
+  parquet_fields.push_back(GroupNode::Make("my_list", Repetition::REQUIRED, {list},
+                                           LogicalType::FixedSizeList(10)));
+  auto arrow_element = ::arrow::field("string", UTF8, true);
+  auto arrow_list = ::arrow::fixed_size_list(arrow_element, 10);
+  arrow_fields.push_back(::arrow::field("my_list", arrow_list, false));
+
+  ArrowWriterProperties::Builder builder;
+  builder.enable_fixed_size_list_logical_type();
+  ASSERT_OK(ConvertSchema(arrow_fields, builder.build()));
 
   ASSERT_NO_FATAL_FAILURE(CheckFlatSchema(parquet_fields));
 }
