@@ -521,19 +521,6 @@ std::shared_ptr<const LogicalType> LogicalType::FromConvertedType(
 
 namespace {
 
-LogicalType::TimeUnit::unit TimeUnitFromThrift(const format::TimeUnit& unit) {
-  if (unit.__isset.MILLIS) {
-    return LogicalType::TimeUnit::MILLIS;
-  }
-  if (unit.__isset.MICROS) {
-    return LogicalType::TimeUnit::MICROS;
-  }
-  if (unit.__isset.NANOS) {
-    return LogicalType::TimeUnit::NANOS;
-  }
-  return LogicalType::TimeUnit::UNKNOWN;
-}
-
 std::shared_ptr<const LogicalType> VectorElementLogicalTypeFromThrift(
     const format::VectorElementLogicalType& type) {
   if (type.__isset.DECIMAL) {
@@ -548,17 +535,6 @@ std::shared_ptr<const LogicalType> VectorElementLogicalTypeFromThrift(
   }
   if (type.__isset.FLOAT16) {
     return LogicalType::Float16();
-  }
-  if (type.__isset.DATE) {
-    return LogicalType::Date();
-  }
-  if (type.__isset.TIME) {
-    return LogicalType::Time(type.TIME.isAdjustedToUTC,
-                             TimeUnitFromThrift(type.TIME.unit));
-  }
-  if (type.__isset.TIMESTAMP) {
-    return LogicalType::Timestamp(type.TIMESTAMP.isAdjustedToUTC,
-                                  TimeUnitFromThrift(type.TIMESTAMP.unit));
   }
   return nullptr;
 }
@@ -580,11 +556,29 @@ std::shared_ptr<const LogicalType> LogicalType::FromThrift(
   } else if (type.__isset.DATE) {
     return DateLogicalType::Make();
   } else if (type.__isset.TIME) {
-    return TimeLogicalType::Make(type.TIME.isAdjustedToUTC,
-                                 TimeUnitFromThrift(type.TIME.unit));
+    LogicalType::TimeUnit::unit unit;
+    if (type.TIME.unit.__isset.MILLIS) {
+      unit = LogicalType::TimeUnit::MILLIS;
+    } else if (type.TIME.unit.__isset.MICROS) {
+      unit = LogicalType::TimeUnit::MICROS;
+    } else if (type.TIME.unit.__isset.NANOS) {
+      unit = LogicalType::TimeUnit::NANOS;
+    } else {
+      unit = LogicalType::TimeUnit::UNKNOWN;
+    }
+    return TimeLogicalType::Make(type.TIME.isAdjustedToUTC, unit);
   } else if (type.__isset.TIMESTAMP) {
-    return TimestampLogicalType::Make(type.TIMESTAMP.isAdjustedToUTC,
-                                      TimeUnitFromThrift(type.TIMESTAMP.unit));
+    LogicalType::TimeUnit::unit unit;
+    if (type.TIMESTAMP.unit.__isset.MILLIS) {
+      unit = LogicalType::TimeUnit::MILLIS;
+    } else if (type.TIMESTAMP.unit.__isset.MICROS) {
+      unit = LogicalType::TimeUnit::MICROS;
+    } else if (type.TIMESTAMP.unit.__isset.NANOS) {
+      unit = LogicalType::TimeUnit::NANOS;
+    } else {
+      unit = LogicalType::TimeUnit::UNKNOWN;
+    }
+    return TimestampLogicalType::Make(type.TIMESTAMP.isAdjustedToUTC, unit);
     // TODO(tpboudreau): activate the commented code after parquet.thrift
     // recognizes IntervalType as a LogicalType
     //} else if (type.__isset.INTERVAL) {
@@ -2076,8 +2070,6 @@ int32_t VectorElementByteWidth(parquet::Type::type element_type,
     case Type::INT64:
     case Type::DOUBLE:
       return 8;
-    case Type::INT96:
-      return 12;
     case Type::FIXED_LEN_BYTE_ARRAY:
       return element_type_length > 0 ? element_type_length : 0;
     default:
@@ -2091,8 +2083,7 @@ int64_t VectorPhysicalTypeLength(int32_t length, int32_t element_width) {
 
 bool IsSupportedVectorElementLogicalType(const LogicalType& logical_type) {
   return logical_type.is_decimal() || logical_type.is_int() || logical_type.is_UUID() ||
-         logical_type.is_float16() || logical_type.is_date() || logical_type.is_time() ||
-         logical_type.is_timestamp();
+         logical_type.is_float16();
 }
 
 format::VectorElementLogicalType VectorElementLogicalTypeToThrift(
@@ -2107,12 +2098,6 @@ format::VectorElementLogicalType VectorElementLogicalTypeToThrift(
     out.__set_UUID(thrift.UUID);
   } else if (thrift.__isset.FLOAT16) {
     out.__set_FLOAT16(thrift.FLOAT16);
-  } else if (thrift.__isset.DATE) {
-    out.__set_DATE(thrift.DATE);
-  } else if (thrift.__isset.TIME) {
-    out.__set_TIME(thrift.TIME);
-  } else if (thrift.__isset.TIMESTAMP) {
-    out.__set_TIMESTAMP(thrift.TIMESTAMP);
   } else {
     throw ParquetException("Unsupported VECTOR element logical type: ",
                            logical_type.ToString());

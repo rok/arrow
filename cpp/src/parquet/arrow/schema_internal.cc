@@ -211,12 +211,6 @@ Result<std::shared_ptr<ArrowType>> FromVectorElement(
         }
         return integer.is_signed() ? ::arrow::int32() : ::arrow::uint32();
       }
-      if (element_logical_type->is_date()) {
-        return ::arrow::date32();
-      }
-      if (element_logical_type->is_time()) {
-        return MakeArrowTime32(*element_logical_type);
-      }
       break;
     case ParquetType::INT64:
       if (!has_logical_type) {
@@ -230,12 +224,6 @@ Result<std::shared_ptr<ArrowType>> FromVectorElement(
               " require value conversion from physical INT64");
         }
         return integer.is_signed() ? ::arrow::int64() : ::arrow::uint64();
-      }
-      if (element_logical_type->is_timestamp()) {
-        return MakeArrowTimestamp(*element_logical_type);
-      }
-      if (element_logical_type->is_time()) {
-        return MakeArrowTime64(*element_logical_type);
       }
       break;
     case ParquetType::FLOAT:

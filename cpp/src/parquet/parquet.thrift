@@ -478,9 +478,6 @@ union VectorElementLogicalType {
   2: IntType INTEGER
   3: UUIDType UUID
   4: Float16Type FLOAT16
-  5: DateType DATE
-  6: TimeType TIME
-  7: TimestampType TIMESTAMP
 }
 
 struct VectorType {

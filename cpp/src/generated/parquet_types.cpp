@@ -2282,20 +2282,6 @@ void VectorElementLogicalType::__set_FLOAT16(const Float16Type& val) {
 __isset.FLOAT16 = true;
 }
 
-void VectorElementLogicalType::__set_DATE(const DateType& val) {
-  this->DATE = val;
-__isset.DATE = true;
-}
-
-void VectorElementLogicalType::__set_TIME(const TimeType& val) {
-  this->TIME = val;
-__isset.TIME = true;
-}
-
-void VectorElementLogicalType::__set_TIMESTAMP(const TimestampType& val) {
-  this->TIMESTAMP = val;
-__isset.TIMESTAMP = true;
-}
 std::ostream& operator<<(std::ostream& out, const VectorElementLogicalType& obj)
 {
   obj.printTo(out);
@@ -2309,9 +2295,6 @@ void swap(VectorElementLogicalType &a, VectorElementLogicalType &b) {
   swap(a.INTEGER, b.INTEGER);
   swap(a.UUID, b.UUID);
   swap(a.FLOAT16, b.FLOAT16);
-  swap(a.DATE, b.DATE);
-  swap(a.TIME, b.TIME);
-  swap(a.TIMESTAMP, b.TIMESTAMP);
   swap(a.__isset, b.__isset);
 }
 
@@ -2333,18 +2316,6 @@ bool VectorElementLogicalType::operator==(const VectorElementLogicalType & rhs) 
     return false;
   else if (__isset.FLOAT16 && !(FLOAT16 == rhs.FLOAT16))
     return false;
-  if (__isset.DATE != rhs.__isset.DATE)
-    return false;
-  else if (__isset.DATE && !(DATE == rhs.DATE))
-    return false;
-  if (__isset.TIME != rhs.__isset.TIME)
-    return false;
-  else if (__isset.TIME && !(TIME == rhs.TIME))
-    return false;
-  if (__isset.TIMESTAMP != rhs.__isset.TIMESTAMP)
-    return false;
-  else if (__isset.TIMESTAMP && !(TIMESTAMP == rhs.TIMESTAMP))
-    return false;
   return true;
 }
 
@@ -2353,9 +2324,6 @@ VectorElementLogicalType::VectorElementLogicalType(const VectorElementLogicalTyp
   INTEGER = other119.INTEGER;
   UUID = other119.UUID;
   FLOAT16 = other119.FLOAT16;
-  DATE = other119.DATE;
-  TIME = other119.TIME;
-  TIMESTAMP = other119.TIMESTAMP;
   __isset = other119.__isset;
 }
 VectorElementLogicalType::VectorElementLogicalType(VectorElementLogicalType&& other120) noexcept {
@@ -2363,9 +2331,6 @@ VectorElementLogicalType::VectorElementLogicalType(VectorElementLogicalType&& ot
   INTEGER = std::move(other120.INTEGER);
   UUID = std::move(other120.UUID);
   FLOAT16 = std::move(other120.FLOAT16);
-  DATE = std::move(other120.DATE);
-  TIME = std::move(other120.TIME);
-  TIMESTAMP = std::move(other120.TIMESTAMP);
   __isset = other120.__isset;
 }
 VectorElementLogicalType& VectorElementLogicalType::operator=(const VectorElementLogicalType& other121) noexcept {
@@ -2373,9 +2338,6 @@ VectorElementLogicalType& VectorElementLogicalType::operator=(const VectorElemen
   INTEGER = other121.INTEGER;
   UUID = other121.UUID;
   FLOAT16 = other121.FLOAT16;
-  DATE = other121.DATE;
-  TIME = other121.TIME;
-  TIMESTAMP = other121.TIMESTAMP;
   __isset = other121.__isset;
   return *this;
 }
@@ -2384,9 +2346,6 @@ VectorElementLogicalType& VectorElementLogicalType::operator=(VectorElementLogic
   INTEGER = std::move(other122.INTEGER);
   UUID = std::move(other122.UUID);
   FLOAT16 = std::move(other122.FLOAT16);
-  DATE = std::move(other122.DATE);
-  TIME = std::move(other122.TIME);
-  TIMESTAMP = std::move(other122.TIMESTAMP);
   __isset = other122.__isset;
   return *this;
 }
@@ -2397,9 +2356,6 @@ void VectorElementLogicalType::printTo(std::ostream& out) const {
   out << ", " << "INTEGER="; (__isset.INTEGER ? (out << to_string(INTEGER)) : (out << "<null>"));
   out << ", " << "UUID="; (__isset.UUID ? (out << to_string(UUID)) : (out << "<null>"));
   out << ", " << "FLOAT16="; (__isset.FLOAT16 ? (out << to_string(FLOAT16)) : (out << "<null>"));
-  out << ", " << "DATE="; (__isset.DATE ? (out << to_string(DATE)) : (out << "<null>"));
-  out << ", " << "TIME="; (__isset.TIME ? (out << to_string(TIME)) : (out << "<null>"));
-  out << ", " << "TIMESTAMP="; (__isset.TIMESTAMP ? (out << to_string(TIMESTAMP)) : (out << "<null>"));
   out << ")";
 }
 

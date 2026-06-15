@@ -1680,30 +1680,6 @@ uint32_t VectorElementLogicalType::read(Protocol_* iprot) {
           xfer += iprot->skip(ftype);
         }
         break;
-      case 5:
-        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-          xfer += this->DATE.read(iprot);
-          this->__isset.DATE = true;
-        } else {
-          xfer += iprot->skip(ftype);
-        }
-        break;
-      case 6:
-        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-          xfer += this->TIME.read(iprot);
-          this->__isset.TIME = true;
-        } else {
-          xfer += iprot->skip(ftype);
-        }
-        break;
-      case 7:
-        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-          xfer += this->TIMESTAMP.read(iprot);
-          this->__isset.TIMESTAMP = true;
-        } else {
-          xfer += iprot->skip(ftype);
-        }
-        break;
       default:
         xfer += iprot->skip(ftype);
         break;
@@ -1740,21 +1716,6 @@ uint32_t VectorElementLogicalType::write(Protocol_* oprot) const {
   if (this->__isset.FLOAT16) {
     xfer += oprot->writeFieldBegin("FLOAT16", ::apache::thrift::protocol::T_STRUCT, 4);
     xfer += this->FLOAT16.write(oprot);
-    xfer += oprot->writeFieldEnd();
-  }
-  if (this->__isset.DATE) {
-    xfer += oprot->writeFieldBegin("DATE", ::apache::thrift::protocol::T_STRUCT, 5);
-    xfer += this->DATE.write(oprot);
-    xfer += oprot->writeFieldEnd();
-  }
-  if (this->__isset.TIME) {
-    xfer += oprot->writeFieldBegin("TIME", ::apache::thrift::protocol::T_STRUCT, 6);
-    xfer += this->TIME.write(oprot);
-    xfer += oprot->writeFieldEnd();
-  }
-  if (this->__isset.TIMESTAMP) {
-    xfer += oprot->writeFieldBegin("TIMESTAMP", ::apache::thrift::protocol::T_STRUCT, 7);
-    xfer += this->TIMESTAMP.write(oprot);
     xfer += oprot->writeFieldEnd();
   }
   xfer += oprot->writeFieldStop();

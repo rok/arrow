@@ -1621,14 +1621,11 @@ void swap(GeographyType &a, GeographyType &b);
 std::ostream& operator<<(std::ostream& out, const GeographyType& obj);
 
 typedef struct _VectorElementLogicalType__isset {
-  _VectorElementLogicalType__isset() : DECIMAL(false), INTEGER(false), UUID(false), FLOAT16(false), DATE(false), TIME(false), TIMESTAMP(false) {}
+  _VectorElementLogicalType__isset() : DECIMAL(false), INTEGER(false), UUID(false), FLOAT16(false) {}
   bool DECIMAL :1;
   bool INTEGER :1;
   bool UUID :1;
   bool FLOAT16 :1;
-  bool DATE :1;
-  bool TIME :1;
-  bool TIMESTAMP :1;
 } _VectorElementLogicalType__isset;
 
 /**
@@ -1656,9 +1653,6 @@ class VectorElementLogicalType {
   IntType INTEGER;
   UUIDType UUID;
   Float16Type FLOAT16;
-  DateType DATE;
-  TimeType TIME;
-  TimestampType TIMESTAMP;
 
   _VectorElementLogicalType__isset __isset;
 
@@ -1669,12 +1663,6 @@ class VectorElementLogicalType {
   void __set_UUID(const UUIDType& val);
 
   void __set_FLOAT16(const Float16Type& val);
-
-  void __set_DATE(const DateType& val);
-
-  void __set_TIME(const TimeType& val);
-
-  void __set_TIMESTAMP(const TimestampType& val);
 
   bool operator == (const VectorElementLogicalType & rhs) const;
   bool operator != (const VectorElementLogicalType &rhs) const {

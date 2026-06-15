@@ -112,13 +112,10 @@ Result<VectorElementStorage> GetVectorElementStorage(const ::arrow::DataType& ty
                                   fixed_size_binary_type.byte_width(),
                                   fixed_size_binary_type.byte_width(), nullptr};
     }
-    case ArrowTypeId::DATE32:
-      return VectorElementStorage{ParquetType::INT32, 4, -1, LogicalType::Date()};
     default:
       return Status::NotImplemented(
           "VECTOR as FIXED_LEN_BYTE_ARRAY is only implemented for int32, uint32, "
-          "int64, uint64, float, double, float16, fixed_size_binary, and date32 "
-          "elements");
+          "int64, uint64, float, double, float16, and fixed_size_binary elements");
   }
 }
 
