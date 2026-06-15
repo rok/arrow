@@ -20,6 +20,7 @@
 #include <string>
 
 #include "arrow/util/endian.h"
+#include "generated/parquet_types.h"
 #include "parquet/types.h"
 
 namespace parquet {
@@ -33,6 +34,38 @@ TEST(TestTypeToString, PhysicalTypes) {
   ASSERT_STREQ("DOUBLE", TypeToString(Type::DOUBLE).c_str());
   ASSERT_STREQ("BYTE_ARRAY", TypeToString(Type::BYTE_ARRAY).c_str());
   ASSERT_STREQ("FIXED_LEN_BYTE_ARRAY", TypeToString(Type::FIXED_LEN_BYTE_ARRAY).c_str());
+}
+
+TEST(TestLogicalType, Vector) {
+  auto vector = LogicalType::Vector(Type::FLOAT, 768);
+  ASSERT_TRUE(vector->is_vector());
+  ASSERT_TRUE(vector->is_applicable(Type::FIXED_LEN_BYTE_ARRAY, 3072));
+  ASSERT_FALSE(vector->is_applicable(Type::FIXED_LEN_BYTE_ARRAY, 3071));
+
+  auto thrift = vector->ToThrift();
+  ASSERT_TRUE(thrift.__isset.VECTOR);
+  ASSERT_EQ(768, thrift.VECTOR.length);
+  ASSERT_EQ(format::Type::FLOAT, thrift.VECTOR.element.type);
+  ASSERT_FALSE(thrift.VECTOR.element.__isset.logical_type);
+
+  auto roundtrip = LogicalType::FromThrift(thrift);
+  ASSERT_TRUE(vector->Equals(*roundtrip));
+
+  auto zero_length = LogicalType::Vector(Type::FLOAT, 0);
+  ASSERT_TRUE(zero_length->is_applicable(Type::FIXED_LEN_BYTE_ARRAY, 1));
+  ASSERT_FALSE(zero_length->is_applicable(Type::FIXED_LEN_BYTE_ARRAY, 0));
+
+  auto float16_vector = LogicalType::Vector(Type::FIXED_LEN_BYTE_ARRAY, 16,
+                                            /*element_type_length=*/2,
+                                            LogicalType::Float16());
+  ASSERT_TRUE(float16_vector->is_applicable(Type::FIXED_LEN_BYTE_ARRAY, 32));
+  thrift = float16_vector->ToThrift();
+  ASSERT_TRUE(thrift.VECTOR.element.__isset.type_length);
+  ASSERT_EQ(2, thrift.VECTOR.element.type_length);
+  ASSERT_TRUE(thrift.VECTOR.element.__isset.logical_type);
+  ASSERT_TRUE(thrift.VECTOR.element.logical_type.__isset.FLOAT16);
+  roundtrip = LogicalType::FromThrift(thrift);
+  ASSERT_TRUE(float16_vector->Equals(*roundtrip));
 }
 
 TEST(TestConvertedTypeToString, ConvertedTypes) {

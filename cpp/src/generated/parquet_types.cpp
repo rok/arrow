@@ -2255,6 +2255,313 @@ void GeographyType::printTo(std::ostream& out) const {
 }
 
 
+
+VectorElementLogicalType::~VectorElementLogicalType() noexcept {
+}
+
+VectorElementLogicalType::VectorElementLogicalType() noexcept {
+}
+
+void VectorElementLogicalType::__set_DECIMAL(const DecimalType& val) {
+  this->DECIMAL = val;
+__isset.DECIMAL = true;
+}
+
+void VectorElementLogicalType::__set_INTEGER(const IntType& val) {
+  this->INTEGER = val;
+__isset.INTEGER = true;
+}
+
+void VectorElementLogicalType::__set_UUID(const UUIDType& val) {
+  this->UUID = val;
+__isset.UUID = true;
+}
+
+void VectorElementLogicalType::__set_FLOAT16(const Float16Type& val) {
+  this->FLOAT16 = val;
+__isset.FLOAT16 = true;
+}
+
+void VectorElementLogicalType::__set_DATE(const DateType& val) {
+  this->DATE = val;
+__isset.DATE = true;
+}
+
+void VectorElementLogicalType::__set_TIME(const TimeType& val) {
+  this->TIME = val;
+__isset.TIME = true;
+}
+
+void VectorElementLogicalType::__set_TIMESTAMP(const TimestampType& val) {
+  this->TIMESTAMP = val;
+__isset.TIMESTAMP = true;
+}
+std::ostream& operator<<(std::ostream& out, const VectorElementLogicalType& obj)
+{
+  obj.printTo(out);
+  return out;
+}
+
+
+void swap(VectorElementLogicalType &a, VectorElementLogicalType &b) {
+  using ::std::swap;
+  swap(a.DECIMAL, b.DECIMAL);
+  swap(a.INTEGER, b.INTEGER);
+  swap(a.UUID, b.UUID);
+  swap(a.FLOAT16, b.FLOAT16);
+  swap(a.DATE, b.DATE);
+  swap(a.TIME, b.TIME);
+  swap(a.TIMESTAMP, b.TIMESTAMP);
+  swap(a.__isset, b.__isset);
+}
+
+bool VectorElementLogicalType::operator==(const VectorElementLogicalType & rhs) const
+{
+  if (__isset.DECIMAL != rhs.__isset.DECIMAL)
+    return false;
+  else if (__isset.DECIMAL && !(DECIMAL == rhs.DECIMAL))
+    return false;
+  if (__isset.INTEGER != rhs.__isset.INTEGER)
+    return false;
+  else if (__isset.INTEGER && !(INTEGER == rhs.INTEGER))
+    return false;
+  if (__isset.UUID != rhs.__isset.UUID)
+    return false;
+  else if (__isset.UUID && !(UUID == rhs.UUID))
+    return false;
+  if (__isset.FLOAT16 != rhs.__isset.FLOAT16)
+    return false;
+  else if (__isset.FLOAT16 && !(FLOAT16 == rhs.FLOAT16))
+    return false;
+  if (__isset.DATE != rhs.__isset.DATE)
+    return false;
+  else if (__isset.DATE && !(DATE == rhs.DATE))
+    return false;
+  if (__isset.TIME != rhs.__isset.TIME)
+    return false;
+  else if (__isset.TIME && !(TIME == rhs.TIME))
+    return false;
+  if (__isset.TIMESTAMP != rhs.__isset.TIMESTAMP)
+    return false;
+  else if (__isset.TIMESTAMP && !(TIMESTAMP == rhs.TIMESTAMP))
+    return false;
+  return true;
+}
+
+VectorElementLogicalType::VectorElementLogicalType(const VectorElementLogicalType& other119) noexcept {
+  DECIMAL = other119.DECIMAL;
+  INTEGER = other119.INTEGER;
+  UUID = other119.UUID;
+  FLOAT16 = other119.FLOAT16;
+  DATE = other119.DATE;
+  TIME = other119.TIME;
+  TIMESTAMP = other119.TIMESTAMP;
+  __isset = other119.__isset;
+}
+VectorElementLogicalType::VectorElementLogicalType(VectorElementLogicalType&& other120) noexcept {
+  DECIMAL = std::move(other120.DECIMAL);
+  INTEGER = std::move(other120.INTEGER);
+  UUID = std::move(other120.UUID);
+  FLOAT16 = std::move(other120.FLOAT16);
+  DATE = std::move(other120.DATE);
+  TIME = std::move(other120.TIME);
+  TIMESTAMP = std::move(other120.TIMESTAMP);
+  __isset = other120.__isset;
+}
+VectorElementLogicalType& VectorElementLogicalType::operator=(const VectorElementLogicalType& other121) noexcept {
+  DECIMAL = other121.DECIMAL;
+  INTEGER = other121.INTEGER;
+  UUID = other121.UUID;
+  FLOAT16 = other121.FLOAT16;
+  DATE = other121.DATE;
+  TIME = other121.TIME;
+  TIMESTAMP = other121.TIMESTAMP;
+  __isset = other121.__isset;
+  return *this;
+}
+VectorElementLogicalType& VectorElementLogicalType::operator=(VectorElementLogicalType&& other122) noexcept {
+  DECIMAL = std::move(other122.DECIMAL);
+  INTEGER = std::move(other122.INTEGER);
+  UUID = std::move(other122.UUID);
+  FLOAT16 = std::move(other122.FLOAT16);
+  DATE = std::move(other122.DATE);
+  TIME = std::move(other122.TIME);
+  TIMESTAMP = std::move(other122.TIMESTAMP);
+  __isset = other122.__isset;
+  return *this;
+}
+void VectorElementLogicalType::printTo(std::ostream& out) const {
+  using ::apache::thrift::to_string;
+  out << "VectorElementLogicalType(";
+  out << "DECIMAL="; (__isset.DECIMAL ? (out << to_string(DECIMAL)) : (out << "<null>"));
+  out << ", " << "INTEGER="; (__isset.INTEGER ? (out << to_string(INTEGER)) : (out << "<null>"));
+  out << ", " << "UUID="; (__isset.UUID ? (out << to_string(UUID)) : (out << "<null>"));
+  out << ", " << "FLOAT16="; (__isset.FLOAT16 ? (out << to_string(FLOAT16)) : (out << "<null>"));
+  out << ", " << "DATE="; (__isset.DATE ? (out << to_string(DATE)) : (out << "<null>"));
+  out << ", " << "TIME="; (__isset.TIME ? (out << to_string(TIME)) : (out << "<null>"));
+  out << ", " << "TIMESTAMP="; (__isset.TIMESTAMP ? (out << to_string(TIMESTAMP)) : (out << "<null>"));
+  out << ")";
+}
+
+
+VectorElementType::~VectorElementType() noexcept {
+}
+
+VectorElementType::VectorElementType() noexcept
+   : type(static_cast<Type::type>(0)),
+     type_length(0) {
+}
+
+void VectorElementType::__set_type(const Type::type val) {
+  this->type = val;
+__isset.type = true;
+}
+
+void VectorElementType::__set_type_length(const int32_t val) {
+  this->type_length = val;
+__isset.type_length = true;
+}
+
+void VectorElementType::__set_logical_type(const VectorElementLogicalType& val) {
+  this->logical_type = val;
+__isset.logical_type = true;
+}
+std::ostream& operator<<(std::ostream& out, const VectorElementType& obj)
+{
+  obj.printTo(out);
+  return out;
+}
+
+
+void swap(VectorElementType &a, VectorElementType &b) {
+  using ::std::swap;
+  swap(a.type, b.type);
+  swap(a.type_length, b.type_length);
+  swap(a.logical_type, b.logical_type);
+  swap(a.__isset, b.__isset);
+}
+
+bool VectorElementType::operator==(const VectorElementType & rhs) const
+{
+  if (!(type == rhs.type))
+    return false;
+  if (__isset.type_length != rhs.__isset.type_length)
+    return false;
+  else if (__isset.type_length && !(type_length == rhs.type_length))
+    return false;
+  if (__isset.logical_type != rhs.__isset.logical_type)
+    return false;
+  else if (__isset.logical_type && !(logical_type == rhs.logical_type))
+    return false;
+  return true;
+}
+
+VectorElementType::VectorElementType(const VectorElementType& other124) noexcept {
+  type = other124.type;
+  type_length = other124.type_length;
+  logical_type = other124.logical_type;
+  __isset = other124.__isset;
+}
+VectorElementType::VectorElementType(VectorElementType&& other125) noexcept {
+  type = other125.type;
+  type_length = other125.type_length;
+  logical_type = std::move(other125.logical_type);
+  __isset = other125.__isset;
+}
+VectorElementType& VectorElementType::operator=(const VectorElementType& other126) noexcept {
+  type = other126.type;
+  type_length = other126.type_length;
+  logical_type = other126.logical_type;
+  __isset = other126.__isset;
+  return *this;
+}
+VectorElementType& VectorElementType::operator=(VectorElementType&& other127) noexcept {
+  type = other127.type;
+  type_length = other127.type_length;
+  logical_type = std::move(other127.logical_type);
+  __isset = other127.__isset;
+  return *this;
+}
+void VectorElementType::printTo(std::ostream& out) const {
+  using ::apache::thrift::to_string;
+  out << "VectorElementType(";
+  out << "type=" << to_string(type);
+  out << ", " << "type_length="; (__isset.type_length ? (out << to_string(type_length)) : (out << "<null>"));
+  out << ", " << "logical_type="; (__isset.logical_type ? (out << to_string(logical_type)) : (out << "<null>"));
+  out << ")";
+}
+
+
+VectorType::~VectorType() noexcept {
+}
+
+VectorType::VectorType() noexcept
+   : length(0) {
+}
+
+void VectorType::__set_length(const int32_t val) {
+  this->length = val;
+__isset.length = true;
+}
+
+void VectorType::__set_element(const VectorElementType& val) {
+  this->element = val;
+__isset.element = true;
+}
+std::ostream& operator<<(std::ostream& out, const VectorType& obj)
+{
+  obj.printTo(out);
+  return out;
+}
+
+
+void swap(VectorType &a, VectorType &b) {
+  using ::std::swap;
+  swap(a.length, b.length);
+  swap(a.element, b.element);
+  swap(a.__isset, b.__isset);
+}
+
+bool VectorType::operator==(const VectorType & rhs) const
+{
+  if (!(length == rhs.length))
+    return false;
+  if (!(element == rhs.element))
+    return false;
+  return true;
+}
+
+VectorType::VectorType(const VectorType& other128) noexcept {
+  length = other128.length;
+  element = other128.element;
+  __isset = other128.__isset;
+}
+VectorType::VectorType(VectorType&& other129) noexcept {
+  length = other129.length;
+  element = std::move(other129.element);
+  __isset = other129.__isset;
+}
+VectorType& VectorType::operator=(const VectorType& other130) noexcept {
+  length = other130.length;
+  element = other130.element;
+  __isset = other130.__isset;
+  return *this;
+}
+VectorType& VectorType::operator=(VectorType&& other131) noexcept {
+  length = other131.length;
+  element = std::move(other131.element);
+  __isset = other131.__isset;
+  return *this;
+}
+void VectorType::printTo(std::ostream& out) const {
+  using ::apache::thrift::to_string;
+  out << "VectorType(";
+  out << "length=" << to_string(length);
+  out << ", " << "element=" << to_string(element);
+  out << ")";
+}
+
+
 LogicalType::~LogicalType() noexcept {
 }
 
@@ -2345,6 +2652,11 @@ void LogicalType::__set_GEOGRAPHY(const GeographyType& val) {
   this->GEOGRAPHY = val;
 __isset.GEOGRAPHY = true;
 }
+
+void LogicalType::__set_VECTOR(const VectorType& val) {
+  this->VECTOR = val;
+__isset.VECTOR = true;
+}
 std::ostream& operator<<(std::ostream& out, const LogicalType& obj)
 {
   obj.printTo(out);
@@ -2371,6 +2683,7 @@ void swap(LogicalType &a, LogicalType &b) {
   swap(a.VARIANT, b.VARIANT);
   swap(a.GEOMETRY, b.GEOMETRY);
   swap(a.GEOGRAPHY, b.GEOGRAPHY);
+  swap(a.VECTOR, b.VECTOR);
   swap(a.__isset, b.__isset);
 }
 
@@ -2444,6 +2757,10 @@ bool LogicalType::operator==(const LogicalType & rhs) const
     return false;
   else if (__isset.GEOGRAPHY && !(GEOGRAPHY == rhs.GEOGRAPHY))
     return false;
+  if (__isset.VECTOR != rhs.__isset.VECTOR)
+    return false;
+  else if (__isset.VECTOR && !(VECTOR == rhs.VECTOR))
+    return false;
   return true;
 }
 
@@ -2465,6 +2782,7 @@ LogicalType::LogicalType(const LogicalType& other119) {
   VARIANT = other119.VARIANT;
   GEOMETRY = other119.GEOMETRY;
   GEOGRAPHY = other119.GEOGRAPHY;
+  VECTOR = other119.VECTOR;
   __isset = other119.__isset;
 }
 LogicalType::LogicalType(LogicalType&& other120) noexcept {
@@ -2485,6 +2803,7 @@ LogicalType::LogicalType(LogicalType&& other120) noexcept {
   VARIANT = std::move(other120.VARIANT);
   GEOMETRY = std::move(other120.GEOMETRY);
   GEOGRAPHY = std::move(other120.GEOGRAPHY);
+  VECTOR = std::move(other120.VECTOR);
   __isset = other120.__isset;
 }
 LogicalType& LogicalType::operator=(const LogicalType& other121) {
@@ -2505,6 +2824,7 @@ LogicalType& LogicalType::operator=(const LogicalType& other121) {
   VARIANT = other121.VARIANT;
   GEOMETRY = other121.GEOMETRY;
   GEOGRAPHY = other121.GEOGRAPHY;
+  VECTOR = other121.VECTOR;
   __isset = other121.__isset;
   return *this;
 }
@@ -2526,6 +2846,7 @@ LogicalType& LogicalType::operator=(LogicalType&& other122) noexcept {
   VARIANT = std::move(other122.VARIANT);
   GEOMETRY = std::move(other122.GEOMETRY);
   GEOGRAPHY = std::move(other122.GEOGRAPHY);
+  VECTOR = std::move(other122.VECTOR);
   __isset = other122.__isset;
   return *this;
 }
@@ -2549,6 +2870,7 @@ void LogicalType::printTo(std::ostream& out) const {
   out << ", " << "VARIANT="; (__isset.VARIANT ? (out << to_string(VARIANT)) : (out << "<null>"));
   out << ", " << "GEOMETRY="; (__isset.GEOMETRY ? (out << to_string(GEOMETRY)) : (out << "<null>"));
   out << ", " << "GEOGRAPHY="; (__isset.GEOGRAPHY ? (out << to_string(GEOGRAPHY)) : (out << "<null>"));
+  out << ", " << "VECTOR="; (__isset.VECTOR ? (out << to_string(VECTOR)) : (out << "<null>"));
   out << ")";
 }
 

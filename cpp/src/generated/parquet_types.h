@@ -1620,8 +1620,179 @@ void swap(GeographyType &a, GeographyType &b);
 
 std::ostream& operator<<(std::ostream& out, const GeographyType& obj);
 
+typedef struct _VectorElementLogicalType__isset {
+  _VectorElementLogicalType__isset() : DECIMAL(false), INTEGER(false), UUID(false), FLOAT16(false), DATE(false), TIME(false), TIMESTAMP(false) {}
+  bool DECIMAL :1;
+  bool INTEGER :1;
+  bool UUID :1;
+  bool FLOAT16 :1;
+  bool DATE :1;
+  bool TIME :1;
+  bool TIMESTAMP :1;
+} _VectorElementLogicalType__isset;
+
+/**
+ * Logical type annotation for fixed-length dense vectors.
+ *
+ * VectorType describes the logical value independently from a particular
+ * physical representation. This version defines its use on FIXED_LEN_BYTE_ARRAY
+ * primitive nodes, where each non-null value stores length fixed-width elements
+ * packed contiguously. For length > 0, the SchemaElement type_length must equal
+ * length multiplied by the byte width of the element physical type. For
+ * length == 0, the SchemaElement type_length must be 1 and the single physical
+ * byte is padding with no logical meaning.
+ */
+class VectorElementLogicalType {
+ public:
+
+  VectorElementLogicalType(const VectorElementLogicalType&) noexcept;
+  VectorElementLogicalType(VectorElementLogicalType&&) noexcept;
+  VectorElementLogicalType& operator=(const VectorElementLogicalType&) noexcept;
+  VectorElementLogicalType& operator=(VectorElementLogicalType&&) noexcept;
+  VectorElementLogicalType() noexcept;
+
+  virtual ~VectorElementLogicalType() noexcept;
+  DecimalType DECIMAL;
+  IntType INTEGER;
+  UUIDType UUID;
+  Float16Type FLOAT16;
+  DateType DATE;
+  TimeType TIME;
+  TimestampType TIMESTAMP;
+
+  _VectorElementLogicalType__isset __isset;
+
+  void __set_DECIMAL(const DecimalType& val);
+
+  void __set_INTEGER(const IntType& val);
+
+  void __set_UUID(const UUIDType& val);
+
+  void __set_FLOAT16(const Float16Type& val);
+
+  void __set_DATE(const DateType& val);
+
+  void __set_TIME(const TimeType& val);
+
+  void __set_TIMESTAMP(const TimestampType& val);
+
+  bool operator == (const VectorElementLogicalType & rhs) const;
+  bool operator != (const VectorElementLogicalType &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const VectorElementLogicalType & ) const;
+
+  template <class Protocol_>
+  uint32_t read(Protocol_* iprot);
+  template <class Protocol_>
+  uint32_t write(Protocol_* oprot) const;
+
+  virtual void printTo(std::ostream& out) const;
+};
+
+void swap(VectorElementLogicalType &a, VectorElementLogicalType &b);
+
+std::ostream& operator<<(std::ostream& out, const VectorElementLogicalType& obj);
+
+typedef struct _VectorElementType__isset {
+  _VectorElementType__isset() : type(false), type_length(false), logical_type(false) {}
+  bool type :1;
+  bool type_length :1;
+  bool logical_type :1;
+} _VectorElementType__isset;
+
+class VectorElementType {
+ public:
+
+  VectorElementType(const VectorElementType&) noexcept;
+  VectorElementType(VectorElementType&&) noexcept;
+  VectorElementType& operator=(const VectorElementType&) noexcept;
+  VectorElementType& operator=(VectorElementType&&) noexcept;
+  VectorElementType() noexcept;
+
+  virtual ~VectorElementType() noexcept;
+  /**
+   *
+   * @see Type
+   */
+  Type::type type;
+  int32_t type_length;
+  VectorElementLogicalType logical_type;
+
+  _VectorElementType__isset __isset;
+
+  void __set_type(const Type::type val);
+
+  void __set_type_length(const int32_t val);
+
+  void __set_logical_type(const VectorElementLogicalType& val);
+
+  bool operator == (const VectorElementType & rhs) const;
+  bool operator != (const VectorElementType &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const VectorElementType & ) const;
+
+  template <class Protocol_>
+  uint32_t read(Protocol_* iprot);
+  template <class Protocol_>
+  uint32_t write(Protocol_* oprot) const;
+
+  virtual void printTo(std::ostream& out) const;
+};
+
+void swap(VectorElementType &a, VectorElementType &b);
+
+std::ostream& operator<<(std::ostream& out, const VectorElementType& obj);
+
+typedef struct _VectorType__isset {
+  _VectorType__isset() : length(false), element(false) {}
+  bool length :1;
+  bool element :1;
+} _VectorType__isset;
+
+class VectorType {
+ public:
+
+  VectorType(const VectorType&) noexcept;
+  VectorType(VectorType&&) noexcept;
+  VectorType& operator=(const VectorType&) noexcept;
+  VectorType& operator=(VectorType&&) noexcept;
+  VectorType() noexcept;
+
+  virtual ~VectorType() noexcept;
+  int32_t length;
+  VectorElementType element;
+
+  _VectorType__isset __isset;
+
+  void __set_length(const int32_t val);
+
+  void __set_element(const VectorElementType& val);
+
+  bool operator == (const VectorType & rhs) const;
+  bool operator != (const VectorType &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const VectorType & ) const;
+
+  template <class Protocol_>
+  uint32_t read(Protocol_* iprot);
+  template <class Protocol_>
+  uint32_t write(Protocol_* oprot) const;
+
+  virtual void printTo(std::ostream& out) const;
+};
+
+void swap(VectorType &a, VectorType &b);
+
+std::ostream& operator<<(std::ostream& out, const VectorType& obj);
+
 typedef struct _LogicalType__isset {
-  _LogicalType__isset() : STRING(false), MAP(false), LIST(false), ENUM(false), DECIMAL(false), DATE(false), TIME(false), TIMESTAMP(false), INTEGER(false), UNKNOWN(false), JSON(false), BSON(false), UUID(false), FLOAT16(false), VARIANT(false), GEOMETRY(false), GEOGRAPHY(false) {}
+  _LogicalType__isset() : STRING(false), MAP(false), LIST(false), ENUM(false), DECIMAL(false), DATE(false), TIME(false), TIMESTAMP(false), INTEGER(false), UNKNOWN(false), JSON(false), BSON(false), UUID(false), FLOAT16(false), VARIANT(false), GEOMETRY(false), GEOGRAPHY(false), VECTOR(false) {}
   bool STRING :1;
   bool MAP :1;
   bool LIST :1;
@@ -1639,6 +1810,7 @@ typedef struct _LogicalType__isset {
   bool VARIANT :1;
   bool GEOMETRY :1;
   bool GEOGRAPHY :1;
+  bool VECTOR :1;
 } _LogicalType__isset;
 
 /**
@@ -1675,6 +1847,7 @@ class LogicalType {
   VariantType VARIANT;
   GeometryType GEOMETRY;
   GeographyType GEOGRAPHY;
+  VectorType VECTOR;
 
   _LogicalType__isset __isset;
 
@@ -1711,6 +1884,8 @@ class LogicalType {
   void __set_GEOMETRY(const GeometryType& val);
 
   void __set_GEOGRAPHY(const GeographyType& val);
+
+  void __set_VECTOR(const VectorType& val);
 
   bool operator == (const LogicalType & rhs) const;
   bool operator != (const LogicalType &rhs) const {

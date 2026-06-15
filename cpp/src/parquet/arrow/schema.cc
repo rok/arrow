@@ -17,6 +17,7 @@
 
 #include "parquet/arrow/schema.h"
 
+#include <algorithm>
 #include <functional>
 #include <string>
 #include <vector>
@@ -76,6 +77,49 @@ namespace {
 
 Repetition::type RepetitionFromNullable(bool is_nullable) {
   return is_nullable ? Repetition::OPTIONAL : Repetition::REQUIRED;
+}
+
+struct VectorElementStorage {
+  ParquetType::type type;
+  int32_t byte_width;
+  int32_t type_length = -1;
+  std::shared_ptr<const LogicalType> logical_type;
+};
+
+Result<VectorElementStorage> GetVectorElementStorage(const ::arrow::DataType& type) {
+  switch (type.id()) {
+    case ArrowTypeId::INT32:
+      return VectorElementStorage{ParquetType::INT32, 4, -1, nullptr};
+    case ArrowTypeId::UINT32:
+      return VectorElementStorage{ParquetType::INT32, 4, -1,
+                                  LogicalType::Int(32, /*is_signed=*/false)};
+    case ArrowTypeId::INT64:
+      return VectorElementStorage{ParquetType::INT64, 8, -1, nullptr};
+    case ArrowTypeId::UINT64:
+      return VectorElementStorage{ParquetType::INT64, 8, -1,
+                                  LogicalType::Int(64, /*is_signed=*/false)};
+    case ArrowTypeId::FLOAT:
+      return VectorElementStorage{ParquetType::FLOAT, 4, -1, nullptr};
+    case ArrowTypeId::DOUBLE:
+      return VectorElementStorage{ParquetType::DOUBLE, 8, -1, nullptr};
+    case ArrowTypeId::HALF_FLOAT:
+      return VectorElementStorage{ParquetType::FIXED_LEN_BYTE_ARRAY, 2, 2,
+                                  LogicalType::Float16()};
+    case ArrowTypeId::FIXED_SIZE_BINARY: {
+      const auto& fixed_size_binary_type =
+          ::arrow::internal::checked_cast<const ::arrow::FixedSizeBinaryType&>(type);
+      return VectorElementStorage{ParquetType::FIXED_LEN_BYTE_ARRAY,
+                                  fixed_size_binary_type.byte_width(),
+                                  fixed_size_binary_type.byte_width(), nullptr};
+    }
+    case ArrowTypeId::DATE32:
+      return VectorElementStorage{ParquetType::INT32, 4, -1, LogicalType::Date()};
+    default:
+      return Status::NotImplemented(
+          "VECTOR as FIXED_LEN_BYTE_ARRAY is only implemented for int32, uint32, "
+          "int64, uint64, float, double, float16, fixed_size_binary, and date32 "
+          "elements");
+  }
 }
 
 Result<std::shared_ptr<::arrow::DataType>> MakeArrowList(
@@ -453,7 +497,24 @@ Status FieldToNode(const std::string& name, const std::shared_ptr<Field>& field,
       return StructToNode(struct_type, name, field->nullable(), field_id, properties,
                           arrow_properties, out);
     }
-    case ArrowTypeId::FIXED_SIZE_LIST:
+    case ArrowTypeId::FIXED_SIZE_LIST: {
+      auto fixed_size_list_type =
+          std::static_pointer_cast<::arrow::FixedSizeListType>(field->type());
+      if (arrow_properties.write_fixed_size_list_as_vector() &&
+          !fixed_size_list_type->value_field()->nullable()) {
+        ARROW_ASSIGN_OR_RAISE(
+            auto element_storage,
+            GetVectorElementStorage(*fixed_size_list_type->value_type()));
+        type = ParquetType::FIXED_LEN_BYTE_ARRAY;
+        length = std::max(1, element_storage.byte_width * fixed_size_list_type->list_size());
+        logical_type = LogicalType::Vector(
+            element_storage.type, fixed_size_list_type->list_size(),
+            element_storage.type_length, element_storage.logical_type);
+        break;
+      }
+      return ListToNode(fixed_size_list_type, name, field->nullable(), field_id,
+                        properties, arrow_properties, out);
+    }
     case ArrowTypeId::LARGE_LIST:
     case ArrowTypeId::LIST: {
       auto list_type = std::static_pointer_cast<::arrow::BaseListType>(field->type());

@@ -463,6 +463,38 @@ struct GeographyType {
 }
 
 /**
+ * Logical type annotation for fixed-length dense vectors.
+ *
+ * VectorType describes the logical value independently from a particular
+ * physical representation. This version defines its use on FIXED_LEN_BYTE_ARRAY
+ * primitive nodes, where each non-null value stores length fixed-width elements
+ * packed contiguously. For length > 0, the SchemaElement type_length must equal
+ * length multiplied by the byte width of the element physical type. For
+ * length == 0, the SchemaElement type_length must be 1 and the single physical
+ * byte is padding with no logical meaning.
+ */
+union VectorElementLogicalType {
+  1: DecimalType DECIMAL
+  2: IntType INTEGER
+  3: UUIDType UUID
+  4: Float16Type FLOAT16
+  5: DateType DATE
+  6: TimeType TIME
+  7: TimestampType TIMESTAMP
+}
+
+struct VectorElementType {
+  1: required Type type;
+  2: optional i32 type_length;
+  3: optional VectorElementLogicalType logical_type;
+}
+
+struct VectorType {
+  1: required i32 length;
+  2: required VectorElementType element;
+}
+
+/**
  * LogicalType annotations to replace ConvertedType.
  *
  * To maintain compatibility, implementations using LogicalType for a
@@ -495,6 +527,7 @@ union LogicalType {
   16: VariantType VARIANT     // no compatible ConvertedType
   17: GeometryType GEOMETRY   // no compatible ConvertedType
   18: GeographyType GEOGRAPHY // no compatible ConvertedType
+  19: VectorType VECTOR       // no compatible ConvertedType
 }
 
 /**

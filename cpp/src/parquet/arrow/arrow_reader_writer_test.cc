@@ -3341,6 +3341,51 @@ TEST(ArrowReadWrite, FixedSizeList) {
   CheckSimpleRoundtrip(table, 2, props_store_schema);
 }
 
+TEST(ArrowReadWrite, FixedSizeListAsVector) {
+  using ::arrow::field;
+  using ::arrow::fixed_size_list;
+  using ::arrow::internal::checked_cast;
+
+  auto type = fixed_size_list(field("element", ::arrow::float32(), false), /*size=*/3);
+  auto array = ::arrow::ArrayFromJSON(type, R"([[1, 2, 3], null, [4, 5, 6]])");
+  auto table = ::arrow::Table::Make(::arrow::schema({field("root", type)}), {array});
+  auto writer_props =
+      ArrowWriterProperties::Builder().enable_fixed_size_list_as_vector()->build();
+
+  std::shared_ptr<Buffer> buffer;
+  ASSERT_NO_FATAL_FAILURE(WriteTableToBuffer(table, 2, writer_props, &buffer));
+  auto parquet_reader = ParquetFileReader::Open(std::make_shared<BufferReader>(buffer));
+  const auto* descr = parquet_reader->metadata()->schema()->Column(0);
+  ASSERT_EQ(Type::FIXED_LEN_BYTE_ARRAY, descr->physical_type());
+  ASSERT_EQ(12, descr->type_length());
+  ASSERT_TRUE(descr->logical_type()->is_vector());
+  const auto& vector_type =
+      checked_cast<const VectorLogicalType&>(*descr->logical_type());
+  ASSERT_EQ(Type::FLOAT, vector_type.element_type());
+  ASSERT_EQ(3, vector_type.length());
+
+  CheckSimpleRoundtrip(table, 2, writer_props);
+
+  auto zero_length_type =
+      fixed_size_list(field("element", ::arrow::float32(), false), /*size=*/0);
+  auto zero_length_array =
+      ::arrow::ArrayFromJSON(zero_length_type, R"([[], null, []])");
+  auto zero_length_table = ::arrow::Table::Make(
+      ::arrow::schema({field("root", zero_length_type)}), {zero_length_array});
+  ASSERT_NO_FATAL_FAILURE(
+      WriteTableToBuffer(zero_length_table, 2, writer_props, &buffer));
+  parquet_reader = ParquetFileReader::Open(std::make_shared<BufferReader>(buffer));
+  descr = parquet_reader->metadata()->schema()->Column(0);
+  ASSERT_EQ(Type::FIXED_LEN_BYTE_ARRAY, descr->physical_type());
+  ASSERT_EQ(1, descr->type_length());
+  ASSERT_TRUE(descr->logical_type()->is_vector());
+  const auto& zero_length_vector_type =
+      checked_cast<const VectorLogicalType&>(*descr->logical_type());
+  ASSERT_EQ(0, zero_length_vector_type.length());
+
+  CheckSimpleRoundtrip(zero_length_table, 2, writer_props);
+}
+
 TEST(ArrowReadWrite, ListOfStructOfList2) {
   using ::arrow::field;
   using ::arrow::list;

@@ -544,7 +544,54 @@ class LeafReader : public ColumnReaderImpl {
   std::shared_ptr<RecordReader> record_reader_;
 };
 
-// Column reader for extension arrays
+// Column reader for packed VECTOR arrays
+class VectorFLBAReader : public ColumnReaderImpl {
+ public:
+  VectorFLBAReader(std::shared_ptr<Field> field,
+                   std::unique_ptr<ColumnReaderImpl> storage_reader)
+      : field_(std::move(field)), storage_reader_(std::move(storage_reader)) {}
+
+  Status GetDefLevels(const int16_t** data, int64_t* length) override {
+    return storage_reader_->GetDefLevels(data, length);
+  }
+
+  Status GetRepLevels(const int16_t** data, int64_t* length) override {
+    return storage_reader_->GetRepLevels(data, length);
+  }
+
+  Status LoadBatch(int64_t number_of_records) final {
+    return storage_reader_->LoadBatch(number_of_records);
+  }
+
+  Status BuildArray(int64_t length_upper_bound,
+                    std::shared_ptr<ChunkedArray>* out) override {
+    std::shared_ptr<ChunkedArray> storage;
+    RETURN_NOT_OK(storage_reader_->BuildArray(length_upper_bound, &storage));
+    ARROW_ASSIGN_OR_RAISE(std::shared_ptr<ArrayData> storage_data,
+                          ChunksToSingle(*storage));
+
+    const auto& list_type =
+        checked_cast<const ::arrow::FixedSizeListType&>(*field_->type());
+    const int64_t child_length = storage_data->length * list_type.list_size();
+    auto child_data = ::arrow::ArrayData::Make(list_type.value_type(), child_length,
+                                               {nullptr, storage_data->buffers[1]},
+                                               /*null_count=*/0);
+    auto data = ::arrow::ArrayData::Make(
+        field_->type(), storage_data->length, {storage_data->buffers[0]},
+        {std::move(child_data)}, storage_data->null_count);
+    *out = std::make_shared<ChunkedArray>(::arrow::MakeArray(std::move(data)));
+    return Status::OK();
+  }
+
+  bool IsOrHasRepeatedChild() const final { return false; }
+
+  const std::shared_ptr<Field> field() override { return field_; }
+
+ private:
+  std::shared_ptr<Field> field_;
+  std::unique_ptr<ColumnReaderImpl> storage_reader_;
+};
+
 class ExtensionReader : public ColumnReaderImpl {
  public:
   ExtensionReader(std::shared_ptr<Field> field,
@@ -884,8 +931,17 @@ Status GetReader(const SchemaField& field, const std::shared_ptr<Field>& arrow_f
     }
     std::unique_ptr<FileColumnIterator> input(
         ctx->iterator_factory(field.column_index, ctx->reader));
-    *out = std::make_unique<LeafReader>(ctx, arrow_field, std::move(input),
-                                        field.level_info);
+    const auto* descr = ctx->reader->metadata()->schema()->Column(field.column_index);
+    if (descr->logical_type()->is_vector()) {
+      auto storage_field = arrow_field->WithType(
+          ::arrow::fixed_size_binary(descr->type_length()));
+      *out = std::make_unique<VectorFLBAReader>(
+          arrow_field, std::make_unique<LeafReader>(ctx, storage_field, std::move(input),
+                                                    field.level_info));
+    } else {
+      *out = std::make_unique<LeafReader>(ctx, arrow_field, std::move(input),
+                                          field.level_info);
+    }
   } else if (type_id == ::arrow::Type::LIST || type_id == ::arrow::Type::MAP ||
              type_id == ::arrow::Type::FIXED_SIZE_LIST ||
              type_id == ::arrow::Type::LARGE_LIST) {
