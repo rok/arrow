@@ -483,15 +483,11 @@ union VectorElementLogicalType {
   7: TimestampType TIMESTAMP
 }
 
-struct VectorElementType {
-  1: required Type type;
-  2: optional i32 type_length;
-  3: optional VectorElementLogicalType logical_type;
-}
-
 struct VectorType {
   1: required i32 length;
-  2: required VectorElementType element;
+  2: required Type element_type;
+  3: optional i32 element_type_length;
+  4: optional VectorElementLogicalType element_logical_type;
 }
 
 /**

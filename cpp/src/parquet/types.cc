@@ -632,13 +632,13 @@ std::shared_ptr<const LogicalType> LogicalType::FromThrift(
     return VariantLogicalType::Make(spec_version);
   } else if (type.__isset.VECTOR) {
     std::shared_ptr<const LogicalType> element_logical_type;
-    if (type.VECTOR.element.__isset.logical_type) {
+    if (type.VECTOR.__isset.element_logical_type) {
       element_logical_type =
-          VectorElementLogicalTypeFromThrift(type.VECTOR.element.logical_type);
+          VectorElementLogicalTypeFromThrift(type.VECTOR.element_logical_type);
     }
     return VectorLogicalType::Make(
-        static_cast<parquet::Type::type>(type.VECTOR.element.type), type.VECTOR.length,
-        type.VECTOR.element.__isset.type_length ? type.VECTOR.element.type_length : -1,
+        static_cast<parquet::Type::type>(type.VECTOR.element_type), type.VECTOR.length,
+        type.VECTOR.__isset.element_type_length ? type.VECTOR.element_type_length : -1,
         std::move(element_logical_type));
   } else {
     // Sentinel type for one we do not recognize
@@ -2210,19 +2210,16 @@ std::string LogicalType::Impl::Vector::ToJSON() const {
 
 format::LogicalType LogicalType::Impl::Vector::ToThrift() const {
   format::LogicalType type;
-  format::VectorElementType element;
-  element.__set_type(static_cast<format::Type::type>(element_type_));
-  if (element_type_length_ > 0) {
-    element.__set_type_length(element_type_length_);
-  }
-  if (element_logical_type_ != nullptr) {
-    element.__set_logical_type(
-        VectorElementLogicalTypeToThrift(*element_logical_type_));
-  }
-
   format::VectorType vector_type;
   vector_type.__set_length(length_);
-  vector_type.__set_element(element);
+  vector_type.__set_element_type(static_cast<format::Type::type>(element_type_));
+  if (element_type_length_ > 0) {
+    vector_type.__set_element_type_length(element_type_length_);
+  }
+  if (element_logical_type_ != nullptr) {
+    vector_type.__set_element_logical_type(
+        VectorElementLogicalTypeToThrift(*element_logical_type_));
+  }
   type.__set_VECTOR(vector_type);
   return type;
 }

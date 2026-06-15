@@ -45,8 +45,8 @@ TEST(TestLogicalType, Vector) {
   auto thrift = vector->ToThrift();
   ASSERT_TRUE(thrift.__isset.VECTOR);
   ASSERT_EQ(768, thrift.VECTOR.length);
-  ASSERT_EQ(format::Type::FLOAT, thrift.VECTOR.element.type);
-  ASSERT_FALSE(thrift.VECTOR.element.__isset.logical_type);
+  ASSERT_EQ(format::Type::FLOAT, thrift.VECTOR.element_type);
+  ASSERT_FALSE(thrift.VECTOR.__isset.element_logical_type);
 
   auto roundtrip = LogicalType::FromThrift(thrift);
   ASSERT_TRUE(vector->Equals(*roundtrip));
@@ -60,10 +60,10 @@ TEST(TestLogicalType, Vector) {
                                             LogicalType::Float16());
   ASSERT_TRUE(float16_vector->is_applicable(Type::FIXED_LEN_BYTE_ARRAY, 32));
   thrift = float16_vector->ToThrift();
-  ASSERT_TRUE(thrift.VECTOR.element.__isset.type_length);
-  ASSERT_EQ(2, thrift.VECTOR.element.type_length);
-  ASSERT_TRUE(thrift.VECTOR.element.__isset.logical_type);
-  ASSERT_TRUE(thrift.VECTOR.element.logical_type.__isset.FLOAT16);
+  ASSERT_TRUE(thrift.VECTOR.__isset.element_type_length);
+  ASSERT_EQ(2, thrift.VECTOR.element_type_length);
+  ASSERT_TRUE(thrift.VECTOR.__isset.element_logical_type);
+  ASSERT_TRUE(thrift.VECTOR.element_logical_type.__isset.FLOAT16);
   roundtrip = LogicalType::FromThrift(thrift);
   ASSERT_TRUE(float16_vector->Equals(*roundtrip));
 }

@@ -2404,99 +2404,13 @@ void VectorElementLogicalType::printTo(std::ostream& out) const {
 }
 
 
-VectorElementType::~VectorElementType() noexcept {
-}
-
-VectorElementType::VectorElementType() noexcept
-   : type(static_cast<Type::type>(0)),
-     type_length(0) {
-}
-
-void VectorElementType::__set_type(const Type::type val) {
-  this->type = val;
-__isset.type = true;
-}
-
-void VectorElementType::__set_type_length(const int32_t val) {
-  this->type_length = val;
-__isset.type_length = true;
-}
-
-void VectorElementType::__set_logical_type(const VectorElementLogicalType& val) {
-  this->logical_type = val;
-__isset.logical_type = true;
-}
-std::ostream& operator<<(std::ostream& out, const VectorElementType& obj)
-{
-  obj.printTo(out);
-  return out;
-}
-
-
-void swap(VectorElementType &a, VectorElementType &b) {
-  using ::std::swap;
-  swap(a.type, b.type);
-  swap(a.type_length, b.type_length);
-  swap(a.logical_type, b.logical_type);
-  swap(a.__isset, b.__isset);
-}
-
-bool VectorElementType::operator==(const VectorElementType & rhs) const
-{
-  if (!(type == rhs.type))
-    return false;
-  if (__isset.type_length != rhs.__isset.type_length)
-    return false;
-  else if (__isset.type_length && !(type_length == rhs.type_length))
-    return false;
-  if (__isset.logical_type != rhs.__isset.logical_type)
-    return false;
-  else if (__isset.logical_type && !(logical_type == rhs.logical_type))
-    return false;
-  return true;
-}
-
-VectorElementType::VectorElementType(const VectorElementType& other124) noexcept {
-  type = other124.type;
-  type_length = other124.type_length;
-  logical_type = other124.logical_type;
-  __isset = other124.__isset;
-}
-VectorElementType::VectorElementType(VectorElementType&& other125) noexcept {
-  type = other125.type;
-  type_length = other125.type_length;
-  logical_type = std::move(other125.logical_type);
-  __isset = other125.__isset;
-}
-VectorElementType& VectorElementType::operator=(const VectorElementType& other126) noexcept {
-  type = other126.type;
-  type_length = other126.type_length;
-  logical_type = other126.logical_type;
-  __isset = other126.__isset;
-  return *this;
-}
-VectorElementType& VectorElementType::operator=(VectorElementType&& other127) noexcept {
-  type = other127.type;
-  type_length = other127.type_length;
-  logical_type = std::move(other127.logical_type);
-  __isset = other127.__isset;
-  return *this;
-}
-void VectorElementType::printTo(std::ostream& out) const {
-  using ::apache::thrift::to_string;
-  out << "VectorElementType(";
-  out << "type=" << to_string(type);
-  out << ", " << "type_length="; (__isset.type_length ? (out << to_string(type_length)) : (out << "<null>"));
-  out << ", " << "logical_type="; (__isset.logical_type ? (out << to_string(logical_type)) : (out << "<null>"));
-  out << ")";
-}
-
-
 VectorType::~VectorType() noexcept {
 }
 
 VectorType::VectorType() noexcept
-   : length(0) {
+   : length(0),
+     element_type(static_cast<Type::type>(0)),
+     element_type_length(0) {
 }
 
 void VectorType::__set_length(const int32_t val) {
@@ -2504,9 +2418,19 @@ void VectorType::__set_length(const int32_t val) {
 __isset.length = true;
 }
 
-void VectorType::__set_element(const VectorElementType& val) {
-  this->element = val;
-__isset.element = true;
+void VectorType::__set_element_type(const Type::type val) {
+  this->element_type = val;
+__isset.element_type = true;
+}
+
+void VectorType::__set_element_type_length(const int32_t val) {
+  this->element_type_length = val;
+__isset.element_type_length = true;
+}
+
+void VectorType::__set_element_logical_type(const VectorElementLogicalType& val) {
+  this->element_logical_type = val;
+__isset.element_logical_type = true;
 }
 std::ostream& operator<<(std::ostream& out, const VectorType& obj)
 {
@@ -2518,7 +2442,9 @@ std::ostream& operator<<(std::ostream& out, const VectorType& obj)
 void swap(VectorType &a, VectorType &b) {
   using ::std::swap;
   swap(a.length, b.length);
-  swap(a.element, b.element);
+  swap(a.element_type, b.element_type);
+  swap(a.element_type_length, b.element_type_length);
+  swap(a.element_logical_type, b.element_logical_type);
   swap(a.__isset, b.__isset);
 }
 
@@ -2526,38 +2452,56 @@ bool VectorType::operator==(const VectorType & rhs) const
 {
   if (!(length == rhs.length))
     return false;
-  if (!(element == rhs.element))
+  if (!(element_type == rhs.element_type))
+    return false;
+  if (__isset.element_type_length != rhs.__isset.element_type_length)
+    return false;
+  else if (__isset.element_type_length && !(element_type_length == rhs.element_type_length))
+    return false;
+  if (__isset.element_logical_type != rhs.__isset.element_logical_type)
+    return false;
+  else if (__isset.element_logical_type && !(element_logical_type == rhs.element_logical_type))
     return false;
   return true;
 }
 
-VectorType::VectorType(const VectorType& other128) noexcept {
-  length = other128.length;
-  element = other128.element;
-  __isset = other128.__isset;
+VectorType::VectorType(const VectorType& other124) noexcept {
+  length = other124.length;
+  element_type = other124.element_type;
+  element_type_length = other124.element_type_length;
+  element_logical_type = other124.element_logical_type;
+  __isset = other124.__isset;
 }
-VectorType::VectorType(VectorType&& other129) noexcept {
-  length = other129.length;
-  element = std::move(other129.element);
-  __isset = other129.__isset;
+VectorType::VectorType(VectorType&& other125) noexcept {
+  length = other125.length;
+  element_type = other125.element_type;
+  element_type_length = other125.element_type_length;
+  element_logical_type = std::move(other125.element_logical_type);
+  __isset = other125.__isset;
 }
-VectorType& VectorType::operator=(const VectorType& other130) noexcept {
-  length = other130.length;
-  element = other130.element;
-  __isset = other130.__isset;
+VectorType& VectorType::operator=(const VectorType& other126) noexcept {
+  length = other126.length;
+  element_type = other126.element_type;
+  element_type_length = other126.element_type_length;
+  element_logical_type = other126.element_logical_type;
+  __isset = other126.__isset;
   return *this;
 }
-VectorType& VectorType::operator=(VectorType&& other131) noexcept {
-  length = other131.length;
-  element = std::move(other131.element);
-  __isset = other131.__isset;
+VectorType& VectorType::operator=(VectorType&& other127) noexcept {
+  length = other127.length;
+  element_type = other127.element_type;
+  element_type_length = other127.element_type_length;
+  element_logical_type = std::move(other127.element_logical_type);
+  __isset = other127.__isset;
   return *this;
 }
 void VectorType::printTo(std::ostream& out) const {
   using ::apache::thrift::to_string;
   out << "VectorType(";
   out << "length=" << to_string(length);
-  out << ", " << "element=" << to_string(element);
+  out << ", " << "element_type=" << to_string(element_type);
+  out << ", " << "element_type_length="; (__isset.element_type_length ? (out << to_string(element_type_length)) : (out << "<null>"));
+  out << ", " << "element_logical_type="; (__isset.element_logical_type ? (out << to_string(element_logical_type)) : (out << "<null>"));
   out << ")";
 }
 

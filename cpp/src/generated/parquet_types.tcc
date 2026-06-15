@@ -1763,95 +1763,6 @@ uint32_t VectorElementLogicalType::write(Protocol_* oprot) const {
 }
 
 template <class Protocol_>
-uint32_t VectorElementType::read(Protocol_* iprot) {
-
-  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-  uint32_t xfer = 0;
-  std::string fname;
-  ::apache::thrift::protocol::TType ftype;
-  int16_t fid;
-
-  xfer += iprot->readStructBegin(fname);
-
-  using ::apache::thrift::protocol::TProtocolException;
-
-  bool isset_type = false;
-
-  while (true)
-  {
-    xfer += iprot->readFieldBegin(fname, ftype, fid);
-    if (ftype == ::apache::thrift::protocol::T_STOP) {
-      break;
-    }
-    switch (fid)
-    {
-      case 1:
-        if (ftype == ::apache::thrift::protocol::T_I32) {
-          int32_t ecast123;
-          xfer += iprot->readI32(ecast123);
-          this->type = static_cast<Type::type>(ecast123);
-          this->__isset.type = true;
-          isset_type = true;
-        } else {
-          xfer += iprot->skip(ftype);
-        }
-        break;
-      case 2:
-        if (ftype == ::apache::thrift::protocol::T_I32) {
-          xfer += iprot->readI32(this->type_length);
-          this->__isset.type_length = true;
-        } else {
-          xfer += iprot->skip(ftype);
-        }
-        break;
-      case 3:
-        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-          xfer += this->logical_type.read(iprot);
-          this->__isset.logical_type = true;
-        } else {
-          xfer += iprot->skip(ftype);
-        }
-        break;
-      default:
-        xfer += iprot->skip(ftype);
-        break;
-    }
-    xfer += iprot->readFieldEnd();
-  }
-
-  xfer += iprot->readStructEnd();
-
-  if (!isset_type)
-    throw TProtocolException(TProtocolException::INVALID_DATA);
-  return xfer;
-}
-
-template <class Protocol_>
-uint32_t VectorElementType::write(Protocol_* oprot) const {
-  uint32_t xfer = 0;
-  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
-  xfer += oprot->writeStructBegin("VectorElementType");
-
-  xfer += oprot->writeFieldBegin("type", ::apache::thrift::protocol::T_I32, 1);
-  xfer += oprot->writeI32(static_cast<int32_t>(this->type));
-  xfer += oprot->writeFieldEnd();
-
-  if (this->__isset.type_length) {
-    xfer += oprot->writeFieldBegin("type_length", ::apache::thrift::protocol::T_I32, 2);
-    xfer += oprot->writeI32(this->type_length);
-    xfer += oprot->writeFieldEnd();
-  }
-  if (this->__isset.logical_type) {
-    xfer += oprot->writeFieldBegin("logical_type", ::apache::thrift::protocol::T_STRUCT, 3);
-    xfer += this->logical_type.write(oprot);
-    xfer += oprot->writeFieldEnd();
-  }
-  xfer += oprot->writeFieldStop();
-  xfer += oprot->writeStructEnd();
-  return xfer;
-}
-
-template <class Protocol_>
 uint32_t VectorType::read(Protocol_* iprot) {
 
   ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
@@ -1865,7 +1776,7 @@ uint32_t VectorType::read(Protocol_* iprot) {
   using ::apache::thrift::protocol::TProtocolException;
 
   bool isset_length = false;
-  bool isset_element = false;
+  bool isset_element_type = false;
 
   while (true)
   {
@@ -1885,10 +1796,28 @@ uint32_t VectorType::read(Protocol_* iprot) {
         }
         break;
       case 2:
+        if (ftype == ::apache::thrift::protocol::T_I32) {
+          int32_t ecast123;
+          xfer += iprot->readI32(ecast123);
+          this->element_type = static_cast<Type::type>(ecast123);
+          this->__isset.element_type = true;
+          isset_element_type = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 3:
+        if (ftype == ::apache::thrift::protocol::T_I32) {
+          xfer += iprot->readI32(this->element_type_length);
+          this->__isset.element_type_length = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 4:
         if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-          xfer += this->element.read(iprot);
-          this->__isset.element = true;
-          isset_element = true;
+          xfer += this->element_logical_type.read(iprot);
+          this->__isset.element_logical_type = true;
         } else {
           xfer += iprot->skip(ftype);
         }
@@ -1904,7 +1833,7 @@ uint32_t VectorType::read(Protocol_* iprot) {
 
   if (!isset_length)
     throw TProtocolException(TProtocolException::INVALID_DATA);
-  if (!isset_element)
+  if (!isset_element_type)
     throw TProtocolException(TProtocolException::INVALID_DATA);
   return xfer;
 }
@@ -1919,10 +1848,20 @@ uint32_t VectorType::write(Protocol_* oprot) const {
   xfer += oprot->writeI32(this->length);
   xfer += oprot->writeFieldEnd();
 
-  xfer += oprot->writeFieldBegin("element", ::apache::thrift::protocol::T_STRUCT, 2);
-  xfer += this->element.write(oprot);
+  xfer += oprot->writeFieldBegin("element_type", ::apache::thrift::protocol::T_I32, 2);
+  xfer += oprot->writeI32(static_cast<int32_t>(this->element_type));
   xfer += oprot->writeFieldEnd();
 
+  if (this->__isset.element_type_length) {
+    xfer += oprot->writeFieldBegin("element_type_length", ::apache::thrift::protocol::T_I32, 3);
+    xfer += oprot->writeI32(this->element_type_length);
+    xfer += oprot->writeFieldEnd();
+  }
+  if (this->__isset.element_logical_type) {
+    xfer += oprot->writeFieldBegin("element_logical_type", ::apache::thrift::protocol::T_STRUCT, 4);
+    xfer += this->element_logical_type.write(oprot);
+    xfer += oprot->writeFieldEnd();
+  }
   xfer += oprot->writeFieldStop();
   xfer += oprot->writeStructEnd();
   return xfer;

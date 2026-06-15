@@ -1695,62 +1695,12 @@ void swap(VectorElementLogicalType &a, VectorElementLogicalType &b);
 
 std::ostream& operator<<(std::ostream& out, const VectorElementLogicalType& obj);
 
-typedef struct _VectorElementType__isset {
-  _VectorElementType__isset() : type(false), type_length(false), logical_type(false) {}
-  bool type :1;
-  bool type_length :1;
-  bool logical_type :1;
-} _VectorElementType__isset;
-
-class VectorElementType {
- public:
-
-  VectorElementType(const VectorElementType&) noexcept;
-  VectorElementType(VectorElementType&&) noexcept;
-  VectorElementType& operator=(const VectorElementType&) noexcept;
-  VectorElementType& operator=(VectorElementType&&) noexcept;
-  VectorElementType() noexcept;
-
-  virtual ~VectorElementType() noexcept;
-  /**
-   *
-   * @see Type
-   */
-  Type::type type;
-  int32_t type_length;
-  VectorElementLogicalType logical_type;
-
-  _VectorElementType__isset __isset;
-
-  void __set_type(const Type::type val);
-
-  void __set_type_length(const int32_t val);
-
-  void __set_logical_type(const VectorElementLogicalType& val);
-
-  bool operator == (const VectorElementType & rhs) const;
-  bool operator != (const VectorElementType &rhs) const {
-    return !(*this == rhs);
-  }
-
-  bool operator < (const VectorElementType & ) const;
-
-  template <class Protocol_>
-  uint32_t read(Protocol_* iprot);
-  template <class Protocol_>
-  uint32_t write(Protocol_* oprot) const;
-
-  virtual void printTo(std::ostream& out) const;
-};
-
-void swap(VectorElementType &a, VectorElementType &b);
-
-std::ostream& operator<<(std::ostream& out, const VectorElementType& obj);
-
 typedef struct _VectorType__isset {
-  _VectorType__isset() : length(false), element(false) {}
+  _VectorType__isset() : length(false), element_type(false), element_type_length(false), element_logical_type(false) {}
   bool length :1;
-  bool element :1;
+  bool element_type :1;
+  bool element_type_length :1;
+  bool element_logical_type :1;
 } _VectorType__isset;
 
 class VectorType {
@@ -1764,13 +1714,23 @@ class VectorType {
 
   virtual ~VectorType() noexcept;
   int32_t length;
-  VectorElementType element;
+  /**
+   *
+   * @see Type
+   */
+  Type::type element_type;
+  int32_t element_type_length;
+  VectorElementLogicalType element_logical_type;
 
   _VectorType__isset __isset;
 
   void __set_length(const int32_t val);
 
-  void __set_element(const VectorElementType& val);
+  void __set_element_type(const Type::type val);
+
+  void __set_element_type_length(const int32_t val);
+
+  void __set_element_logical_type(const VectorElementLogicalType& val);
 
   bool operator == (const VectorType & rhs) const;
   bool operator != (const VectorType &rhs) const {
