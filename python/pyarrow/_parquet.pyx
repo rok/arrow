@@ -2328,8 +2328,6 @@ cdef shared_ptr[ArrowWriterProperties] _create_arrow_writer_properties(
 
     if write_fixed_size_list_as_vector:
         arrow_props.enable_fixed_size_list_as_vector()
-    else:
-        arrow_props.disable_fixed_size_list_as_vector()
 
     # writer_engine_version
 

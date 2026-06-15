@@ -17,7 +17,6 @@
 
 #include "parquet/arrow/schema.h"
 
-#include <algorithm>
 #include <functional>
 #include <string>
 #include <vector>
@@ -503,7 +502,9 @@ Status FieldToNode(const std::string& name, const std::shared_ptr<Field>& field,
             auto element_storage,
             GetVectorElementStorage(*fixed_size_list_type->value_type()));
         type = ParquetType::FIXED_LEN_BYTE_ARRAY;
-        length = std::max(1, element_storage.byte_width * fixed_size_list_type->list_size());
+        length = fixed_size_list_type->list_size() == 0
+                     ? 1
+                     : element_storage.byte_width * fixed_size_list_type->list_size();
         logical_type = LogicalType::Vector(
             element_storage.type, fixed_size_list_type->list_size(),
             element_storage.type_length, element_storage.logical_type);

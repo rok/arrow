@@ -1375,12 +1375,6 @@ class PARQUET_EXPORT ArrowWriterProperties {
       return this;
     }
 
-    /// \brief Disable writing Arrow FixedSizeList as annotated FIXED_LEN_BYTE_ARRAY.
-    Builder* disable_fixed_size_list_as_vector() {
-      write_fixed_size_list_as_vector_ = false;
-      return this;
-    }
-
     /// Set the version of the Parquet writer engine.
     Builder* set_engine_version(EngineVersion version) {
       engine_version_ = version;

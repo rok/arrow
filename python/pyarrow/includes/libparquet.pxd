@@ -531,7 +531,6 @@ cdef extern from "parquet/api/writer.h" namespace "parquet" nogil:
             Builder* enable_compliant_nested_types()
             Builder* disable_compliant_nested_types()
             Builder* enable_fixed_size_list_as_vector()
-            Builder* disable_fixed_size_list_as_vector()
             Builder* set_engine_version(ArrowWriterEngineVersion version)
             Builder* set_time_adjusted_to_utc(c_bool adjusted)
             shared_ptr[ArrowWriterProperties] build()
