@@ -205,9 +205,9 @@ Result<std::shared_ptr<ArrowType>> FromVectorElement(
       if (element_logical_type->is_int()) {
         const auto& integer = checked_cast<const IntLogicalType&>(*element_logical_type);
         if (integer.bit_width() != 32) {
-          return Status::NotImplemented(
-              "VECTOR IntType elements with bit width ", integer.bit_width(),
-              " require value conversion from physical INT32");
+          return Status::NotImplemented("VECTOR IntType elements with bit width ",
+                                        integer.bit_width(),
+                                        " require value conversion from physical INT32");
         }
         return integer.is_signed() ? ::arrow::int32() : ::arrow::uint32();
       }
@@ -219,9 +219,9 @@ Result<std::shared_ptr<ArrowType>> FromVectorElement(
       if (element_logical_type->is_int()) {
         const auto& integer = checked_cast<const IntLogicalType&>(*element_logical_type);
         if (integer.bit_width() != 64) {
-          return Status::NotImplemented(
-              "VECTOR IntType elements with bit width ", integer.bit_width(),
-              " require value conversion from physical INT64");
+          return Status::NotImplemented("VECTOR IntType elements with bit width ",
+                                        integer.bit_width(),
+                                        " require value conversion from physical INT64");
         }
         return integer.is_signed() ? ::arrow::int64() : ::arrow::uint64();
       }

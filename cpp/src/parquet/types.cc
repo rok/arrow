@@ -879,9 +879,7 @@ bool LogicalType::is_geography() const {
 bool LogicalType::is_variant() const {
   return impl_->type() == LogicalType::Type::VARIANT;
 }
-bool LogicalType::is_vector() const {
-  return impl_->type() == LogicalType::Type::VECTOR;
-}
+bool LogicalType::is_vector() const { return impl_->type() == LogicalType::Type::VECTOR; }
 bool LogicalType::is_none() const { return impl_->type() == LogicalType::Type::NONE; }
 bool LogicalType::is_valid() const {
   return impl_->type() != LogicalType::Type::UNDEFINED;
@@ -2143,7 +2141,8 @@ class LogicalType::Impl::Vector final : public LogicalType::Impl::Incompatible,
 
 bool LogicalType::Impl::Vector::is_applicable(parquet::Type::type primitive_type,
                                               int32_t primitive_length) const {
-  const int32_t element_width = VectorElementByteWidth(element_type_, element_type_length_);
+  const int32_t element_width =
+      VectorElementByteWidth(element_type_, element_type_length_);
   return primitive_type == parquet::Type::FIXED_LEN_BYTE_ARRAY && element_width > 0 &&
          primitive_length == VectorPhysicalTypeLength(length_, element_width);
 }
@@ -2161,8 +2160,7 @@ int32_t VectorLogicalType::element_type_length() const {
 }
 
 std::shared_ptr<const LogicalType> VectorLogicalType::element_logical_type() const {
-  return (dynamic_cast<const LogicalType::Impl::Vector&>(*impl_))
-      .element_logical_type();
+  return (dynamic_cast<const LogicalType::Impl::Vector&>(*impl_)).element_logical_type();
 }
 
 std::string LogicalType::Impl::Vector::ToString() const {
@@ -2232,7 +2230,8 @@ std::shared_ptr<const LogicalType> VectorLogicalType::Make(
     throw ParquetException("Vector logical type requires non-negative length");
   }
   if (VectorElementByteWidth(element_type, element_type_length) == 0) {
-    throw ParquetException("Unsupported VECTOR element type: ", TypeToString(element_type));
+    throw ParquetException("Unsupported VECTOR element type: ",
+                           TypeToString(element_type));
   }
   if (element_logical_type != nullptr && !element_logical_type->is_none()) {
     if (!IsSupportedVectorElementLogicalType(*element_logical_type)) {

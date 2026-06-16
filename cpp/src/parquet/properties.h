@@ -1417,8 +1417,8 @@ class PARQUET_EXPORT ArrowWriterProperties {
       return std::shared_ptr<ArrowWriterProperties>(new ArrowWriterProperties(
           write_timestamps_as_int96_, coerce_timestamps_enabled_, coerce_timestamps_unit_,
           truncated_timestamps_allowed_, store_schema_, compliant_nested_types_,
-          write_fixed_size_list_as_vector_, engine_version_, use_threads_,
-          executor_, write_time_adjusted_to_utc_));
+          write_fixed_size_list_as_vector_, engine_version_, use_threads_, executor_,
+          write_time_adjusted_to_utc_));
     }
 
    private:

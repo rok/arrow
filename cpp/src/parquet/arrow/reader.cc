@@ -574,7 +574,7 @@ class VectorFLBAReader : public ColumnReaderImpl {
         checked_cast<const ::arrow::FixedSizeListType&>(*field_->type());
     const int64_t child_length = storage_data->length * list_type.list_size();
     auto child_data = ::arrow::ArrayData::Make(list_type.value_type(), child_length,
-                                               {nullptr, storage_data->buffers[1]},
+                                               {nullptr, storage_data.buffers[1]},
                                                /*null_count=*/0);
     auto data = ::arrow::ArrayData::Make(
         field_->type(), storage_data->length, {storage_data->buffers[0]},
@@ -933,8 +933,8 @@ Status GetReader(const SchemaField& field, const std::shared_ptr<Field>& arrow_f
         ctx->iterator_factory(field.column_index, ctx->reader));
     const auto* descr = ctx->reader->metadata()->schema()->Column(field.column_index);
     if (descr->logical_type()->is_vector()) {
-      auto storage_field = arrow_field->WithType(
-          ::arrow::fixed_size_binary(descr->type_length()));
+      auto storage_field =
+          arrow_field->WithType(::arrow::fixed_size_binary(descr->type_length()));
       *out = std::make_unique<VectorFLBAReader>(
           arrow_field, std::make_unique<LeafReader>(ctx, storage_field, std::move(input),
                                                     field.level_info));

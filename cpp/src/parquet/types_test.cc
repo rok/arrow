@@ -55,9 +55,9 @@ TEST(TestLogicalType, Vector) {
   ASSERT_TRUE(zero_length->is_applicable(Type::FIXED_LEN_BYTE_ARRAY, 1));
   ASSERT_FALSE(zero_length->is_applicable(Type::FIXED_LEN_BYTE_ARRAY, 0));
 
-  auto float16_vector = LogicalType::Vector(Type::FIXED_LEN_BYTE_ARRAY, 16,
-                                            /*element_type_length=*/2,
-                                            LogicalType::Float16());
+  auto float16_vector =
+      LogicalType::Vector(Type::FIXED_LEN_BYTE_ARRAY, 16,
+                          /*element_type_length=*/2, LogicalType::Float16());
   ASSERT_TRUE(float16_vector->is_applicable(Type::FIXED_LEN_BYTE_ARRAY, 32));
   thrift = float16_vector->ToThrift();
   ASSERT_TRUE(thrift.VECTOR.__isset.element_type_length);

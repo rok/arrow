@@ -3368,8 +3368,7 @@ TEST(ArrowReadWrite, FixedSizeListAsVector) {
 
   auto zero_length_type =
       fixed_size_list(field("element", ::arrow::float32(), false), /*size=*/0);
-  auto zero_length_array =
-      ::arrow::ArrayFromJSON(zero_length_type, R"([[], null, []])");
+  auto zero_length_array = ::arrow::ArrayFromJSON(zero_length_type, R"([[], null, []])");
   auto zero_length_table = ::arrow::Table::Make(
       ::arrow::schema({field("root", zero_length_type)}), {zero_length_array});
   ASSERT_NO_FATAL_FAILURE(

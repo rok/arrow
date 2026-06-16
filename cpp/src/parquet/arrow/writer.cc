@@ -441,10 +441,10 @@ class FileWriterImpl : public FileWriter {
       const auto* column_descr = writer_->schema()->Column(column_index);
       const auto* parquet_node = column_descr->schema_node().get();
       if (parquet_node->logical_type()->is_vector()) {
-        ARROW_ASSIGN_OR_RAISE(
-            data_to_write, FixedSizeListToFixedSizeBinary(
-                               *data, offset, size, column_descr->type_length(),
-                               column_write_context_.memory_pool));
+        ARROW_ASSIGN_OR_RAISE(data_to_write,
+                              FixedSizeListToFixedSizeBinary(
+                                  *data, offset, size, column_descr->type_length(),
+                                  column_write_context_.memory_pool));
         offset = 0;
       }
       ARROW_ASSIGN_OR_RAISE(
