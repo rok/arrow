@@ -519,6 +519,28 @@ std::shared_ptr<const LogicalType> LogicalType::FromConvertedType(
   return UndefinedLogicalType::Make();
 }
 
+namespace {
+
+std::shared_ptr<const LogicalType> VectorElementLogicalTypeFromThrift(
+    const format::VectorElementLogicalType& type) {
+  if (type.__isset.DECIMAL) {
+    return LogicalType::Decimal(type.DECIMAL.precision, type.DECIMAL.scale);
+  }
+  if (type.__isset.INTEGER) {
+    return LogicalType::Int(static_cast<int>(type.INTEGER.bitWidth),
+                            type.INTEGER.isSigned);
+  }
+  if (type.__isset.UUID) {
+    return LogicalType::UUID();
+  }
+  if (type.__isset.FLOAT16) {
+    return LogicalType::Float16();
+  }
+  return nullptr;
+}
+
+}  // namespace
+
 std::shared_ptr<const LogicalType> LogicalType::FromThrift(
     const format::LogicalType& type) {
   if (type.__isset.STRING) {
@@ -602,6 +624,16 @@ std::shared_ptr<const LogicalType> LogicalType::FromThrift(
     }
 
     return VariantLogicalType::Make(spec_version);
+  } else if (type.__isset.VECTOR) {
+    std::shared_ptr<const LogicalType> element_logical_type;
+    if (type.VECTOR.__isset.element_logical_type) {
+      element_logical_type =
+          VectorElementLogicalTypeFromThrift(type.VECTOR.element_logical_type);
+    }
+    return VectorLogicalType::Make(
+        static_cast<parquet::Type::type>(type.VECTOR.element_type), type.VECTOR.length,
+        type.VECTOR.__isset.element_type_length ? type.VECTOR.element_type_length : -1,
+        std::move(element_logical_type));
   } else {
     // Sentinel type for one we do not recognize
     return UndefinedLogicalType::Make();
@@ -671,6 +703,13 @@ std::shared_ptr<const LogicalType> LogicalType::Geography(
 
 std::shared_ptr<const LogicalType> LogicalType::Variant(int8_t spec_version) {
   return VariantLogicalType::Make(spec_version);
+}
+
+std::shared_ptr<const LogicalType> LogicalType::Vector(
+    parquet::Type::type element_type, int32_t length, int32_t element_type_length,
+    std::shared_ptr<const LogicalType> element_logical_type) {
+  return VectorLogicalType::Make(element_type, length, element_type_length,
+                                 std::move(element_logical_type));
 }
 
 std::shared_ptr<const LogicalType> LogicalType::None() { return NoLogicalType::Make(); }
@@ -758,6 +797,7 @@ class LogicalType::Impl {
   class Geometry;
   class Geography;
   class Variant;
+  class Vector;
   class No;
   class Undefined;
 
@@ -839,6 +879,7 @@ bool LogicalType::is_geography() const {
 bool LogicalType::is_variant() const {
   return impl_->type() == LogicalType::Type::VARIANT;
 }
+bool LogicalType::is_vector() const { return impl_->type() == LogicalType::Type::VECTOR; }
 bool LogicalType::is_none() const { return impl_->type() == LogicalType::Type::NONE; }
 bool LogicalType::is_valid() const {
   return impl_->type() != LogicalType::Type::UNDEFINED;
@@ -2013,6 +2054,202 @@ format::LogicalType LogicalType::Impl::Variant::ToThrift() const {
 std::shared_ptr<const LogicalType> VariantLogicalType::Make(const int8_t spec_version) {
   auto logical_type = std::shared_ptr<VariantLogicalType>(new VariantLogicalType());
   logical_type->impl_.reset(new LogicalType::Impl::Variant(spec_version));
+  return logical_type;
+}
+
+namespace {
+
+int32_t VectorElementByteWidth(parquet::Type::type element_type,
+                               int32_t element_type_length) {
+  switch (element_type) {
+    case Type::INT32:
+    case Type::FLOAT:
+      return 4;
+    case Type::INT64:
+    case Type::DOUBLE:
+      return 8;
+    case Type::FIXED_LEN_BYTE_ARRAY:
+      return element_type_length > 0 ? element_type_length : 0;
+    default:
+      return 0;
+  }
+}
+
+int64_t VectorPhysicalTypeLength(int32_t length, int32_t element_width) {
+  return length == 0 ? 1 : static_cast<int64_t>(length) * element_width;
+}
+
+bool IsSupportedVectorElementLogicalType(const LogicalType& logical_type) {
+  return logical_type.is_decimal() || logical_type.is_int() || logical_type.is_UUID() ||
+         logical_type.is_float16();
+}
+
+format::VectorElementLogicalType VectorElementLogicalTypeToThrift(
+    const LogicalType& logical_type) {
+  format::VectorElementLogicalType out;
+  format::LogicalType thrift = logical_type.ToThrift();
+  if (thrift.__isset.DECIMAL) {
+    out.__set_DECIMAL(thrift.DECIMAL);
+  } else if (thrift.__isset.INTEGER) {
+    out.__set_INTEGER(thrift.INTEGER);
+  } else if (thrift.__isset.UUID) {
+    out.__set_UUID(thrift.UUID);
+  } else if (thrift.__isset.FLOAT16) {
+    out.__set_FLOAT16(thrift.FLOAT16);
+  } else {
+    throw ParquetException("Unsupported VECTOR element logical type: ",
+                           logical_type.ToString());
+  }
+  return out;
+}
+
+}  // namespace
+
+class LogicalType::Impl::Vector final : public LogicalType::Impl::Incompatible,
+                                        public LogicalType::Impl::Applicable {
+ public:
+  friend class VectorLogicalType;
+
+  bool is_applicable(parquet::Type::type primitive_type,
+                     int32_t primitive_length = -1) const override;
+  std::string ToString() const override;
+  std::string ToJSON() const override;
+  format::LogicalType ToThrift() const override;
+  bool Equals(const LogicalType& other) const override;
+
+  parquet::Type::type element_type() const { return element_type_; }
+  int32_t length() const { return length_; }
+  int32_t element_type_length() const { return element_type_length_; }
+  std::shared_ptr<const LogicalType> element_logical_type() const {
+    return element_logical_type_;
+  }
+
+ private:
+  Vector(parquet::Type::type element_type, int32_t length, int32_t element_type_length,
+         std::shared_ptr<const LogicalType> element_logical_type)
+      : LogicalType::Impl(LogicalType::Type::VECTOR, SortOrder::UNKNOWN),
+        element_type_(element_type),
+        length_(length),
+        element_type_length_(element_type_length),
+        element_logical_type_(std::move(element_logical_type)) {}
+
+  parquet::Type::type element_type_;
+  int32_t length_;
+  int32_t element_type_length_;
+  std::shared_ptr<const LogicalType> element_logical_type_;
+};
+
+bool LogicalType::Impl::Vector::is_applicable(parquet::Type::type primitive_type,
+                                              int32_t primitive_length) const {
+  const int32_t element_width =
+      VectorElementByteWidth(element_type_, element_type_length_);
+  return primitive_type == parquet::Type::FIXED_LEN_BYTE_ARRAY && element_width > 0 &&
+         primitive_length == VectorPhysicalTypeLength(length_, element_width);
+}
+
+parquet::Type::type VectorLogicalType::element_type() const {
+  return (dynamic_cast<const LogicalType::Impl::Vector&>(*impl_)).element_type();
+}
+
+int32_t VectorLogicalType::length() const {
+  return (dynamic_cast<const LogicalType::Impl::Vector&>(*impl_)).length();
+}
+
+int32_t VectorLogicalType::element_type_length() const {
+  return (dynamic_cast<const LogicalType::Impl::Vector&>(*impl_)).element_type_length();
+}
+
+std::shared_ptr<const LogicalType> VectorLogicalType::element_logical_type() const {
+  return (dynamic_cast<const LogicalType::Impl::Vector&>(*impl_)).element_logical_type();
+}
+
+std::string LogicalType::Impl::Vector::ToString() const {
+  std::stringstream type;
+  type << "Vector(element_type=" << TypeToString(element_type_);
+  if (element_type_length_ > 0) {
+    type << "(" << element_type_length_ << ")";
+  }
+  type << ", length=" << length_;
+  if (element_logical_type_ != nullptr) {
+    type << ", element_logical_type=" << element_logical_type_->ToString();
+  }
+  type << ")";
+  return type.str();
+}
+
+std::string LogicalType::Impl::Vector::ToJSON() const {
+  std::stringstream json;
+  json << R"({"Type": "Vector", "element_type": ")" << TypeToString(element_type_)
+       << R"(", "length": )" << length_;
+  if (element_type_length_ > 0) {
+    json << R"(, "element_type_length": )" << element_type_length_;
+  }
+  if (element_logical_type_ != nullptr) {
+    json << R"(, "element_logical_type": )" << element_logical_type_->ToJSON();
+  }
+  json << "}";
+  return json.str();
+}
+
+format::LogicalType LogicalType::Impl::Vector::ToThrift() const {
+  format::LogicalType type;
+  format::VectorType vector_type;
+  vector_type.__set_length(length_);
+  vector_type.__set_element_type(static_cast<format::Type::type>(element_type_));
+  if (element_type_length_ > 0) {
+    vector_type.__set_element_type_length(element_type_length_);
+  }
+  if (element_logical_type_ != nullptr) {
+    vector_type.__set_element_logical_type(
+        VectorElementLogicalTypeToThrift(*element_logical_type_));
+  }
+  type.__set_VECTOR(vector_type);
+  return type;
+}
+
+bool LogicalType::Impl::Vector::Equals(const LogicalType& other) const {
+  if (other.type() != LogicalType::Type::VECTOR) {
+    return false;
+  }
+  const auto& vector = dynamic_cast<const VectorLogicalType&>(other);
+  if (vector.element_type() != element_type_ || vector.length() != length_ ||
+      vector.element_type_length() != element_type_length_) {
+    return false;
+  }
+  const auto other_element_logical_type = vector.element_logical_type();
+  if (element_logical_type_ == nullptr || other_element_logical_type == nullptr) {
+    return element_logical_type_ == nullptr && other_element_logical_type == nullptr;
+  }
+  return element_logical_type_->Equals(*other_element_logical_type);
+}
+
+std::shared_ptr<const LogicalType> VectorLogicalType::Make(
+    parquet::Type::type element_type, int32_t length, int32_t element_type_length,
+    std::shared_ptr<const LogicalType> element_logical_type) {
+  if (length < 0) {
+    throw ParquetException("Vector logical type requires non-negative length");
+  }
+  if (VectorElementByteWidth(element_type, element_type_length) == 0) {
+    throw ParquetException("Unsupported VECTOR element type: ",
+                           TypeToString(element_type));
+  }
+  if (element_logical_type != nullptr && !element_logical_type->is_none()) {
+    if (!IsSupportedVectorElementLogicalType(*element_logical_type)) {
+      throw ParquetException("Unsupported VECTOR element logical type: ",
+                             element_logical_type->ToString());
+    }
+    if (!element_logical_type->is_applicable(element_type, element_type_length)) {
+      throw ParquetException(element_logical_type->ToString(),
+                             " cannot annotate VECTOR element type ",
+                             TypeToString(element_type));
+    }
+  } else {
+    element_logical_type = nullptr;
+  }
+
+  auto logical_type = std::shared_ptr<VectorLogicalType>(new VectorLogicalType());
+  logical_type->impl_.reset(new LogicalType::Impl::Vector(
+      element_type, length, element_type_length, std::move(element_logical_type)));
   return logical_type;
 }
 

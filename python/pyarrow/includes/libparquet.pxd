@@ -69,6 +69,7 @@ cdef extern from "parquet/api/schema.h" namespace "parquet" nogil:
         ParquetLogicalType_UUID" parquet::LogicalType::Type::UUID"
         ParquetLogicalType_GEOMETRY" parquet::LogicalType::Type::GEOMETRY"
         ParquetLogicalType_GEOGRAPHY" parquet::LogicalType::Type::GEOGRAPHY"
+        ParquetLogicalType_VECTOR" parquet::LogicalType::Type::VECTOR"
         ParquetLogicalType_NONE" parquet::LogicalType::Type::NONE"
 
     enum ParquetTimeUnit" parquet::LogicalType::TimeUnit::unit":
@@ -529,6 +530,7 @@ cdef extern from "parquet/api/writer.h" namespace "parquet" nogil:
             Builder* store_schema()
             Builder* enable_compliant_nested_types()
             Builder* disable_compliant_nested_types()
+            Builder* enable_fixed_size_list_as_vector()
             Builder* set_engine_version(ArrowWriterEngineVersion version)
             Builder* set_time_adjusted_to_utc(c_bool adjusted)
             shared_ptr[ArrowWriterProperties] build()

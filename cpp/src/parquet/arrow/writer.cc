@@ -18,6 +18,7 @@
 #include "parquet/arrow/writer.h"
 
 #include <algorithm>
+#include <cstring>
 #include <deque>
 #include <memory>
 #include <string>
@@ -56,6 +57,7 @@ using arrow::ExtensionArray;
 using arrow::ExtensionType;
 using arrow::Field;
 using arrow::FixedSizeBinaryArray;
+using arrow::FixedSizeListArray;
 using arrow::ListArray;
 using arrow::MemoryPool;
 using arrow::NumericArray;
@@ -105,6 +107,65 @@ bool HasNullableRoot(const SchemaManifest& schema_manifest,
     current_field = schema_manifest.GetParent(current_field);
   }
   return nullable;
+}
+
+Result<std::shared_ptr<ChunkedArray>> FixedSizeListToFixedSizeBinary(
+    const ChunkedArray& data, int64_t offset, int64_t size, int32_t storage_byte_width,
+    MemoryPool* pool) {
+  auto sliced = data.Slice(offset, size);
+  std::vector<std::shared_ptr<Array>> chunks;
+  chunks.reserve(sliced->num_chunks());
+
+  for (const auto& chunk : sliced->chunks()) {
+    const auto& list_array = checked_cast<const FixedSizeListArray&>(*chunk);
+    const auto& list_type =
+        checked_cast<const ::arrow::FixedSizeListType&>(*chunk->type());
+    const auto& value_type =
+        checked_cast<const ::arrow::FixedWidthType&>(*list_type.value_type());
+    const int32_t value_byte_width = value_type.bit_width() / 8;
+    const int32_t expected_storage_byte_width =
+        list_type.list_size() == 0 ? storage_byte_width
+                                   : list_type.list_size() * value_byte_width;
+    if (expected_storage_byte_width != storage_byte_width) {
+      return Status::Invalid("VECTOR storage byte width mismatch: expected ",
+                             expected_storage_byte_width, " but Parquet schema has ",
+                             storage_byte_width);
+    }
+    const int64_t data_size = chunk->length() * storage_byte_width;
+
+    auto values = list_array.values();
+    if (values->null_count() != 0) {
+      for (int64_t i = 0; i < list_array.length(); ++i) {
+        if (list_array.IsNull(i)) {
+          continue;
+        }
+        const int64_t value_offset = list_array.value_offset(i);
+        for (int32_t j = 0; j < list_type.list_size(); ++j) {
+          if (values->IsNull(value_offset + j)) {
+            return Status::Invalid(
+                "Cannot write VECTOR as FIXED_LEN_BYTE_ARRAY when elements are null");
+          }
+        }
+      }
+    }
+    ARROW_ASSIGN_OR_RAISE(auto data_buffer, AllocateBuffer(data_size, pool));
+    if (list_type.list_size() == 0) {
+      std::memset(data_buffer->mutable_data(), 0, data_size);
+    } else {
+      const auto& values_data = values->data()->buffers[1];
+      const uint8_t* source =
+          values_data->data() + list_array.value_offset(0) * value_byte_width;
+      std::memcpy(data_buffer->mutable_data(), source, data_size);
+    }
+
+    auto storage_type = ::arrow::fixed_size_binary(storage_byte_width);
+    auto array_data =
+        ::arrow::ArrayData::Make(storage_type, chunk->length(),
+                                 {chunk->data()->buffers[0], std::move(data_buffer)},
+                                 chunk->null_count(), /*offset=*/0);
+    chunks.push_back(::arrow::MakeArray(std::move(array_data)));
+  }
+  return std::make_shared<ChunkedArray>(std::move(chunks));
 }
 
 Status GetSchemaMetadata(const ::arrow::Schema& schema, ::arrow::MemoryPool* pool,
@@ -375,9 +436,20 @@ class FileWriterImpl : public FileWriter {
       if (row_group_writer_->buffered()) {
         return Status::Invalid("Cannot write column chunk into the buffered row group.");
       }
+      std::shared_ptr<ChunkedArray> data_to_write = data;
+      const int column_index = row_group_writer_->current_column() + 1;
+      const auto* column_descr = writer_->schema()->Column(column_index);
+      const auto* parquet_node = column_descr->schema_node().get();
+      if (parquet_node->logical_type()->is_vector()) {
+        ARROW_ASSIGN_OR_RAISE(data_to_write,
+                              FixedSizeListToFixedSizeBinary(
+                                  *data, offset, size, column_descr->type_length(),
+                                  column_write_context_.memory_pool));
+        offset = 0;
+      }
       ARROW_ASSIGN_OR_RAISE(
           std::unique_ptr<ArrowColumnWriterV2> writer,
-          ArrowColumnWriterV2::Make(*data, offset, size, schema_manifest_,
+          ArrowColumnWriterV2::Make(*data_to_write, offset, size, schema_manifest_,
                                     row_group_writer_));
       return writer->Write(&column_write_context_);
     }
@@ -456,11 +528,22 @@ class FileWriterImpl : public FileWriter {
       int column_index_start = 0;
 
       for (int i = 0; i < batch.num_columns(); i++) {
-        ChunkedArray chunked_array{batch.column(i)};
-        ARROW_ASSIGN_OR_RAISE(
-            std::unique_ptr<ArrowColumnWriterV2> writer,
-            ArrowColumnWriterV2::Make(chunked_array, offset, size, schema_manifest_,
-                                      row_group_writer_, column_index_start));
+        std::shared_ptr<ChunkedArray> chunked_array =
+            std::make_shared<ChunkedArray>(batch.column(i));
+        int64_t column_offset = offset;
+        const auto* column_descr = writer_->schema()->Column(column_index_start);
+        const auto* parquet_node = column_descr->schema_node().get();
+        if (parquet_node->logical_type()->is_vector()) {
+          ARROW_ASSIGN_OR_RAISE(chunked_array, FixedSizeListToFixedSizeBinary(
+                                                   *chunked_array, offset, size,
+                                                   column_descr->type_length(),
+                                                   column_write_context_.memory_pool));
+          column_offset = 0;
+        }
+        ARROW_ASSIGN_OR_RAISE(std::unique_ptr<ArrowColumnWriterV2> writer,
+                              ArrowColumnWriterV2::Make(
+                                  *chunked_array, column_offset, size, schema_manifest_,
+                                  row_group_writer_, column_index_start));
         column_index_start += writer->leaf_count();
         if (arrow_properties_->use_threads()) {
           writers.emplace_back(std::move(writer));

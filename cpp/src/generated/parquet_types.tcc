@@ -1625,6 +1625,209 @@ uint32_t GeographyType::write(Protocol_* oprot) const {
   return xfer;
 }
 
+
+template <class Protocol_>
+uint32_t VectorElementLogicalType::read(Protocol_* iprot) {
+
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
+
+  xfer += iprot->readStructBegin(fname);
+
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 1:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->DECIMAL.read(iprot);
+          this->__isset.DECIMAL = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 2:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->INTEGER.read(iprot);
+          this->__isset.INTEGER = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 3:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->UUID.read(iprot);
+          this->__isset.UUID = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 4:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->FLOAT16.read(iprot);
+          this->__isset.FLOAT16 = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
+    }
+    xfer += iprot->readFieldEnd();
+  }
+
+  xfer += iprot->readStructEnd();
+
+  return xfer;
+}
+
+template <class Protocol_>
+uint32_t VectorElementLogicalType::write(Protocol_* oprot) const {
+  uint32_t xfer = 0;
+  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("VectorElementLogicalType");
+
+  if (this->__isset.DECIMAL) {
+    xfer += oprot->writeFieldBegin("DECIMAL", ::apache::thrift::protocol::T_STRUCT, 1);
+    xfer += this->DECIMAL.write(oprot);
+    xfer += oprot->writeFieldEnd();
+  }
+  if (this->__isset.INTEGER) {
+    xfer += oprot->writeFieldBegin("INTEGER", ::apache::thrift::protocol::T_STRUCT, 2);
+    xfer += this->INTEGER.write(oprot);
+    xfer += oprot->writeFieldEnd();
+  }
+  if (this->__isset.UUID) {
+    xfer += oprot->writeFieldBegin("UUID", ::apache::thrift::protocol::T_STRUCT, 3);
+    xfer += this->UUID.write(oprot);
+    xfer += oprot->writeFieldEnd();
+  }
+  if (this->__isset.FLOAT16) {
+    xfer += oprot->writeFieldBegin("FLOAT16", ::apache::thrift::protocol::T_STRUCT, 4);
+    xfer += this->FLOAT16.write(oprot);
+    xfer += oprot->writeFieldEnd();
+  }
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
+
+template <class Protocol_>
+uint32_t VectorType::read(Protocol_* iprot) {
+
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
+
+  xfer += iprot->readStructBegin(fname);
+
+  using ::apache::thrift::protocol::TProtocolException;
+
+  bool isset_length = false;
+  bool isset_element_type = false;
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 1:
+        if (ftype == ::apache::thrift::protocol::T_I32) {
+          xfer += iprot->readI32(this->length);
+          this->__isset.length = true;
+          isset_length = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 2:
+        if (ftype == ::apache::thrift::protocol::T_I32) {
+          int32_t ecast123;
+          xfer += iprot->readI32(ecast123);
+          this->element_type = static_cast<Type::type>(ecast123);
+          this->__isset.element_type = true;
+          isset_element_type = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 3:
+        if (ftype == ::apache::thrift::protocol::T_I32) {
+          xfer += iprot->readI32(this->element_type_length);
+          this->__isset.element_type_length = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 4:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->element_logical_type.read(iprot);
+          this->__isset.element_logical_type = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
+    }
+    xfer += iprot->readFieldEnd();
+  }
+
+  xfer += iprot->readStructEnd();
+
+  if (!isset_length)
+    throw TProtocolException(TProtocolException::INVALID_DATA);
+  if (!isset_element_type)
+    throw TProtocolException(TProtocolException::INVALID_DATA);
+  return xfer;
+}
+
+template <class Protocol_>
+uint32_t VectorType::write(Protocol_* oprot) const {
+  uint32_t xfer = 0;
+  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("VectorType");
+
+  xfer += oprot->writeFieldBegin("length", ::apache::thrift::protocol::T_I32, 1);
+  xfer += oprot->writeI32(this->length);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("element_type", ::apache::thrift::protocol::T_I32, 2);
+  xfer += oprot->writeI32(static_cast<int32_t>(this->element_type));
+  xfer += oprot->writeFieldEnd();
+
+  if (this->__isset.element_type_length) {
+    xfer += oprot->writeFieldBegin("element_type_length", ::apache::thrift::protocol::T_I32, 3);
+    xfer += oprot->writeI32(this->element_type_length);
+    xfer += oprot->writeFieldEnd();
+  }
+  if (this->__isset.element_logical_type) {
+    xfer += oprot->writeFieldBegin("element_logical_type", ::apache::thrift::protocol::T_STRUCT, 4);
+    xfer += this->element_logical_type.write(oprot);
+    xfer += oprot->writeFieldEnd();
+  }
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
+
 template <class Protocol_>
 uint32_t LogicalType::read(Protocol_* iprot) {
 
@@ -1783,6 +1986,14 @@ uint32_t LogicalType::read(Protocol_* iprot) {
           xfer += iprot->skip(ftype);
         }
         break;
+      case 19:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->VECTOR.read(iprot);
+          this->__isset.VECTOR = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
       default:
         xfer += iprot->skip(ftype);
         break;
@@ -1884,6 +2095,11 @@ uint32_t LogicalType::write(Protocol_* oprot) const {
   if (this->__isset.GEOGRAPHY) {
     xfer += oprot->writeFieldBegin("GEOGRAPHY", ::apache::thrift::protocol::T_STRUCT, 18);
     xfer += this->GEOGRAPHY.write(oprot);
+    xfer += oprot->writeFieldEnd();
+  }
+  if (this->__isset.VECTOR) {
+    xfer += oprot->writeFieldBegin("VECTOR", ::apache::thrift::protocol::T_STRUCT, 19);
+    xfer += this->VECTOR.write(oprot);
     xfer += oprot->writeFieldEnd();
   }
   xfer += oprot->writeFieldStop();
