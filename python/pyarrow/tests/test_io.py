@@ -25,7 +25,7 @@ import gzip
 import math
 import os
 import pathlib
-import pytest
+import pytest  # type: ignore[import-not-found]
 import random
 import sys
 import tempfile
@@ -34,7 +34,7 @@ import weakref
 try:
     import numpy as np
 except ImportError:
-    np = None
+    np = None  # type: ignore[assignment]
 
 from pyarrow.util import guid
 from pyarrow import Codec
@@ -812,8 +812,9 @@ def test_cache_options_pickling(pickle_module):
 
 @pytest.mark.numpy
 @pytest.mark.parametrize("compression", [
-    pytest.param(
-        "bz2", marks=pytest.mark.xfail(raises=pa.lib.ArrowNotImplementedError)
+    pytest.param("bz2", marks=pytest.mark.xfail(
+        raises=pa.lib.ArrowNotImplementedError  # type: ignore[attr-defined]
+    )
     ),
     "brotli",
     "gzip",
@@ -853,8 +854,9 @@ def test_compress_decompress(compression):
 
 @pytest.mark.numpy
 @pytest.mark.parametrize("compression", [
-    pytest.param(
-        "bz2", marks=pytest.mark.xfail(raises=pa.lib.ArrowNotImplementedError)
+    pytest.param("bz2", marks=pytest.mark.xfail(
+        raises=pa.lib.ArrowNotImplementedError  # type: ignore[attr-defined]
+    )
     ),
     "brotli",
     "gzip",
@@ -1773,9 +1775,9 @@ def test_unknown_compression_raises():
     "gzip",
     "lz4",
     "zstd",
-    pytest.param(
-        "snappy",
-        marks=pytest.mark.xfail(raises=pa.lib.ArrowNotImplementedError)
+    pytest.param("snappy", marks=pytest.mark.xfail(
+        raises=pa.lib.ArrowNotImplementedError  # type: ignore[attr-defined]
+    )
     )
 ])
 def test_compressed_roundtrip(compression):
