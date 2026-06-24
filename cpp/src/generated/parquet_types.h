@@ -202,7 +202,12 @@ struct FieldRepetitionType {
     /**
      * The field is repeated and can contain 0 or more values
      */
-    REPEATED = 2
+    REPEATED = 2,
+    /**
+     * This field repeats a fixed number of times per parent value without increasing
+     * the maximum definition or repetition level of its descendants.
+     */
+    VECTOR = 3
   };
 };
 
@@ -1732,7 +1737,7 @@ void swap(LogicalType &a, LogicalType &b);
 std::ostream& operator<<(std::ostream& out, const LogicalType& obj);
 
 typedef struct _SchemaElement__isset {
-  _SchemaElement__isset() : type(false), type_length(false), repetition_type(false), num_children(false), converted_type(false), scale(false), precision(false), field_id(false), logicalType(false) {}
+  _SchemaElement__isset() : type(false), type_length(false), repetition_type(false), num_children(false), converted_type(false), scale(false), precision(false), field_id(false), logicalType(false), vector_length(false) {}
   bool type :1;
   bool type_length :1;
   bool repetition_type :1;
@@ -1742,6 +1747,7 @@ typedef struct _SchemaElement__isset {
   bool precision :1;
   bool field_id :1;
   bool logicalType :1;
+  bool vector_length :1;
 } _SchemaElement__isset;
 
 /**
@@ -1820,6 +1826,10 @@ class SchemaElement {
    * for some logical types to ensure forward-compatibility in format v1.
    */
   LogicalType logicalType;
+  /**
+   * Required when repetition_type is VECTOR. Must be positive.
+   */
+  int32_t vector_length;
 
   _SchemaElement__isset __isset;
 
@@ -1842,6 +1852,8 @@ class SchemaElement {
   void __set_field_id(const int32_t val);
 
   void __set_logicalType(const LogicalType& val);
+
+  void __set_vector_length(const int32_t val);
 
   bool operator == (const SchemaElement & rhs) const;
   bool operator != (const SchemaElement &rhs) const {

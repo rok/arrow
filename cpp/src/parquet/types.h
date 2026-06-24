@@ -112,7 +112,13 @@ class LogicalType;
 
 // Mirrors parquet::FieldRepetitionType
 struct Repetition {
-  enum type { REQUIRED = 0, OPTIONAL = 1, REPEATED = 2, /*Always last*/ UNDEFINED = 3 };
+  enum type {
+    REQUIRED = 0,
+    OPTIONAL = 1,
+    REPEATED = 2,
+    VECTOR = 3,
+    /*Always last*/ UNDEFINED = 4
+  };
 };
 
 // Reference:

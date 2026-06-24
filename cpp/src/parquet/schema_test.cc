@@ -43,7 +43,8 @@ namespace schema {
 
 static inline SchemaElement NewPrimitive(const std::string& name,
                                          FieldRepetitionType::type repetition,
-                                         Type::type type, int field_id = -1) {
+                                         Type::type type, int field_id = -1,
+                                         int32_t vector_length = -1) {
   SchemaElement result;
   result.__set_name(name);
   result.__set_repetition_type(repetition);
@@ -51,12 +52,16 @@ static inline SchemaElement NewPrimitive(const std::string& name,
   if (field_id >= 0) {
     result.__set_field_id(field_id);
   }
+  if (vector_length >= 0) {
+    result.__set_vector_length(vector_length);
+  }
   return result;
 }
 
 static inline SchemaElement NewGroup(const std::string& name,
                                      FieldRepetitionType::type repetition,
-                                     int num_children, int field_id = -1) {
+                                     int num_children, int field_id = -1,
+                                     int32_t vector_length = -1) {
   SchemaElement result;
   result.__set_name(name);
   result.__set_repetition_type(repetition);
@@ -64,6 +69,9 @@ static inline SchemaElement NewGroup(const std::string& name,
 
   if (field_id >= 0) {
     result.__set_field_id(field_id);
+  }
+  if (vector_length >= 0) {
+    result.__set_vector_length(vector_length);
   }
 
   return result;
@@ -217,6 +225,30 @@ TEST_F(TestPrimitiveNode, FromParquet) {
   ASSERT_EQ(12, prim_node_->decimal_metadata().precision);
 }
 
+TEST_F(TestPrimitiveNode, VectorFromParquet) {
+  SchemaElement elt =
+      NewPrimitive(name_, FieldRepetitionType::VECTOR, Type::FLOAT, field_id_, 8);
+
+  ASSERT_NO_FATAL_FAILURE(Convert(&elt));
+  ASSERT_EQ(name_, prim_node_->name());
+  ASSERT_EQ(field_id_, prim_node_->field_id());
+  ASSERT_EQ(Repetition::VECTOR, prim_node_->repetition());
+  ASSERT_TRUE(prim_node_->is_vector());
+  ASSERT_EQ(8, prim_node_->vector_length());
+  ASSERT_EQ(Type::FLOAT, prim_node_->physical_type());
+}
+
+TEST_F(TestPrimitiveNode, VectorValidation) {
+  ASSERT_THROW(PrimitiveNode::Make("vec", Repetition::VECTOR, Type::FLOAT),
+               ParquetException);
+  ASSERT_THROW(PrimitiveNode::Make("scalar", Repetition::REQUIRED, Type::FLOAT,
+                                   ConvertedType::NONE, -1, -1, -1, -1, 4),
+               ParquetException);
+  ASSERT_THROW(PrimitiveNode::Make("empty", Repetition::VECTOR, Type::FLOAT,
+                                   ConvertedType::NONE, -1, -1, -1, -1, 0),
+               ParquetException);
+}
+
 TEST_F(TestPrimitiveNode, Equals) {
   PrimitiveNode node1("foo", Repetition::REQUIRED, Type::INT32);
   PrimitiveNode node2("foo", Repetition::REQUIRED, Type::INT64);
@@ -363,6 +395,16 @@ TEST_F(TestGroupNode, Attrs) {
   // logical types
   ASSERT_EQ(ConvertedType::NONE, node1.converted_type());
   ASSERT_EQ(ConvertedType::LIST, node2.converted_type());
+}
+
+TEST_F(TestGroupNode, VectorAttrs) {
+  auto node = GroupNode::Make("vec", Repetition::VECTOR, Fields1(), ConvertedType::NONE,
+                              /*field_id=*/-1,
+                              /*vector_length=*/4);
+
+  ASSERT_TRUE(node->is_vector());
+  ASSERT_EQ(Repetition::VECTOR, node->repetition());
+  ASSERT_EQ(4, node->vector_length());
 }
 
 TEST_F(TestGroupNode, Equals) {
@@ -825,6 +867,21 @@ TEST_F(TestSchemaDescriptor, BuildTree) {
   ASSERT_EQ(nleaves, descr_.num_columns());
 }
 
+TEST_F(TestSchemaDescriptor, BuildTreeVector) {
+  NodePtr element = PrimitiveNode::Make("element", Repetition::VECTOR, Type::FLOAT,
+                                        ConvertedType::NONE, -1, -1, -1, -1, 3);
+  NodePtr embedding = GroupNode::Make("embedding", Repetition::OPTIONAL, {element});
+
+  descr_.Init(GroupNode::Make("schema", Repetition::REPEATED, {embedding}));
+
+  ASSERT_EQ(1, descr_.num_columns());
+  const ColumnDescriptor* col = descr_.Column(0);
+  EXPECT_EQ(1, col->max_definition_level());
+  EXPECT_EQ(0, col->max_repetition_level());
+  EXPECT_TRUE(col->schema_node()->is_vector());
+  EXPECT_EQ(3, col->schema_node()->vector_length());
+}
+
 TEST_F(TestSchemaDescriptor, HasRepeatedFields) {
   NodeVector fields;
   NodePtr schema;
@@ -910,6 +967,22 @@ TEST(TestSchemaPrinter, Examples) {
 }
 )";
   ASSERT_EQ(expected, result);
+}
+
+TEST(TestSchemaPrinter, Vector) {
+  NodePtr schema = GroupNode::Make(
+      "schema", Repetition::REPEATED,
+      {GroupNode::Make("embedding", Repetition::OPTIONAL,
+                       {PrimitiveNode::Make("element", Repetition::VECTOR, Type::FLOAT,
+                                            ConvertedType::NONE, -1, -1, -1, -1, 3)})});
+
+  std::string expected = R"(repeated group field_id=-1 schema {
+  optional group field_id=-1 embedding {
+    vector float field_id=-1 element [3];
+  }
+}
+)";
+  ASSERT_EQ(expected, Print(schema));
 }
 
 static void ConfirmFactoryEquivalence(

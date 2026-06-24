@@ -32,8 +32,11 @@
 #include "parquet/properties.h"
 
 #include "arrow/array.h"
+#include "arrow/array/array_nested.h"
+#include "arrow/array/builder_binary.h"
 #include "arrow/array/builder_primitive.h"
 #include "arrow/array/data.h"
+#include "arrow/buffer.h"
 #include "arrow/compute/cast.h"
 #include "arrow/io/memory.h"
 #include "arrow/table.h"
@@ -283,15 +286,93 @@ struct Examples<bool> {
   static constexpr std::array<bool, 2> values() { return {false, true}; }
 };
 
+::arrow::Result<std::shared_ptr<Buffer>> WriteReadBenchmarkBuffer(
+    const Table& table, const std::shared_ptr<WriterProperties>& properties,
+    const std::shared_ptr<ArrowWriterProperties>& arrow_properties) {
+  auto output = CreateOutputStream();
+  RETURN_NOT_OK(WriteTable(table, ::arrow::default_memory_pool(), output,
+                           /*chunk_size=*/table.num_rows(), properties,
+                           arrow_properties));
+  return output->Finish();
+}
+
+void SetParquetSizeCounters(::benchmark::State& state, int64_t parquet_size,
+                            int64_t total_bytes) {
+  state.counters["parquet_size_bytes"] = static_cast<double>(parquet_size);
+  if (total_bytes > 0) {
+    state.counters["parquet_to_raw_ratio"] =
+        static_cast<double>(parquet_size) / static_cast<double>(total_bytes);
+  }
+}
+
+static void BenchmarkWriteTable(::benchmark::State& state, const Table& table,
+                                std::shared_ptr<WriterProperties> properties,
+                                std::shared_ptr<ArrowWriterProperties> arrow_properties,
+                                int64_t num_values = -1, int64_t total_bytes = -1) {
+  PARQUET_ASSIGN_OR_THROW(auto sample_buffer,
+                          WriteReadBenchmarkBuffer(table, properties, arrow_properties));
+
+  for (auto _ : state) {
+    auto output = CreateOutputStream();
+    EXIT_NOT_OK(WriteTable(table, ::arrow::default_memory_pool(), output,
+                           /*chunk_size=*/table.num_rows(), properties,
+                           arrow_properties));
+    auto finished = output->Finish();
+    EXIT_NOT_OK(finished.status());
+  }
+
+  if (num_values == -1) {
+    num_values = table.num_rows();
+  }
+  state.SetItemsProcessed(num_values * state.iterations());
+  if (total_bytes != -1) {
+    state.SetBytesProcessed(total_bytes * state.iterations());
+    SetParquetSizeCounters(state, sample_buffer->size(), total_bytes);
+  }
+}
+
+static void BenchmarkRoundtripTable(
+    ::benchmark::State& state, const Table& table,
+    std::shared_ptr<WriterProperties> properties,
+    std::shared_ptr<ArrowWriterProperties> arrow_properties, int64_t num_values = -1,
+    int64_t total_bytes = -1) {
+  PARQUET_ASSIGN_OR_THROW(auto sample_buffer,
+                          WriteReadBenchmarkBuffer(table, properties, arrow_properties));
+
+  for (auto _ : state) {
+    auto output = CreateOutputStream();
+    EXIT_NOT_OK(WriteTable(table, ::arrow::default_memory_pool(), output,
+                           /*chunk_size=*/table.num_rows(), properties,
+                           arrow_properties));
+    PARQUET_ASSIGN_OR_THROW(auto buffer, output->Finish());
+
+    auto reader =
+        ParquetFileReader::Open(std::make_shared<::arrow::io::BufferReader>(buffer));
+    auto arrow_reader_result =
+        FileReader::Make(::arrow::default_memory_pool(), std::move(reader));
+    EXIT_NOT_OK(arrow_reader_result.status());
+    auto arrow_reader = std::move(*arrow_reader_result);
+
+    auto table_result = arrow_reader->ReadTable();
+    EXIT_NOT_OK(table_result.status());
+  }
+
+  if (num_values == -1) {
+    num_values = table.num_rows();
+  }
+  state.SetItemsProcessed(num_values * state.iterations());
+  if (total_bytes != -1) {
+    state.SetBytesProcessed(total_bytes * state.iterations());
+    SetParquetSizeCounters(state, sample_buffer->size(), total_bytes);
+  }
+}
+
 static void BenchmarkReadTable(::benchmark::State& state, const Table& table,
                                std::shared_ptr<WriterProperties> properties,
+                               std::shared_ptr<ArrowWriterProperties> arrow_properties,
                                int64_t num_values = -1, int64_t total_bytes = -1) {
-  // Make sure we roundtrip Arrow types by storing the schema
-  auto arrow_properties = ArrowWriterProperties::Builder().store_schema()->build();
-  auto output = CreateOutputStream();
-  EXIT_NOT_OK(WriteTable(table, ::arrow::default_memory_pool(), output,
-                         /*chunk_size=*/table.num_rows(), properties, arrow_properties));
-  PARQUET_ASSIGN_OR_THROW(auto buffer, output->Finish());
+  PARQUET_ASSIGN_OR_THROW(auto buffer,
+                          WriteReadBenchmarkBuffer(table, properties, arrow_properties));
 
   for (auto _ : state) {
     auto reader =
@@ -311,7 +392,16 @@ static void BenchmarkReadTable(::benchmark::State& state, const Table& table,
   state.SetItemsProcessed(num_values * state.iterations());
   if (total_bytes != -1) {
     state.SetBytesProcessed(total_bytes * state.iterations());
+    SetParquetSizeCounters(state, buffer->size(), total_bytes);
   }
+}
+
+static void BenchmarkReadTable(::benchmark::State& state, const Table& table,
+                               std::shared_ptr<WriterProperties> properties,
+                               int64_t num_values = -1, int64_t total_bytes = -1) {
+  auto arrow_properties = ArrowWriterProperties::Builder().store_schema()->build();
+  BenchmarkReadTable(state, table, std::move(properties), std::move(arrow_properties),
+                     num_values, total_bytes);
 }
 
 static void BenchmarkReadTable(::benchmark::State& state, const Table& table,
@@ -718,6 +808,478 @@ static void BM_ReadListOfListColumn(::benchmark::State& state) {
 }
 
 BENCHMARK(BM_ReadListOfListColumn)->Apply(NestedReadArguments);
+
+std::shared_ptr<Array> MakeFloatValues(int64_t num_values, bool nullable = false) {
+  ::arrow::FloatBuilder value_builder;
+  EXIT_NOT_OK(value_builder.Reserve(num_values));
+  for (int64_t i = 0; i < num_values; ++i) {
+    if (nullable && (i % 2) == 1) {
+      EXIT_NOT_OK(value_builder.AppendNull());
+    } else {
+      EXIT_NOT_OK(value_builder.Append(static_cast<float>(i % 1024) / 1024.0f));
+    }
+  }
+  std::shared_ptr<Array> values;
+  EXIT_NOT_OK(value_builder.Finish(&values));
+  return values;
+}
+
+int64_t CountAlternatingValidRows(int64_t num_rows) { return (num_rows + 1) / 2; }
+
+std::shared_ptr<Buffer> MakeAlternatingValidityBitmap(int64_t num_rows,
+                                                      int64_t* null_count_out) {
+  const int64_t valid_count = CountAlternatingValidRows(num_rows);
+  *null_count_out = num_rows - valid_count;
+  auto bitmap = ::arrow::AllocateEmptyBitmap(num_rows, ::arrow::default_memory_pool())
+                    .MoveValueUnsafe();
+  ::arrow::bit_util::SetBitsTo(bitmap->mutable_data(), 0, num_rows, false);
+  for (int64_t i = 0; i < num_rows; ++i) {
+    if ((i % 2) == 0) {
+      ::arrow::bit_util::SetBit(bitmap->mutable_data(), i);
+    }
+  }
+  return bitmap;
+}
+
+std::shared_ptr<Table> MakeFixedSizeListFloatTable(int64_t num_rows, int32_t list_size,
+                                                   bool nullable = false,
+                                                   bool element_nullable = false) {
+  const int64_t num_values = num_rows * list_size;
+  auto values = MakeFloatValues(num_values, element_nullable);
+
+  auto value_field = ::arrow::field("item", ::arrow::float32(), element_nullable);
+  auto type = ::arrow::fixed_size_list(value_field, list_size);
+  std::shared_ptr<Array> list_array;
+  if (nullable) {
+    int64_t null_count = 0;
+    auto validity = MakeAlternatingValidityBitmap(num_rows, &null_count);
+    PARQUET_ASSIGN_OR_THROW(list_array, ::arrow::FixedSizeListArray::FromArrays(
+                                            values, type, validity, null_count));
+  } else {
+    PARQUET_ASSIGN_OR_THROW(list_array,
+                            ::arrow::FixedSizeListArray::FromArrays(values, type));
+  }
+  auto field = ::arrow::field("column", type, nullable);
+  return Table::Make(::arrow::schema({field}), {list_array}, num_rows);
+}
+
+std::shared_ptr<Array> MakeInt32Values(int64_t num_values) {
+  ::arrow::Int32Builder builder;
+  EXIT_NOT_OK(builder.Reserve(num_values));
+  for (int64_t i = 0; i < num_values; ++i) {
+    EXIT_NOT_OK(builder.Append(static_cast<int32_t>(i % 1024)));
+  }
+  std::shared_ptr<Array> values;
+  EXIT_NOT_OK(builder.Finish(&values));
+  return values;
+}
+
+std::shared_ptr<Table> MakeFixedSizeListStructTable(int64_t num_rows, int32_t list_size) {
+  const int64_t num_values = num_rows * list_size;
+  auto x = MakeFloatValues(num_values);
+  auto y = MakeInt32Values(num_values);
+  auto struct_type = ::arrow::struct_({::arrow::field("x", ::arrow::float32(), false),
+                                       ::arrow::field("y", ::arrow::int32(), false)});
+  auto values = std::make_shared<::arrow::StructArray>(struct_type, num_values,
+                                                       ::arrow::ArrayVector{x, y});
+  auto type =
+      ::arrow::fixed_size_list(::arrow::field("item", struct_type, false), list_size);
+  PARQUET_ASSIGN_OR_THROW(auto list_array,
+                          ::arrow::FixedSizeListArray::FromArrays(values, type));
+  auto field = ::arrow::field("column", type, false);
+  return Table::Make(::arrow::schema({field}), {list_array}, num_rows);
+}
+
+std::shared_ptr<WriterProperties> FixedSizeListWriterProperties(
+    Encoding::type encoding) {
+  auto builder = WriterProperties::Builder();
+  return builder.disable_dictionary()
+      ->disable_statistics()
+      ->disable_write_page_index()
+      ->encoding(encoding)
+      ->build();
+}
+
+std::shared_ptr<WriterProperties> FixedSizeListVectorWriterProperties() {
+  return FixedSizeListWriterProperties(Encoding::PLAIN);
+}
+
+std::shared_ptr<WriterProperties> FixedSizeListVectorByteStreamSplitWriterProperties() {
+  return FixedSizeListWriterProperties(Encoding::BYTE_STREAM_SPLIT);
+}
+
+// ArrowWriterProperties used by the LIST side. Same as VECTOR side except the
+// experimental_vector_encoding flag is off.
+std::shared_ptr<ArrowWriterProperties> FixedSizeListAsListArrowWriterProperties() {
+  ArrowWriterProperties::Builder builder;
+  builder.store_schema();
+  return builder.build();
+}
+
+std::shared_ptr<ArrowWriterProperties> FixedSizeListVectorArrowWriterProperties() {
+  ArrowWriterProperties::Builder builder;
+  builder.store_schema();
+  builder.enable_experimental_vector_encoding();
+  return builder.build();
+}
+
+static void BM_WriteFixedSizeListFloatAsList(::benchmark::State& state) {
+  const int32_t list_size = static_cast<int32_t>(state.range(0));
+  const int64_t num_rows = BENCHMARK_SIZE / list_size;
+  auto table = MakeFixedSizeListFloatTable(num_rows, list_size, /*nullable=*/false);
+  const int64_t total_bytes = num_rows * list_size * static_cast<int64_t>(sizeof(float));
+
+  BenchmarkWriteTable(state, *table, FixedSizeListVectorWriterProperties(),
+                      FixedSizeListAsListArrowWriterProperties(), num_rows, total_bytes);
+}
+
+static void BM_ReadFixedSizeListFloatAsList(::benchmark::State& state) {
+  const int32_t list_size = static_cast<int32_t>(state.range(0));
+  const int64_t num_rows = BENCHMARK_SIZE / list_size;
+  auto table = MakeFixedSizeListFloatTable(num_rows, list_size, /*nullable=*/false);
+  const int64_t total_bytes = num_rows * list_size * static_cast<int64_t>(sizeof(float));
+
+  BenchmarkReadTable(state, *table, FixedSizeListVectorWriterProperties(),
+                     FixedSizeListAsListArrowWriterProperties(), num_rows, total_bytes);
+}
+
+static void BM_RoundtripFixedSizeListFloatAsList(::benchmark::State& state) {
+  const int32_t list_size = static_cast<int32_t>(state.range(0));
+  const int64_t num_rows = BENCHMARK_SIZE / list_size;
+  auto table = MakeFixedSizeListFloatTable(num_rows, list_size, /*nullable=*/false);
+  const int64_t total_bytes = num_rows * list_size * static_cast<int64_t>(sizeof(float));
+
+  BenchmarkRoundtripTable(state, *table, FixedSizeListVectorWriterProperties(),
+                          FixedSizeListAsListArrowWriterProperties(), num_rows,
+                          total_bytes);
+}
+
+static void BM_WriteFixedSizeListFloatAsListByteStreamSplit(
+    ::benchmark::State& state) {
+  const int32_t list_size = static_cast<int32_t>(state.range(0));
+  const int64_t num_rows = BENCHMARK_SIZE / list_size;
+  auto table = MakeFixedSizeListFloatTable(num_rows, list_size, /*nullable=*/false);
+  const int64_t total_bytes = num_rows * list_size * static_cast<int64_t>(sizeof(float));
+
+  BenchmarkWriteTable(state, *table, FixedSizeListVectorByteStreamSplitWriterProperties(),
+                      FixedSizeListAsListArrowWriterProperties(), num_rows, total_bytes);
+}
+
+static void BM_ReadFixedSizeListFloatAsListByteStreamSplit(::benchmark::State& state) {
+  const int32_t list_size = static_cast<int32_t>(state.range(0));
+  const int64_t num_rows = BENCHMARK_SIZE / list_size;
+  auto table = MakeFixedSizeListFloatTable(num_rows, list_size, /*nullable=*/false);
+  const int64_t total_bytes = num_rows * list_size * static_cast<int64_t>(sizeof(float));
+
+  BenchmarkReadTable(state, *table, FixedSizeListVectorByteStreamSplitWriterProperties(),
+                     FixedSizeListAsListArrowWriterProperties(), num_rows, total_bytes);
+}
+
+static void BM_RoundtripFixedSizeListFloatAsListByteStreamSplit(
+    ::benchmark::State& state) {
+  const int32_t list_size = static_cast<int32_t>(state.range(0));
+  const int64_t num_rows = BENCHMARK_SIZE / list_size;
+  auto table = MakeFixedSizeListFloatTable(num_rows, list_size, /*nullable=*/false);
+  const int64_t total_bytes = num_rows * list_size * static_cast<int64_t>(sizeof(float));
+
+  BenchmarkRoundtripTable(state, *table,
+                          FixedSizeListVectorByteStreamSplitWriterProperties(),
+                          FixedSizeListAsListArrowWriterProperties(), num_rows,
+                          total_bytes);
+}
+
+static void BM_WriteFixedSizeListFloatVector(::benchmark::State& state) {
+  const int32_t list_size = static_cast<int32_t>(state.range(0));
+  const int64_t num_rows = BENCHMARK_SIZE / list_size;
+  auto table = MakeFixedSizeListFloatTable(num_rows, list_size, /*nullable=*/false);
+  const int64_t total_bytes = num_rows * list_size * static_cast<int64_t>(sizeof(float));
+
+  BenchmarkWriteTable(state, *table, FixedSizeListVectorWriterProperties(),
+                      FixedSizeListVectorArrowWriterProperties(), num_rows, total_bytes);
+}
+
+static void BM_ReadFixedSizeListFloatVector(::benchmark::State& state) {
+  const int32_t list_size = static_cast<int32_t>(state.range(0));
+  const int64_t num_rows = BENCHMARK_SIZE / list_size;
+  auto table = MakeFixedSizeListFloatTable(num_rows, list_size, /*nullable=*/false);
+  const int64_t total_bytes = num_rows * list_size * static_cast<int64_t>(sizeof(float));
+
+  BenchmarkReadTable(state, *table, FixedSizeListVectorWriterProperties(),
+                     FixedSizeListVectorArrowWriterProperties(), num_rows, total_bytes);
+}
+
+static void BM_RoundtripFixedSizeListFloatVector(::benchmark::State& state) {
+  const int32_t list_size = static_cast<int32_t>(state.range(0));
+  const int64_t num_rows = BENCHMARK_SIZE / list_size;
+  auto table = MakeFixedSizeListFloatTable(num_rows, list_size, /*nullable=*/false);
+  const int64_t total_bytes = num_rows * list_size * static_cast<int64_t>(sizeof(float));
+
+  BenchmarkRoundtripTable(state, *table, FixedSizeListVectorWriterProperties(),
+                          FixedSizeListVectorArrowWriterProperties(), num_rows,
+                          total_bytes);
+}
+
+static void BM_WriteFixedSizeListFloatVectorByteStreamSplit(
+    ::benchmark::State& state) {
+  const int32_t list_size = static_cast<int32_t>(state.range(0));
+  const int64_t num_rows = BENCHMARK_SIZE / list_size;
+  auto table = MakeFixedSizeListFloatTable(num_rows, list_size, /*nullable=*/false);
+  const int64_t total_bytes = num_rows * list_size * static_cast<int64_t>(sizeof(float));
+
+  BenchmarkWriteTable(state, *table, FixedSizeListVectorByteStreamSplitWriterProperties(),
+                      FixedSizeListVectorArrowWriterProperties(), num_rows, total_bytes);
+}
+
+static void BM_ReadFixedSizeListFloatVectorByteStreamSplit(
+    ::benchmark::State& state) {
+  const int32_t list_size = static_cast<int32_t>(state.range(0));
+  const int64_t num_rows = BENCHMARK_SIZE / list_size;
+  auto table = MakeFixedSizeListFloatTable(num_rows, list_size, /*nullable=*/false);
+  const int64_t total_bytes = num_rows * list_size * static_cast<int64_t>(sizeof(float));
+
+  BenchmarkReadTable(state, *table, FixedSizeListVectorByteStreamSplitWriterProperties(),
+                     FixedSizeListVectorArrowWriterProperties(), num_rows, total_bytes);
+}
+
+static void BM_RoundtripFixedSizeListFloatVectorByteStreamSplit(
+    ::benchmark::State& state) {
+  const int32_t list_size = static_cast<int32_t>(state.range(0));
+  const int64_t num_rows = BENCHMARK_SIZE / list_size;
+  auto table = MakeFixedSizeListFloatTable(num_rows, list_size, /*nullable=*/false);
+  const int64_t total_bytes = num_rows * list_size * static_cast<int64_t>(sizeof(float));
+
+  BenchmarkRoundtripTable(state, *table,
+                          FixedSizeListVectorByteStreamSplitWriterProperties(),
+                          FixedSizeListVectorArrowWriterProperties(), num_rows,
+                          total_bytes);
+}
+
+static void BM_WriteFixedSizeListFloatVectorNullable(::benchmark::State& state) {
+  const int32_t list_size = static_cast<int32_t>(state.range(0));
+  const int64_t num_rows = BENCHMARK_SIZE / list_size;
+  const int64_t present_rows = CountAlternatingValidRows(num_rows);
+  auto table = MakeFixedSizeListFloatTable(num_rows, list_size, /*nullable=*/true);
+  const int64_t total_bytes =
+      present_rows * list_size * static_cast<int64_t>(sizeof(float));
+
+  BenchmarkWriteTable(state, *table, FixedSizeListVectorWriterProperties(),
+                      FixedSizeListVectorArrowWriterProperties(), num_rows, total_bytes);
+}
+
+static void BM_ReadFixedSizeListFloatVectorNullable(::benchmark::State& state) {
+  const int32_t list_size = static_cast<int32_t>(state.range(0));
+  const int64_t num_rows = BENCHMARK_SIZE / list_size;
+  const int64_t present_rows = CountAlternatingValidRows(num_rows);
+  auto table = MakeFixedSizeListFloatTable(num_rows, list_size, /*nullable=*/true);
+  const int64_t total_bytes =
+      present_rows * list_size * static_cast<int64_t>(sizeof(float));
+
+  BenchmarkReadTable(state, *table, FixedSizeListVectorWriterProperties(),
+                     FixedSizeListVectorArrowWriterProperties(), num_rows, total_bytes);
+}
+
+static void BM_RoundtripFixedSizeListFloatVectorNullable(::benchmark::State& state) {
+  const int32_t list_size = static_cast<int32_t>(state.range(0));
+  const int64_t num_rows = BENCHMARK_SIZE / list_size;
+  const int64_t present_rows = CountAlternatingValidRows(num_rows);
+  auto table = MakeFixedSizeListFloatTable(num_rows, list_size, /*nullable=*/true);
+  const int64_t total_bytes =
+      present_rows * list_size * static_cast<int64_t>(sizeof(float));
+
+  BenchmarkRoundtripTable(state, *table, FixedSizeListVectorWriterProperties(),
+                          FixedSizeListVectorArrowWriterProperties(), num_rows,
+                          total_bytes);
+}
+
+static void BM_RoundtripFixedSizeListStructVector(::benchmark::State& state) {
+  const int32_t list_size = static_cast<int32_t>(state.range(0));
+  const int64_t num_rows = BENCHMARK_SIZE / list_size;
+  auto table = MakeFixedSizeListStructTable(num_rows, list_size);
+  const int64_t total_bytes =
+      num_rows * list_size * static_cast<int64_t>(sizeof(float) + sizeof(int32_t));
+
+  BenchmarkRoundtripTable(state, *table, FixedSizeListVectorWriterProperties(),
+                          FixedSizeListVectorArrowWriterProperties(), num_rows,
+                          total_bytes);
+}
+
+// Realistic embedding-table row: scalar metadata columns alongside a FSL<float, N>
+// embedding. Used to measure VECTOR vs LIST in a wide-table layout instead of a
+// single-column microbenchmark.
+std::shared_ptr<Table> MakeRealisticEmbeddingTable(int64_t num_rows, int32_t list_size) {
+  const int64_t num_values = num_rows * list_size;
+
+  ::arrow::Int64Builder id_builder;
+  EXIT_NOT_OK(id_builder.Reserve(num_rows));
+  for (int64_t i = 0; i < num_rows; ++i) {
+    EXIT_NOT_OK(id_builder.Append(i));
+  }
+  std::shared_ptr<Array> id;
+  EXIT_NOT_OK(id_builder.Finish(&id));
+
+  auto ts_type = ::arrow::timestamp(::arrow::TimeUnit::MICRO);
+  ::arrow::TimestampBuilder ts_builder(ts_type, ::arrow::default_memory_pool());
+  EXIT_NOT_OK(ts_builder.Reserve(num_rows));
+  const int64_t epoch_us = 1700000000LL * 1000000LL;
+  for (int64_t i = 0; i < num_rows; ++i) {
+    EXIT_NOT_OK(ts_builder.Append(epoch_us + i * 1000000LL));
+  }
+  std::shared_ptr<Array> ts;
+  EXIT_NOT_OK(ts_builder.Finish(&ts));
+
+  ::arrow::Int32Builder category_builder;
+  EXIT_NOT_OK(category_builder.Reserve(num_rows));
+  for (int64_t i = 0; i < num_rows; ++i) {
+    EXIT_NOT_OK(category_builder.Append(static_cast<int32_t>(i % 64)));
+  }
+  std::shared_ptr<Array> category;
+  EXIT_NOT_OK(category_builder.Finish(&category));
+
+  auto score = MakeFloatValues(num_rows);
+
+  ::arrow::StringBuilder label_builder;
+  EXIT_NOT_OK(label_builder.Reserve(num_rows));
+  constexpr std::array<const char*, 8> kLabels = {"alpha",   "beta", "gamma", "delta",
+                                                  "epsilon", "zeta", "eta",   "theta"};
+  for (int64_t i = 0; i < num_rows; ++i) {
+    EXIT_NOT_OK(label_builder.Append(kLabels[i % kLabels.size()]));
+  }
+  std::shared_ptr<Array> label;
+  EXIT_NOT_OK(label_builder.Finish(&label));
+
+  auto embedding_values = MakeFloatValues(num_values);
+  auto embedding_type = ::arrow::fixed_size_list(
+      ::arrow::field("item", ::arrow::float32(), false), list_size);
+  std::shared_ptr<Array> embedding;
+  PARQUET_ASSIGN_OR_THROW(embedding, ::arrow::FixedSizeListArray::FromArrays(
+                                         embedding_values, embedding_type));
+
+  auto schema = ::arrow::schema({
+      ::arrow::field("id", ::arrow::int64(), false),
+      ::arrow::field("ts", ts_type, false),
+      ::arrow::field("category", ::arrow::int32(), false),
+      ::arrow::field("score", ::arrow::float32(), false),
+      ::arrow::field("label", ::arrow::utf8(), false),
+      ::arrow::field("embedding", embedding_type, false),
+  });
+  return Table::Make(schema, {id, ts, category, score, label, embedding}, num_rows);
+}
+
+// Bytes processed counts every column. Both LIST and VECTOR sides report the same
+// number so per-column ratios are comparable across sides.
+int64_t RealisticEmbeddingTableBytes(int64_t num_rows, int32_t list_size) {
+  const int64_t per_row_scalar = sizeof(int64_t)    // id
+                                 + sizeof(int64_t)  // ts
+                                 + sizeof(int32_t)  // category
+                                 + sizeof(float);   // score
+  // Average string length for kLabels above is ~5.5 chars; round to 6.
+  const int64_t per_row_label = 6;
+  const int64_t per_row_embedding = list_size * static_cast<int64_t>(sizeof(float));
+  return num_rows * (per_row_scalar + per_row_label + per_row_embedding);
+}
+
+static void BM_WriteRealisticEmbeddingRowAsList(::benchmark::State& state) {
+  const int32_t list_size = static_cast<int32_t>(state.range(0));
+  const int64_t num_rows = BENCHMARK_SIZE / list_size;
+  auto table = MakeRealisticEmbeddingTable(num_rows, list_size);
+  const int64_t total_bytes = RealisticEmbeddingTableBytes(num_rows, list_size);
+
+  BenchmarkWriteTable(state, *table, FixedSizeListVectorWriterProperties(),
+                      FixedSizeListAsListArrowWriterProperties(), num_rows, total_bytes);
+}
+
+static void BM_ReadRealisticEmbeddingRowAsList(::benchmark::State& state) {
+  const int32_t list_size = static_cast<int32_t>(state.range(0));
+  const int64_t num_rows = BENCHMARK_SIZE / list_size;
+  auto table = MakeRealisticEmbeddingTable(num_rows, list_size);
+  const int64_t total_bytes = RealisticEmbeddingTableBytes(num_rows, list_size);
+
+  BenchmarkReadTable(state, *table, FixedSizeListVectorWriterProperties(),
+                     FixedSizeListAsListArrowWriterProperties(), num_rows, total_bytes);
+}
+
+static void BM_RoundtripRealisticEmbeddingRowAsList(::benchmark::State& state) {
+  const int32_t list_size = static_cast<int32_t>(state.range(0));
+  const int64_t num_rows = BENCHMARK_SIZE / list_size;
+  auto table = MakeRealisticEmbeddingTable(num_rows, list_size);
+  const int64_t total_bytes = RealisticEmbeddingTableBytes(num_rows, list_size);
+
+  BenchmarkRoundtripTable(state, *table, FixedSizeListVectorWriterProperties(),
+                          FixedSizeListAsListArrowWriterProperties(), num_rows,
+                          total_bytes);
+}
+
+static void BM_WriteRealisticEmbeddingRowVector(::benchmark::State& state) {
+  const int32_t list_size = static_cast<int32_t>(state.range(0));
+  const int64_t num_rows = BENCHMARK_SIZE / list_size;
+  auto table = MakeRealisticEmbeddingTable(num_rows, list_size);
+  const int64_t total_bytes = RealisticEmbeddingTableBytes(num_rows, list_size);
+
+  BenchmarkWriteTable(state, *table, FixedSizeListVectorWriterProperties(),
+                      FixedSizeListVectorArrowWriterProperties(), num_rows, total_bytes);
+}
+
+static void BM_ReadRealisticEmbeddingRowVector(::benchmark::State& state) {
+  const int32_t list_size = static_cast<int32_t>(state.range(0));
+  const int64_t num_rows = BENCHMARK_SIZE / list_size;
+  auto table = MakeRealisticEmbeddingTable(num_rows, list_size);
+  const int64_t total_bytes = RealisticEmbeddingTableBytes(num_rows, list_size);
+
+  BenchmarkReadTable(state, *table, FixedSizeListVectorWriterProperties(),
+                     FixedSizeListVectorArrowWriterProperties(), num_rows, total_bytes);
+}
+
+static void BM_RoundtripRealisticEmbeddingRowVector(::benchmark::State& state) {
+  const int32_t list_size = static_cast<int32_t>(state.range(0));
+  const int64_t num_rows = BENCHMARK_SIZE / list_size;
+  auto table = MakeRealisticEmbeddingTable(num_rows, list_size);
+  const int64_t total_bytes = RealisticEmbeddingTableBytes(num_rows, list_size);
+
+  BenchmarkRoundtripTable(state, *table, FixedSizeListVectorWriterProperties(),
+                          FixedSizeListVectorArrowWriterProperties(), num_rows,
+                          total_bytes);
+}
+
+BENCHMARK(BM_WriteFixedSizeListFloatAsList)->Arg(80)->Arg(768)->Arg(10000);
+BENCHMARK(BM_ReadFixedSizeListFloatAsList)->Arg(80)->Arg(768)->Arg(10000);
+BENCHMARK(BM_RoundtripFixedSizeListFloatAsList)->Arg(80)->Arg(768)->Arg(10000);
+BENCHMARK(BM_WriteFixedSizeListFloatAsListByteStreamSplit)
+    ->Arg(80)
+    ->Arg(768)
+    ->Arg(10000);
+BENCHMARK(BM_ReadFixedSizeListFloatAsListByteStreamSplit)
+    ->Arg(80)
+    ->Arg(768)
+    ->Arg(10000);
+BENCHMARK(BM_RoundtripFixedSizeListFloatAsListByteStreamSplit)
+    ->Arg(80)
+    ->Arg(768)
+    ->Arg(10000);
+BENCHMARK(BM_WriteFixedSizeListFloatVector)->Arg(80)->Arg(768)->Arg(10000);
+BENCHMARK(BM_ReadFixedSizeListFloatVector)->Arg(80)->Arg(768)->Arg(10000);
+BENCHMARK(BM_RoundtripFixedSizeListFloatVector)->Arg(80)->Arg(768)->Arg(10000);
+BENCHMARK(BM_WriteFixedSizeListFloatVectorByteStreamSplit)
+    ->Arg(80)
+    ->Arg(768)
+    ->Arg(10000);
+BENCHMARK(BM_ReadFixedSizeListFloatVectorByteStreamSplit)
+    ->Arg(80)
+    ->Arg(768)
+    ->Arg(10000);
+BENCHMARK(BM_RoundtripFixedSizeListFloatVectorByteStreamSplit)
+    ->Arg(80)
+    ->Arg(768)
+    ->Arg(10000);
+BENCHMARK(BM_WriteFixedSizeListFloatVectorNullable)->Arg(80)->Arg(768)->Arg(10000);
+BENCHMARK(BM_ReadFixedSizeListFloatVectorNullable)->Arg(80)->Arg(768)->Arg(10000);
+BENCHMARK(BM_RoundtripFixedSizeListFloatVectorNullable)->Arg(80)->Arg(768)->Arg(10000);
+BENCHMARK(BM_RoundtripFixedSizeListStructVector)->Arg(80);
+BENCHMARK(BM_WriteRealisticEmbeddingRowAsList)->Arg(768);
+BENCHMARK(BM_ReadRealisticEmbeddingRowAsList)->Arg(768);
+BENCHMARK(BM_RoundtripRealisticEmbeddingRowAsList)->Arg(768);
+BENCHMARK(BM_WriteRealisticEmbeddingRowVector)->Arg(768);
+BENCHMARK(BM_ReadRealisticEmbeddingRowVector)->Arg(768);
+BENCHMARK(BM_RoundtripRealisticEmbeddingRowVector)->Arg(768);
 
 //
 // Benchmark different ways of reading select row groups

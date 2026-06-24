@@ -20,12 +20,14 @@
 #include <algorithm>
 #include <deque>
 #include <memory>
+#include <numeric>
 #include <string>
 #include <type_traits>
 #include <utility>
 #include <vector>
 
 #include "arrow/array.h"
+#include "arrow/array/concatenate.h"
 #include "arrow/extension_type.h"
 #include "arrow/ipc/writer.h"
 #include "arrow/record_batch.h"
@@ -107,6 +109,58 @@ bool HasNullableRoot(const SchemaManifest& schema_manifest,
   return nullable;
 }
 
+int64_t CountVisitedValues(const std::vector<ElementRange>& visited_elements) {
+  return std::accumulate(
+      visited_elements.begin(), visited_elements.end(), int64_t{0},
+      [](int64_t total, const ElementRange& range) { return total + range.Size(); });
+}
+
+Result<std::shared_ptr<Array>> MaterializeVectorLeafArray(
+    const MultipathLevelBuilderResult& result, ArrowWriteContext* ctx,
+    bool* leaf_is_nullable) {
+  const auto& visited_elements = result.post_list_visited_elements;
+  DCHECK_GT(visited_elements.size(), 0);
+
+  // Nullable VECTOR rows still need one child slot per vector element so that the
+  // generic spaced leaf writer can align leaf slots with the VECTOR def levels.  Arrow
+  // FixedSizeList already stores child slots for null parent rows, so preserve a
+  // zero-copy slice over the complete child range and let WriteArrow's def-level-derived
+  // validity bitmap suppress values belonging to null vector rows.
+  if (CountVisitedValues(visited_elements) == result.def_rep_level_count &&
+      visited_elements.size() == 1) {
+    const ElementRange& range = visited_elements[0];
+    auto values = result.leaf_array->Slice(range.start, range.Size());
+    if (values->null_count() != 0) {
+      *leaf_is_nullable = true;
+    }
+    return values;
+  }
+
+  ::arrow::ArrayVector parts;
+  parts.reserve(visited_elements.size() * 2 + 1);
+  int64_t position = 0;
+  for (const ElementRange& range : visited_elements) {
+    if (range.start > position) {
+      ARROW_ASSIGN_OR_RAISE(
+          auto null_values,
+          ::arrow::MakeArrayOfNull(result.leaf_array->type(), range.start - position,
+                                   ctx->memory_pool));
+      parts.push_back(std::move(null_values));
+    }
+    parts.push_back(result.leaf_array->Slice(range.start, range.Size()));
+    position = range.end;
+  }
+  if (position < result.def_rep_level_count) {
+    ARROW_ASSIGN_OR_RAISE(auto null_values,
+                          ::arrow::MakeArrayOfNull(result.leaf_array->type(),
+                                                   result.def_rep_level_count - position,
+                                                   ctx->memory_pool));
+    parts.push_back(std::move(null_values));
+  }
+  *leaf_is_nullable = true;
+  return ::arrow::Concatenate(parts, ctx->memory_pool);
+}
+
 Status GetSchemaMetadata(const ::arrow::Schema& schema, ::arrow::MemoryPool* pool,
                          const ArrowWriterProperties& properties,
                          std::shared_ptr<const KeyValueMetadata>* out) {
@@ -131,6 +185,51 @@ Status GetSchemaMetadata(const ::arrow::Schema& schema, ::arrow::MemoryPool* poo
   std::string schema_base64 = ::arrow::util::base64_encode(schema_as_string);
   result->Append(kArrowSchemaKey, std::move(schema_base64));
   *out = std::move(result);
+  return Status::OK();
+}
+
+Status ValidateVectorColumnProperties(const SchemaDescriptor* schema,
+                                      const WriterProperties& properties) {
+  for (int i = 0; i < schema->num_columns(); ++i) {
+    const ColumnDescriptor* column = schema->Column(i);
+    if (!column->in_vector_column()) {
+      continue;
+    }
+    const auto& path = column->path();
+    if (properties.dictionary_enabled(path)) {
+      return Status::Invalid(
+          "Experimental VECTOR encoding does not support dictionary "
+          "encoding for column '",
+          path->ToDotString(), "'");
+    }
+    if (properties.statistics_enabled(path)) {
+      return Status::Invalid(
+          "Experimental VECTOR encoding does not support statistics "
+          "for column '",
+          path->ToDotString(), "'");
+    }
+    if (properties.page_index_enabled(path)) {
+      return Status::Invalid(
+          "Experimental VECTOR encoding does not support page index "
+          "for column '",
+          path->ToDotString(), "'");
+    }
+    if (properties.bloom_filter_options(path).has_value()) {
+      return Status::Invalid(
+          "Experimental VECTOR encoding does not support bloom filters "
+          "for column '",
+          path->ToDotString(), "'");
+    }
+    if (properties.content_defined_chunking_enabled()) {
+      // CDC is a file-level switch; report it against the first vector column we see
+      // so the user gets a clear, actionable error rather than a late ParquetException
+      // from WriteLevels complaining about partial vector batches.
+      return Status::Invalid(
+          "Experimental VECTOR encoding does not support content-defined chunking "
+          "(column '",
+          path->ToDotString(), "' is VECTOR-encoded)");
+    }
+  }
   return Status::OK();
 }
 
@@ -169,17 +268,22 @@ class ArrowColumnWriterV2 {
             leaf_idx, ctx, [&](const MultipathLevelBuilderResult& result) {
               size_t visited_component_size = result.post_list_visited_elements.size();
               DCHECK_GT(visited_component_size, 0);
-              if (visited_component_size != 1) {
+              std::shared_ptr<Array> values_array;
+              bool leaf_is_nullable = result.leaf_is_nullable;
+              if (result.leaf_is_vector) {
+                ARROW_ASSIGN_OR_RAISE(values_array, MaterializeVectorLeafArray(
+                                                        result, ctx, &leaf_is_nullable));
+              } else if (visited_component_size == 1) {
+                const ElementRange& range = result.post_list_visited_elements[0];
+                values_array = result.leaf_array->Slice(range.start, range.Size());
+              } else {
                 return Status::NotImplemented(
                     "Lists with non-zero length null components are not supported");
               }
-              const ElementRange& range = result.post_list_visited_elements[0];
-              std::shared_ptr<Array> values_array =
-                  result.leaf_array->Slice(range.start, range.Size());
 
               return column_writer->WriteArrow(result.def_levels, result.rep_levels,
                                                result.def_rep_level_count, *values_array,
-                                               ctx, result.leaf_is_nullable);
+                                               ctx, leaf_is_nullable);
             }));
       }
 
@@ -201,7 +305,7 @@ class ArrowColumnWriterV2 {
   static ::arrow::Result<std::unique_ptr<ArrowColumnWriterV2>> Make(
       const ChunkedArray& data, int64_t offset, const int64_t size,
       const SchemaManifest& schema_manifest, RowGroupWriter* row_group_writer,
-      int start_leaf_column_index = -1) {
+      bool write_fixed_size_list_as_vector, int start_leaf_column_index = -1) {
     int64_t absolute_position = 0;
     int chunk_index = 0;
     int64_t chunk_offset = 0;
@@ -271,8 +375,10 @@ class ArrowColumnWriterV2 {
       std::shared_ptr<Array> array_to_write = chunk.Slice(chunk_offset, chunk_write_size);
 
       if (array_to_write->length() > 0) {
-        ARROW_ASSIGN_OR_RAISE(std::unique_ptr<MultipathLevelBuilder> builder,
-                              MultipathLevelBuilder::Make(*array_to_write, is_nullable));
+        ARROW_ASSIGN_OR_RAISE(
+            std::unique_ptr<MultipathLevelBuilder> builder,
+            MultipathLevelBuilder::Make(*array_to_write, is_nullable,
+                                        write_fixed_size_list_as_vector));
         if (leaf_count != builder->GetLeafCount()) {
           return Status::UnknownError("data type leaf_count != builder_leaf_count",
                                       leaf_count, " ", builder->GetLeafCount());
@@ -328,6 +434,8 @@ class FileWriterImpl : public FileWriter {
   }
 
   Status Init() {
+    RETURN_NOT_OK(
+        ValidateVectorColumnProperties(writer_->schema(), *writer_->properties()));
     return SchemaManifest::Make(writer_->schema(), /*schema_metadata=*/nullptr,
                                 default_arrow_reader_properties(), &schema_manifest_);
   }
@@ -375,10 +483,10 @@ class FileWriterImpl : public FileWriter {
       if (row_group_writer_->buffered()) {
         return Status::Invalid("Cannot write column chunk into the buffered row group.");
       }
-      ARROW_ASSIGN_OR_RAISE(
-          std::unique_ptr<ArrowColumnWriterV2> writer,
-          ArrowColumnWriterV2::Make(*data, offset, size, schema_manifest_,
-                                    row_group_writer_));
+      ARROW_ASSIGN_OR_RAISE(std::unique_ptr<ArrowColumnWriterV2> writer,
+                            ArrowColumnWriterV2::Make(
+                                *data, offset, size, schema_manifest_, row_group_writer_,
+                                arrow_properties_->write_fixed_size_list_as_vector()));
       return writer->Write(&column_write_context_);
     }
 
@@ -459,8 +567,10 @@ class FileWriterImpl : public FileWriter {
         ChunkedArray chunked_array{batch.column(i)};
         ARROW_ASSIGN_OR_RAISE(
             std::unique_ptr<ArrowColumnWriterV2> writer,
-            ArrowColumnWriterV2::Make(chunked_array, offset, size, schema_manifest_,
-                                      row_group_writer_, column_index_start));
+            ArrowColumnWriterV2::Make(
+                chunked_array, offset, size, schema_manifest_, row_group_writer_,
+                arrow_properties_->write_fixed_size_list_as_vector(),
+                column_index_start));
         column_index_start += writer->leaf_count();
         if (arrow_properties_->use_threads()) {
           writers.emplace_back(std::move(writer));

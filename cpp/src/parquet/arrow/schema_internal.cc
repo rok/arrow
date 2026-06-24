@@ -20,6 +20,7 @@
 #include "arrow/extension/json.h"
 #include "arrow/extension/uuid.h"
 #include "arrow/type.h"
+#include "arrow/type_traits.h"
 #include "arrow/util/key_value_metadata.h"
 #include "arrow/util/logging.h"
 #include "arrow/util/string.h"
@@ -36,6 +37,13 @@ namespace parquet::arrow {
 using ::arrow::Result;
 using ::arrow::Status;
 using ::arrow::internal::checked_cast;
+
+bool IsSupportedVectorElementType(const ::arrow::DataType& type) {
+  return type.id() == ::arrow::Type::STRUCT ||
+         (!::arrow::is_nested(type) && ::arrow::is_fixed_width(type) &&
+          type.id() != ::arrow::Type::DICTIONARY &&
+          type.id() != ::arrow::Type::EXTENSION);
+}
 
 namespace {
 

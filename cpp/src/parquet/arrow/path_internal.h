@@ -94,6 +94,12 @@ struct MultipathLevelBuilderResult {
 
   /// Whether the leaf array is nullable.
   bool leaf_is_nullable;
+
+  /// Whether this leaf is produced from an Arrow FixedSizeList being written as
+  /// Parquet VECTOR.  For nullable VECTOR elements the physical Parquet leaf is
+  /// below the VECTOR node, so checking only the primitive schema node is not
+  /// sufficient.
+  bool leaf_is_vector = false;
 };
 
 /// \brief Logic for being able to write out nesting (rep/def level) data that is
@@ -132,7 +138,8 @@ class PARQUET_EXPORT MultipathLevelBuilder {
   ///   the array column as nullable (as determined by its type's parent
   ///   field).
   static ::arrow::Result<std::unique_ptr<MultipathLevelBuilder>> Make(
-      const ::arrow::Array& array, bool array_field_nullable);
+      const ::arrow::Array& array, bool array_field_nullable,
+      bool write_fixed_size_list_as_vector = false);
 
   virtual ~MultipathLevelBuilder() = default;
 

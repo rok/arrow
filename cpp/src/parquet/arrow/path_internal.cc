@@ -106,6 +106,7 @@
 #include "arrow/util/macros.h"
 #include "arrow/visit_array_inline.h"
 
+#include "parquet/arrow/schema_internal.h"
 #include "parquet/properties.h"
 
 namespace parquet::arrow {
@@ -450,6 +451,85 @@ struct FixedSizedRangeSelector {
   int list_size;
 };
 
+struct NoLevelTerminalNode {
+  IterationResult Run(const ElementRange&, PathWriteContext*) { return kDone; }
+};
+
+class VectorNullableNode {
+ public:
+  VectorNullableNode(const uint8_t* null_bitmap, int64_t entry_offset,
+                     int32_t vector_length, int16_t def_level_if_present,
+                     bool child_emits_present_def_levels)
+      : null_bitmap_(null_bitmap),
+        entry_offset_(entry_offset),
+        vector_length_(vector_length),
+        valid_bits_reader_(MakeReader(ElementRange{0, 0})),
+        def_level_if_present_(def_level_if_present),
+        def_level_if_null_(def_level_if_present - 1),
+        child_emits_present_def_levels_(child_emits_present_def_levels),
+        new_range_(true) {}
+
+  ::arrow::internal::BitRunReader MakeReader(const ElementRange& range) {
+    return ::arrow::internal::BitRunReader(null_bitmap_, entry_offset_ + range.start,
+                                           range.Size());
+  }
+
+  IterationResult Run(ElementRange* range, ElementRange* child_range,
+                      PathWriteContext* context) {
+    if (range->Empty()) {
+      new_range_ = true;
+      return kDone;
+    }
+    if (null_bitmap_ == nullptr) {
+      child_range->start = range->start * vector_length_;
+      child_range->end = child_range->start + range->Size() * vector_length_;
+      context->RecordPostListVisit(*child_range);
+      if (!child_emits_present_def_levels_) {
+        RETURN_IF_ERROR(
+            context->AppendDefLevels(child_range->Size(), def_level_if_present_));
+      }
+      range->start = range->end;
+      new_range_ = false;
+      return kNext;
+    }
+    if (new_range_) {
+      valid_bits_reader_ = MakeReader(*range);
+    }
+    ::arrow::internal::BitRun run = valid_bits_reader_.NextRun();
+    while (!range->Empty() && !run.set) {
+      range->start += run.length;
+      RETURN_IF_ERROR(
+          context->AppendDefLevels(run.length * vector_length_, def_level_if_null_));
+      run = valid_bits_reader_.NextRun();
+    }
+    if (range->Empty()) {
+      new_range_ = true;
+      return kDone;
+    }
+
+    child_range->start = range->start * vector_length_;
+    child_range->end = child_range->start + run.length * vector_length_;
+    context->RecordPostListVisit(*child_range);
+    if (!child_emits_present_def_levels_) {
+      RETURN_IF_ERROR(
+          context->AppendDefLevels(run.length * vector_length_, def_level_if_present_));
+    }
+    range->start += run.length;
+    new_range_ = false;
+    return kNext;
+  }
+
+ private:
+  const uint8_t* null_bitmap_;
+  int64_t entry_offset_;
+  int32_t vector_length_;
+  ::arrow::internal::BitRunReader valid_bits_reader_;
+  int16_t def_level_if_present_;
+  int16_t def_level_if_null_;
+  bool child_emits_present_def_levels_;
+  bool new_range_ = true;
+};
+
 // An intermediate node that handles null values.
 class NullableNode {
  public:
@@ -519,7 +599,8 @@ struct PathInfo {
   // Note index order matters here.
   using Node =
       std::variant<NullableTerminalNode, ListNode, LargeListNode, FixedSizeListNode,
-                   NullableNode, AllPresentTerminalNode, AllNullsTerminalNode>;
+                   NullableNode, VectorNullableNode, AllPresentTerminalNode,
+                   AllNullsTerminalNode, NoLevelTerminalNode>;
 
   std::vector<Node> path;
   std::shared_ptr<Array> primitive_array;
@@ -527,6 +608,7 @@ struct PathInfo {
   int16_t max_rep_level = 0;
   bool has_dictionary = false;
   bool leaf_is_nullable = false;
+  bool leaf_is_vector = false;
 };
 
 /// Contains logic for writing a single leaf node to parquet.
@@ -543,6 +625,7 @@ Status WritePath(ElementRange root_range, PathInfo* path_info,
   MultipathLevelBuilderResult builder_result;
   builder_result.leaf_array = path_info->primitive_array;
   builder_result.leaf_is_nullable = path_info->leaf_is_nullable;
+  builder_result.leaf_is_vector = path_info->leaf_is_vector;
 
   if (path_info->max_def_level == 0) {
     // This case only occurs when there are no nullable or repeated
@@ -597,6 +680,12 @@ Status WritePath(ElementRange root_range, PathInfo* path_info,
       IterationResult operator()(LargeListNode& node) {
         return node.Run(stack_position, stack_position + 1, context);
       }
+      IterationResult operator()(VectorNullableNode& node) {
+        return node.Run(stack_position, stack_position + 1, context);
+      }
+      IterationResult operator()(NoLevelTerminalNode& node) {
+        return node.Run(*stack_position, context);
+      }
       ElementRange* stack_position;
       PathWriteContext* context;
     } visitor = {stack_position, &context};
@@ -624,8 +713,12 @@ Status WritePath(ElementRange root_range, PathInfo* path_info,
       builder_result.post_list_visited_elements.push_back({0, 0});
     }
   } else {
-    builder_result.post_list_visited_elements.push_back(
-        {0, builder_result.leaf_array->length()});
+    if (!context.visited_elements.empty()) {
+      std::swap(builder_result.post_list_visited_elements, context.visited_elements);
+    } else {
+      builder_result.post_list_visited_elements.push_back(
+          {0, builder_result.leaf_array->length()});
+    }
     builder_result.rep_levels = nullptr;
   }
 
@@ -661,6 +754,7 @@ struct FixupVisitor {
   }
 
   void operator()(NullableNode& arg) { HandleIntermediateNode(arg); }
+  void operator()(VectorNullableNode&) {}
 
   void operator()(AllNullsTerminalNode& arg) {
     // Even though no processing happens past this point we
@@ -671,6 +765,7 @@ struct FixupVisitor {
 
   void operator()(NullableTerminalNode&) {}
   void operator()(AllPresentTerminalNode&) {}
+  void operator()(NoLevelTerminalNode&) {}
 };
 
 PathInfo Fixup(PathInfo info) {
@@ -692,7 +787,9 @@ PathInfo Fixup(PathInfo info) {
 
 class PathBuilder {
  public:
-  explicit PathBuilder(bool start_nullable) : nullable_in_parent_(start_nullable) {}
+  PathBuilder(bool start_nullable, bool write_fixed_size_list_as_vector)
+      : nullable_in_parent_(start_nullable),
+        write_fixed_size_list_as_vector_(write_fixed_size_list_as_vector) {}
   template <typename T>
   void AddTerminalInfo(const T& array) {
     info_.leaf_is_nullable = nullable_in_parent_;
@@ -801,6 +898,40 @@ class PathBuilder {
   }
 
   Status Visit(const ::arrow::FixedSizeListArray& array) {
+    if (write_fixed_size_list_as_vector_) {
+      if (!IsSupportedVectorElementType(*array.value_type())) {
+        return Status::NotImplemented(
+            "Experimental VECTOR writing only supports fixed-width primitive or struct "
+            "elements");
+      }
+      int32_t list_size = array.list_type()->list_size();
+      const bool element_nullable = array.list_type()->value_field()->nullable();
+      info_.leaf_is_vector = true;
+      const bool parent_nullable = nullable_in_parent_;
+      if (parent_nullable) {
+        info_.max_def_level++;
+      }
+      const bool child_emits_present_def_levels =
+          element_nullable || array.value_type()->id() == ::arrow::Type::STRUCT;
+      if (parent_nullable || element_nullable ||
+          array.value_type()->id() == ::arrow::Type::STRUCT) {
+        info_.path.emplace_back(VectorNullableNode(
+            parent_nullable ? array.null_bitmap_data() : nullptr, array.offset(),
+            list_size, info_.max_def_level, child_emits_present_def_levels));
+      }
+      auto values =
+          array.values()->Slice(array.value_offset(0), array.length() * list_size);
+      if (!element_nullable && array.value_type()->id() != ::arrow::Type::STRUCT) {
+        info_.leaf_is_nullable = false;
+        info_.primitive_array = values;
+        info_.path.emplace_back(NoLevelTerminalNode{});
+        paths_.push_back(Fixup(info_));
+        return Status::OK();
+      }
+      nullable_in_parent_ = element_nullable;
+      return VisitInline(*values);
+    }
+
     MaybeAddNullable(array);
     int32_t list_size = array.list_type()->list_size();
     // Technically we could encode fixed size lists with two level encodings
@@ -840,6 +971,7 @@ class PathBuilder {
   PathInfo info_;
   std::vector<PathInfo> paths_;
   bool nullable_in_parent_;
+  bool write_fixed_size_list_as_vector_;
 };
 
 Status PathBuilder::VisitInline(const Array& array) {
@@ -883,8 +1015,10 @@ class MultipathLevelBuilderImpl : public MultipathLevelBuilder {
 
 // static
 ::arrow::Result<std::unique_ptr<MultipathLevelBuilder>> MultipathLevelBuilder::Make(
-    const ::arrow::Array& array, bool array_field_nullable) {
-  auto constructor = std::make_unique<PathBuilder>(array_field_nullable);
+    const ::arrow::Array& array, bool array_field_nullable,
+    bool write_fixed_size_list_as_vector) {
+  auto constructor = std::make_unique<PathBuilder>(array_field_nullable,
+                                                   write_fixed_size_list_as_vector);
   RETURN_NOT_OK(VisitArrayInline(array, constructor.get()));
   return std::make_unique<MultipathLevelBuilderImpl>(array.data(),
                                                      std::move(constructor));
@@ -894,8 +1028,12 @@ class MultipathLevelBuilderImpl : public MultipathLevelBuilder {
 Status MultipathLevelBuilder::Write(const Array& array, bool array_field_nullable,
                                     ArrowWriteContext* context,
                                     MultipathLevelBuilder::CallbackFunction callback) {
+  const bool write_fixed_size_list_as_vector =
+      context->properties != nullptr &&
+      context->properties->write_fixed_size_list_as_vector();
   ARROW_ASSIGN_OR_RAISE(std::unique_ptr<MultipathLevelBuilder> builder,
-                        MultipathLevelBuilder::Make(array, array_field_nullable));
+                        MultipathLevelBuilder::Make(array, array_field_nullable,
+                                                    write_fixed_size_list_as_vector));
   for (int leaf_idx = 0; leaf_idx < builder->GetLeafCount(); leaf_idx++) {
     RETURN_NOT_OK(builder->Write(leaf_idx, context, callback));
   }
