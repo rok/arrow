@@ -144,9 +144,8 @@ Status ValidateSupportedVectorStructNode(const Node& node) {
   if (IsSupportedVectorStructNode(node)) {
     return Status::OK();
   }
-  return Status::NotImplemented(
-      "VECTOR elements only support primitive, nested VECTOR, or nested struct fields; "
-      "repeated/list/map descendants are not supported");
+  return Status::Invalid(
+      "VECTOR element subtrees must not contain repeated, list, or map fields");
 }
 
 // Option B mapping for Arrow FixedSizeList -> Parquet VECTOR.
@@ -766,7 +765,8 @@ bool IsVectorGroup(const GroupNode& group) {
 //   }
 //
 // The element may be a primitive, a struct group, or a nested vector group
-// (itself in canonical form).
+// (itself in canonical form). The middle group and element field names are
+// part of the canonical VECTOR layout and are validated.
 Status VectorToSchemaField(const GroupNode& group, LevelInfo current_levels,
                            SchemaTreeContext* ctx, const SchemaField* parent,
                            SchemaField* out) {
@@ -785,8 +785,9 @@ Status VectorToSchemaField(const GroupNode& group, LevelInfo current_levels,
         "VECTOR-repeated nodes must be groups containing a single element field");
   }
   const auto& vector_group = static_cast<const GroupNode&>(child);
-  // Mirroring LIST, the writer names the VECTOR-repeated group "list" but
-  // readers do not depend on group names.
+  if (vector_group.name() != "list") {
+    return Status::Invalid("VECTOR-repeated middle groups must be named 'list'");
+  }
   if (vector_group.logical_type() != nullptr && !vector_group.logical_type()->is_none()) {
     return Status::Invalid("VECTOR-repeated groups must not have a logical type");
   }
@@ -797,6 +798,9 @@ Status VectorToSchemaField(const GroupNode& group, LevelInfo current_levels,
     return Status::Invalid("VECTOR-repeated groups must have a single element child");
   }
   const Node& element = *vector_group.field(0);
+  if (element.name() != "element") {
+    return Status::Invalid("VECTOR element fields must be named 'element'");
+  }
   if (element.is_repeated() || element.is_vector()) {
     return Status::Invalid("VECTOR elements must be required or optional");
   }

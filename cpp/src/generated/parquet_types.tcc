@@ -2066,7 +2066,7 @@ uint32_t SchemaElement::read(Protocol_* iprot) {
           xfer += iprot->skip(ftype);
         }
         break;
-      case 12:
+      case 11:
         if (ftype == ::apache::thrift::protocol::T_I32) {
           xfer += iprot->readI32(this->vector_length);
           this->__isset.vector_length = true;
@@ -2144,7 +2144,7 @@ uint32_t SchemaElement::write(Protocol_* oprot) const {
     xfer += oprot->writeFieldEnd();
   }
   if (this->__isset.vector_length) {
-    xfer += oprot->writeFieldBegin("vector_length", ::apache::thrift::protocol::T_I32, 12);
+    xfer += oprot->writeFieldBegin("vector_length", ::apache::thrift::protocol::T_I32, 11);
     xfer += oprot->writeI32(this->vector_length);
     xfer += oprot->writeFieldEnd();
   }

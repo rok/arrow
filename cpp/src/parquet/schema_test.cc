@@ -411,6 +411,14 @@ TEST_F(TestGroupNode, VectorValidation) {
                                ConvertedType::NONE, /*field_id=*/-1,
                                /*vector_length=*/4),
                ParquetException);
+  ASSERT_THROW(GroupNode::Make("list", Repetition::VECTOR, Fields1(),
+                               ConvertedType::LIST, /*field_id=*/-1,
+                               /*vector_length=*/4),
+               ParquetException);
+  ASSERT_THROW(GroupNode::Make("list", Repetition::VECTOR, Fields1(),
+                               LogicalType::List(), /*field_id=*/-1,
+                               /*vector_length=*/4),
+               ParquetException);
 }
 
 TEST_F(TestGroupNode, VectorLogicalTypeRoundTrip) {
@@ -909,7 +917,8 @@ TEST_F(TestSchemaDescriptor, BuildTreeVector) {
   NodePtr vector = GroupNode::Make("list", Repetition::VECTOR, {element},
                                    /*converted_type=*/ConvertedType::NONE,
                                    /*field_id=*/-1, /*vector_length=*/3);
-  NodePtr embedding = GroupNode::Make("embedding", Repetition::OPTIONAL, {vector});
+  NodePtr embedding = GroupNode::Make("embedding", Repetition::OPTIONAL, {vector},
+                                      LogicalType::Vector());
 
   descr_.Init(GroupNode::Make("schema", Repetition::REPEATED, {embedding}));
 
@@ -923,13 +932,17 @@ TEST_F(TestSchemaDescriptor, BuildTreeVector) {
 
 TEST_F(TestSchemaDescriptor, BuildTreeNestedVector) {
   NodePtr element = PrimitiveNode::Make("element", Repetition::REQUIRED, Type::FLOAT);
-  NodePtr inner = GroupNode::Make("inner", Repetition::VECTOR, {element},
-                                  /*converted_type=*/ConvertedType::NONE,
-                                  /*field_id=*/-1, /*vector_length=*/4);
-  NodePtr outer = GroupNode::Make("outer", Repetition::VECTOR, {inner},
-                                  /*converted_type=*/ConvertedType::NONE,
-                                  /*field_id=*/-1, /*vector_length=*/3);
-  NodePtr embedding = GroupNode::Make("embedding", Repetition::OPTIONAL, {outer});
+  NodePtr inner_list = GroupNode::Make("list", Repetition::VECTOR, {element},
+                                       /*converted_type=*/ConvertedType::NONE,
+                                       /*field_id=*/-1, /*vector_length=*/4);
+  NodePtr inner_vector = GroupNode::Make("element", Repetition::REQUIRED, {inner_list},
+                                         LogicalType::Vector());
+  NodePtr outer_list = GroupNode::Make("list", Repetition::VECTOR, {inner_vector},
+                                       /*converted_type=*/ConvertedType::NONE,
+                                       /*field_id=*/-1, /*vector_length=*/3);
+  NodePtr embedding =
+      GroupNode::Make("embedding", Repetition::OPTIONAL, {outer_list},
+                      LogicalType::Vector());
 
   descr_.Init(GroupNode::Make("schema", Repetition::REPEATED, {embedding}));
 
@@ -942,13 +955,17 @@ TEST_F(TestSchemaDescriptor, BuildTreeNestedVector) {
 
 TEST_F(TestSchemaDescriptor, BuildTreeNestedVectorLengthOverflow) {
   NodePtr element = PrimitiveNode::Make("element", Repetition::REQUIRED, Type::FLOAT);
-  NodePtr inner = GroupNode::Make("inner", Repetition::VECTOR, {element},
-                                  /*converted_type=*/ConvertedType::NONE,
-                                  /*field_id=*/-1, /*vector_length=*/46341);
-  NodePtr outer = GroupNode::Make("outer", Repetition::VECTOR, {inner},
-                                  /*converted_type=*/ConvertedType::NONE,
-                                  /*field_id=*/-1, /*vector_length=*/46341);
-  NodePtr embedding = GroupNode::Make("embedding", Repetition::OPTIONAL, {outer});
+  NodePtr inner_list = GroupNode::Make("list", Repetition::VECTOR, {element},
+                                       /*converted_type=*/ConvertedType::NONE,
+                                       /*field_id=*/-1, /*vector_length=*/46341);
+  NodePtr inner_vector = GroupNode::Make("element", Repetition::REQUIRED, {inner_list},
+                                         LogicalType::Vector());
+  NodePtr outer_list = GroupNode::Make("list", Repetition::VECTOR, {inner_vector},
+                                       /*converted_type=*/ConvertedType::NONE,
+                                       /*field_id=*/-1, /*vector_length=*/46341);
+  NodePtr embedding =
+      GroupNode::Make("embedding", Repetition::OPTIONAL, {outer_list},
+                      LogicalType::Vector());
 
   ASSERT_THROW(descr_.Init(GroupNode::Make("schema", Repetition::REPEATED, {embedding})),
                ParquetException);
@@ -1047,14 +1064,14 @@ TEST(TestSchemaPrinter, Vector) {
       {GroupNode::Make(
           "embedding", Repetition::OPTIONAL,
           {GroupNode::Make(
-              "vector", Repetition::VECTOR,
+              "list", Repetition::VECTOR,
               {PrimitiveNode::Make("element", Repetition::REQUIRED, Type::FLOAT)},
               /*logical_type=*/nullptr, -1, 3)},
           LogicalType::Vector())});
 
   std::string expected = R"(repeated group field_id=-1 schema {
   optional group field_id=-1 embedding (Vector) {
-    vector group field_id=-1 vector [3] {
+    vector group field_id=-1 list [3] {
       required float field_id=-1 element;
     }
   }

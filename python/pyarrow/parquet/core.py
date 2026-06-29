@@ -878,11 +878,11 @@ dictionary_pagesize_limit : int, default None
     default 1MB.
 experimental_vector_encoding : bool, default False
     EXPERIMENTAL: Encode supported fixed-size list values, including the storage
-    of fixed-shape tensor extension arrays, using Parquet VECTOR repetition.
-    Unsupported fixed-size list values fall back to the standard LIST encoding:
-    zero-length lists, variable-width or dictionary or extension elements,
-    struct elements containing fixed-size lists, and fixed-size lists below
-    nullable groups.
+    of fixed-shape tensor extension arrays, using the canonical 3-level Parquet
+    VECTOR layout. Unsupported fixed-size list values fall back to the standard
+    LIST encoding: zero-length lists, variable-width or dictionary or extension
+    elements, struct elements containing fixed-size lists, and fixed-size lists
+    below nullable groups.
 store_schema : bool, default True
     By default, the Arrow schema is serialized and stored in the Parquet
     file metadata (in the "ARROW:schema" key). When reading the file,

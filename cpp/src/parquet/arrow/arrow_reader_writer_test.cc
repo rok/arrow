@@ -5041,7 +5041,7 @@ TEST(TestArrowReaderAdHoc, ReadNestedVectorUnderNullableStructAncestor) {
   auto inner_vector = GroupNode::Make("list", Repetition::VECTOR, {element},
                                       ConvertedType::NONE, /*field_id=*/-1,
                                       /*vector_length=*/3);
-  auto inner = GroupNode::Make("inner", Repetition::REQUIRED, {inner_vector},
+  auto inner = GroupNode::Make("element", Repetition::REQUIRED, {inner_vector},
                                LogicalType::Vector());
   auto outer_vector = GroupNode::Make("list", Repetition::VECTOR, {inner},
                                       ConvertedType::NONE, /*field_id=*/-1,
@@ -5076,7 +5076,7 @@ TEST(TestArrowReaderAdHoc, ReadNestedVectorUnderNullableStructAncestor) {
   auto inner_type = ::arrow::fixed_size_list(
       ::arrow::field("element", ::arrow::int32(), /*nullable=*/false), 3);
   auto outer_type = ::arrow::fixed_size_list(
-      ::arrow::field("inner", inner_type, /*nullable=*/false), 2);
+      ::arrow::field("element", inner_type, /*nullable=*/false), 2);
   auto parent_type = ::arrow::struct_({::arrow::field("embedding", outer_type,
                                                       /*nullable=*/false)});
   auto rows_type = ::arrow::list(::arrow::field("parent", parent_type,

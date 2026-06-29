@@ -1401,10 +1401,10 @@ class PARQUET_EXPORT ArrowWriterProperties {
     }
 
     /// \brief EXPERIMENTAL: encode supported Arrow FixedSizeList values as Parquet
-    /// VECTOR.  Unsupported FixedSizeList values fall back to the standard LIST
-    /// encoding: zero-length lists, variable-width or dictionary or extension
-    /// elements, struct elements containing fixed-size lists, and fixed-size
-    /// lists below nullable groups.
+    /// VECTOR using the canonical 3-level VECTOR layout. Unsupported FixedSizeList
+    /// values fall back to the standard LIST encoding: zero-length lists,
+    /// variable-width or dictionary or extension elements, struct elements containing
+    /// fixed-size lists, and fixed-size lists below nullable groups.
     Builder* enable_experimental_vector_encoding() {
       write_fixed_size_list_as_vector_ = true;
       return this;

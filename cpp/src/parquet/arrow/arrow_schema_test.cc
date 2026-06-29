@@ -329,33 +329,33 @@ TEST_F(TestConvertParquetSchema, VectorAnnotatedGroupWithoutVectorChildRejected)
   ASSERT_RAISES(Invalid, ConvertSchema(parquet_fields));
 }
 
-TEST_F(TestConvertParquetSchema, VectorMiddleGroupNameIrrelevant) {
-  // Mirroring LIST, readers do not depend on the VECTOR-repeated group's name.
-  std::vector<NodePtr> parquet_fields;
-  std::vector<std::shared_ptr<Field>> arrow_fields;
-
+TEST_F(TestConvertParquetSchema, VectorMiddleGroupNameRejected) {
+  // The canonical VECTOR layout requires the middle group to be named "list".
   auto element = PrimitiveNode::Make("element", Repetition::REQUIRED, ParquetType::FLOAT);
   auto vector = GroupNode::Make("vector", Repetition::VECTOR, {element},
                                 /*logical_type=*/nullptr, -1, 3);
-  parquet_fields.push_back(GroupNode::Make("embedding", Repetition::OPTIONAL, {vector},
-                                           LogicalType::Vector()));
-  arrow_fields.push_back(::arrow::field(
-      "embedding",
-      ::arrow::fixed_size_list(::arrow::field("element", ::arrow::float32(), false), 3),
-      true));
-
-  ASSERT_OK(ConvertSchema(parquet_fields));
-  ASSERT_NO_FATAL_FAILURE(CheckFlatSchema(::arrow::schema(arrow_fields)));
-}
-
-TEST_F(TestConvertParquetSchema, VectorMiddleGroupLogicalTypeRejected) {
-  auto element = PrimitiveNode::Make("element", Repetition::REQUIRED, ParquetType::FLOAT);
-  auto vector =
-      GroupNode::Make("list", Repetition::VECTOR, {element}, LogicalType::List(), -1, 3);
   std::vector<NodePtr> parquet_fields = {GroupNode::Make(
       "embedding", Repetition::OPTIONAL, {vector}, LogicalType::Vector())};
 
   ASSERT_RAISES(Invalid, ConvertSchema(parquet_fields));
+}
+
+TEST_F(TestConvertParquetSchema, VectorElementNameRejected) {
+  // The canonical VECTOR layout requires the element field to be named "element".
+  auto element = PrimitiveNode::Make("item", Repetition::REQUIRED, ParquetType::FLOAT);
+  auto vector = GroupNode::Make("list", Repetition::VECTOR, {element},
+                                /*logical_type=*/nullptr, -1, 3);
+  std::vector<NodePtr> parquet_fields = {GroupNode::Make(
+      "embedding", Repetition::OPTIONAL, {vector}, LogicalType::Vector())};
+
+  ASSERT_RAISES(Invalid, ConvertSchema(parquet_fields));
+}
+
+TEST_F(TestConvertParquetSchema, VectorMiddleGroupLogicalTypeRejected) {
+  auto element = PrimitiveNode::Make("element", Repetition::REQUIRED, ParquetType::FLOAT);
+  ASSERT_THROW(GroupNode::Make("list", Repetition::VECTOR, {element},
+                               LogicalType::List(), -1, 3),
+               ParquetException);
 }
 
 TEST_F(TestConvertParquetSchema, VectorOnPrimitiveRejected) {
@@ -451,12 +451,13 @@ TEST_F(TestConvertParquetSchema, VectorFixedSizeListStructWithListRejected) {
   auto list = GroupNode::Make("list", Repetition::REPEATED, {list_element});
   auto items =
       GroupNode::Make("items", Repetition::REQUIRED, {list}, LogicalType::List());
-  auto vector = GroupNode::Make("list", Repetition::VECTOR, {items},
+  auto element = GroupNode::Make("element", Repetition::REQUIRED, {items});
+  auto vector = GroupNode::Make("list", Repetition::VECTOR, {element},
                                 /*logical_type=*/nullptr, -1, 3);
   std::vector<NodePtr> parquet_fields = {GroupNode::Make(
       "embedding", Repetition::OPTIONAL, {vector}, LogicalType::Vector())};
 
-  ASSERT_RAISES(NotImplemented, ConvertSchema(parquet_fields));
+  ASSERT_RAISES(Invalid, ConvertSchema(parquet_fields));
 }
 
 TEST_F(TestConvertParquetSchema, VectorFixedSizeListStructWithRepeatedPrimitiveRejected) {
@@ -467,7 +468,7 @@ TEST_F(TestConvertParquetSchema, VectorFixedSizeListStructWithRepeatedPrimitiveR
   std::vector<NodePtr> parquet_fields = {GroupNode::Make(
       "embedding", Repetition::OPTIONAL, {vector}, LogicalType::Vector())};
 
-  ASSERT_RAISES(NotImplemented, ConvertSchema(parquet_fields));
+  ASSERT_RAISES(Invalid, ConvertSchema(parquet_fields));
 }
 
 TEST_F(TestConvertParquetSchema, DuplicateFieldNames) {

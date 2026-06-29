@@ -341,6 +341,9 @@ GroupNode::GroupNode(const std::string& name, Repetition::type repetition,
     : Node(Node::GROUP, name, repetition, converted_type, id, vector_length),
       fields_(fields) {
   ValidateVectorProperties(repetition, vector_length);
+  if (repetition == Repetition::VECTOR && converted_type != ConvertedType::NONE) {
+    throw ParquetException("VECTOR-repeated groups must not have a converted type");
+  }
   // For forward compatibility, create an equivalent logical type
   logical_type_ = LogicalType::FromConvertedType(converted_type_);
   if (!(logical_type_ && (logical_type_->is_nested() || logical_type_->is_none()) &&
@@ -363,6 +366,9 @@ GroupNode::GroupNode(const std::string& name, Repetition::type repetition,
     : Node(Node::GROUP, name, repetition, std::move(logical_type), id, vector_length),
       fields_(fields) {
   ValidateVectorProperties(repetition, vector_length);
+  if (repetition == Repetition::VECTOR && logical_type_ && !logical_type_->is_none()) {
+    throw ParquetException("VECTOR-repeated groups must not have a logical type");
+  }
   if (logical_type_) {
     // Check for logical type <=> node type consistency
     if (logical_type_->is_nested()) {
