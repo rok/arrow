@@ -1252,6 +1252,20 @@ std::function<std::shared_ptr<::arrow::DataType>(FieldVector)> GetNestedFactory(
         return [](FieldVector fields) { return ::arrow::struct_(std::move(fields)); };
       }
       break;
+    case ::arrow::Type::FIXED_SIZE_LIST:
+      if (origin_type.id() == ::arrow::Type::FIXED_SIZE_LIST) {
+        const auto origin_list_size =
+            checked_cast<const ::arrow::FixedSizeListType&>(origin_type).list_size();
+        const auto inferred_list_size =
+            checked_cast<const ::arrow::FixedSizeListType&>(inferred_type).list_size();
+        if (origin_list_size == inferred_list_size) {
+          return [origin_list_size](FieldVector fields) {
+            DCHECK_EQ(fields.size(), 1);
+            return ::arrow::fixed_size_list(std::move(fields[0]), origin_list_size);
+          };
+        }
+      }
+      break;
     case ::arrow::Type::LIST:
     case ::arrow::Type::LARGE_LIST: {
       switch (origin_type.id()) {

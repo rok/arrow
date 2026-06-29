@@ -2876,6 +2876,32 @@ TEST(TestArrowReadWrite, ScanContents) {
   ASSERT_EQ(num_rows, num_rows_returned);
 }
 
+TEST(TestArrowReadWrite, ScanContentsVector) {
+  auto vector_type = ::arrow::fixed_size_list(
+      ::arrow::field("element", ::arrow::int32(), /*nullable=*/false), 3);
+  auto table = ::arrow::Table::Make(
+      ::arrow::schema({::arrow::field("id", ::arrow::int32(), /*nullable=*/false),
+                       ::arrow::field("embedding", vector_type, /*nullable=*/true)}),
+      {::arrow::ArrayFromJSON(::arrow::int32(), "[0, 1, 2, 3]"),
+       ::arrow::ArrayFromJSON(
+           vector_type, R"([[1, 2, 3], null, [7, 8, 9], [10, 11, 12]])")});
+
+  ArrowWriterProperties::Builder builder;
+  builder.enable_experimental_vector_encoding();
+  ASSERT_OK_AND_ASSIGN(auto buffer,
+                       WriteTableToBuffer(table, /*row_group_size=*/2,
+                                          VectorWriterProperties(), builder.build()));
+  ASSERT_OK_AND_ASSIGN(auto reader, OpenFile(std::make_shared<BufferReader>(buffer),
+                                             ::arrow::default_memory_pool()));
+
+  int64_t num_rows_returned = 0;
+  ASSERT_OK_NO_THROW(reader->ScanContents({}, 2, &num_rows_returned));
+  ASSERT_EQ(table->num_rows(), num_rows_returned);
+
+  ASSERT_OK_NO_THROW(reader->ScanContents({1}, 2, &num_rows_returned));
+  ASSERT_EQ(table->num_rows(), num_rows_returned);
+}
+
 TEST(TestArrowReadWrite, ReadColumnSubset) {
   const int num_columns = 20;
   const int num_rows = 1000;
@@ -3594,6 +3620,32 @@ TEST(ArrowReadWrite, FixedSizeListVectorNullableRoundTripNullPatterns) {
     ASSERT_NO_FATAL_FAILURE(CheckVectorFixedSizeListRoundtrip(
         table, std::max<int64_t>(1, table->num_rows())));
   }
+}
+
+TEST(ArrowReadWrite, FixedSizeListVectorRestoresStoredChildMetadata) {
+  auto child_metadata = ::arrow::key_value_metadata({{"child_key", "child_value"}});
+  auto vector_type = ::arrow::fixed_size_list(
+      ::arrow::field("item", ::arrow::int32(), /*nullable=*/false, child_metadata), 2);
+  auto table = ::arrow::Table::Make(
+      ::arrow::schema({::arrow::field("root", vector_type, /*nullable=*/true)}),
+      {::arrow::ArrayFromJSON(vector_type, R"([[1, 2], null, [5, 6]])")});
+
+  ArrowWriterProperties::Builder builder;
+  builder.store_schema()->enable_experimental_vector_encoding();
+  ASSERT_OK_AND_ASSIGN(auto buffer,
+                       WriteTableToBuffer(table, /*row_group_size=*/3,
+                                          VectorWriterProperties(), builder.build()));
+
+  std::unique_ptr<FileReader> reader;
+  FileReaderBuilder reader_builder;
+  ASSERT_OK_NO_THROW(reader_builder.Open(std::make_shared<BufferReader>(buffer)));
+  ASSERT_OK(reader_builder.Build(&reader));
+  ASSERT_OK_AND_ASSIGN(auto result, reader->ReadTable());
+
+  const auto& result_type =
+      checked_cast<const ::arrow::FixedSizeListType&>(*result->schema()->field(0)->type());
+  ASSERT_NE(nullptr, result_type.value_field()->metadata());
+  ASSERT_TRUE(result_type.value_field()->metadata()->Equals(*child_metadata));
 }
 
 TEST(ArrowReadWrite, FixedSizeListVectorStructOfVectorsRoundTrip) {
