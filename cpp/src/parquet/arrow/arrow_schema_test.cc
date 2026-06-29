@@ -289,6 +289,188 @@ TEST_F(TestConvertParquetSchema, ParquetAnnotatedFields) {
   ASSERT_NO_FATAL_FAILURE(CheckFlatSchema(arrow_schema));
 }
 
+TEST_F(TestConvertParquetSchema, UnannotatedVectorGroupRejected) {
+  // The VECTOR logical type annotation is required: a plain group containing a
+  // VECTOR-repeated child is not silently interpreted as a vector.
+  auto element = PrimitiveNode::Make("element", Repetition::REQUIRED, ParquetType::FLOAT);
+  auto vector = GroupNode::Make("vector", Repetition::VECTOR, {element},
+                                /*logical_type=*/nullptr, -1, 3);
+  std::vector<NodePtr> parquet_fields = {GroupNode::Make(
+      "embedding", Repetition::OPTIONAL, {vector}, /*logical_type=*/nullptr)};
+
+  ASSERT_RAISES(Invalid, ConvertSchema(parquet_fields));
+}
+
+TEST_F(TestConvertParquetSchema, VectorFixedSizeListAnnotated) {
+  std::vector<NodePtr> parquet_fields;
+  std::vector<std::shared_ptr<Field>> arrow_fields;
+
+  auto element = PrimitiveNode::Make("element", Repetition::REQUIRED, ParquetType::FLOAT);
+  auto vector = GroupNode::Make("list", Repetition::VECTOR, {element},
+                                /*logical_type=*/nullptr, -1, 3);
+  parquet_fields.push_back(GroupNode::Make("embedding", Repetition::OPTIONAL, {vector},
+                                           LogicalType::Vector()));
+  arrow_fields.push_back(::arrow::field(
+      "embedding",
+      ::arrow::fixed_size_list(::arrow::field("element", ::arrow::float32(), false), 3),
+      true));
+
+  ASSERT_OK(ConvertSchema(parquet_fields));
+  ASSERT_NO_FATAL_FAILURE(CheckFlatSchema(::arrow::schema(arrow_fields)));
+}
+
+TEST_F(TestConvertParquetSchema, VectorAnnotatedGroupWithoutVectorChildRejected) {
+  // A group annotated with the VECTOR logical type must contain a single
+  // VECTOR-repeated child.
+  auto element = PrimitiveNode::Make("element", Repetition::REQUIRED, ParquetType::FLOAT);
+  std::vector<NodePtr> parquet_fields = {GroupNode::Make(
+      "embedding", Repetition::OPTIONAL, {element}, LogicalType::Vector())};
+
+  ASSERT_RAISES(Invalid, ConvertSchema(parquet_fields));
+}
+
+TEST_F(TestConvertParquetSchema, VectorMiddleGroupNameRejected) {
+  // The canonical VECTOR layout requires the middle group to be named "list".
+  auto element = PrimitiveNode::Make("element", Repetition::REQUIRED, ParquetType::FLOAT);
+  auto vector = GroupNode::Make("vector", Repetition::VECTOR, {element},
+                                /*logical_type=*/nullptr, -1, 3);
+  std::vector<NodePtr> parquet_fields = {GroupNode::Make(
+      "embedding", Repetition::OPTIONAL, {vector}, LogicalType::Vector())};
+
+  ASSERT_RAISES(Invalid, ConvertSchema(parquet_fields));
+}
+
+TEST_F(TestConvertParquetSchema, VectorElementNameRejected) {
+  // The canonical VECTOR layout requires the element field to be named "element".
+  auto element = PrimitiveNode::Make("item", Repetition::REQUIRED, ParquetType::FLOAT);
+  auto vector = GroupNode::Make("list", Repetition::VECTOR, {element},
+                                /*logical_type=*/nullptr, -1, 3);
+  std::vector<NodePtr> parquet_fields = {GroupNode::Make(
+      "embedding", Repetition::OPTIONAL, {vector}, LogicalType::Vector())};
+
+  ASSERT_RAISES(Invalid, ConvertSchema(parquet_fields));
+}
+
+TEST_F(TestConvertParquetSchema, VectorMiddleGroupLogicalTypeRejected) {
+  auto element = PrimitiveNode::Make("element", Repetition::REQUIRED, ParquetType::FLOAT);
+  ASSERT_THROW(
+      GroupNode::Make("list", Repetition::VECTOR, {element}, LogicalType::List(), -1, 3),
+      ParquetException);
+}
+
+TEST_F(TestConvertParquetSchema, VectorOnPrimitiveRejected) {
+  // VECTOR repetition directly on a primitive is not part of the canonical
+  // 3-level vector structure; vectors must use a VECTOR group whose single
+  // child is a VECTOR-repeated group containing the element.
+  ASSERT_THROW(PrimitiveNode::Make("element", Repetition::VECTOR, ParquetType::FLOAT,
+                                   ConvertedType::NONE, -1, -1, -1, -1, 3),
+               ParquetException);
+}
+
+TEST_F(TestConvertParquetSchema, VectorUnderNullableStructAncestor) {
+  auto element = PrimitiveNode::Make("element", Repetition::REQUIRED, ParquetType::INT32);
+  auto vector = GroupNode::Make("list", Repetition::VECTOR, {element},
+                                /*logical_type=*/nullptr, -1, 2);
+  auto embedding =
+      GroupNode::Make("embedding", Repetition::REQUIRED, {vector}, LogicalType::Vector());
+  std::vector<NodePtr> parquet_fields = {
+      GroupNode::Make("outer", Repetition::OPTIONAL, {embedding})};
+
+  auto expected = ::arrow::schema({::arrow::field(
+      "outer",
+      ::arrow::struct_({::arrow::field(
+          "embedding",
+          ::arrow::fixed_size_list(::arrow::field("element", INT32, false), 2), false)}),
+      true)});
+
+  ASSERT_OK(ConvertSchema(parquet_fields));
+  ASSERT_NO_FATAL_FAILURE(CheckFlatSchema(expected));
+}
+
+TEST_F(TestConvertParquetSchema, VectorFixedSizeListNullableStructElement) {
+  std::vector<NodePtr> parquet_fields;
+  std::vector<std::shared_ptr<Field>> arrow_fields;
+
+  auto x = PrimitiveNode::Make("x", Repetition::REQUIRED, ParquetType::FLOAT);
+  auto y = PrimitiveNode::Make("y", Repetition::OPTIONAL, ParquetType::INT32);
+  auto item = GroupNode::Make("element", Repetition::OPTIONAL, {x, y});
+  auto vector = GroupNode::Make("list", Repetition::VECTOR, {item},
+                                /*logical_type=*/nullptr, -1, 3);
+  parquet_fields.push_back(GroupNode::Make("embedding", Repetition::OPTIONAL, {vector},
+                                           LogicalType::Vector()));
+  arrow_fields.push_back(::arrow::field(
+      "embedding",
+      ::arrow::fixed_size_list(
+          ::arrow::field("element",
+                         ::arrow::struct_({::arrow::field("x", FLOAT, false),
+                                           ::arrow::field("y", INT32, true)}),
+                         true),
+          3),
+      true));
+
+  ASSERT_OK(ConvertSchema(parquet_fields));
+  ASSERT_NO_FATAL_FAILURE(CheckFlatSchema(::arrow::schema(arrow_fields)));
+}
+
+TEST_F(TestConvertParquetSchema, VectorFixedSizeListNullableNestedStructElement) {
+  std::vector<NodePtr> parquet_fields;
+  std::vector<std::shared_ptr<Field>> arrow_fields;
+
+  auto x = PrimitiveNode::Make("x", Repetition::REQUIRED, ParquetType::FLOAT);
+  auto y = PrimitiveNode::Make("y", Repetition::OPTIONAL, ParquetType::INT32);
+  auto point = GroupNode::Make("point", Repetition::REQUIRED, {x, y});
+  auto z = PrimitiveNode::Make("z", Repetition::OPTIONAL, LogicalType::Int(16, true),
+                               ParquetType::INT32);
+  auto item = GroupNode::Make("element", Repetition::OPTIONAL, {point, z});
+  auto vector = GroupNode::Make("list", Repetition::VECTOR, {item},
+                                /*logical_type=*/nullptr, -1, 3);
+  parquet_fields.push_back(GroupNode::Make("embedding", Repetition::OPTIONAL, {vector},
+                                           LogicalType::Vector()));
+  arrow_fields.push_back(::arrow::field(
+      "embedding",
+      ::arrow::fixed_size_list(
+          ::arrow::field(
+              "element",
+              ::arrow::struct_(
+                  {::arrow::field("point",
+                                  ::arrow::struct_({::arrow::field("x", FLOAT, false),
+                                                    ::arrow::field("y", INT32, true)}),
+                                  false),
+                   ::arrow::field("z", ::arrow::int16(), true)}),
+              true),
+          3),
+      true));
+
+  ASSERT_OK(ConvertSchema(parquet_fields));
+  ASSERT_NO_FATAL_FAILURE(CheckFlatSchema(::arrow::schema(arrow_fields)));
+}
+
+TEST_F(TestConvertParquetSchema, VectorFixedSizeListStructWithListRejected) {
+  auto list_element =
+      PrimitiveNode::Make("element", Repetition::REQUIRED, ParquetType::INT32);
+  auto list = GroupNode::Make("list", Repetition::REPEATED, {list_element});
+  auto items =
+      GroupNode::Make("items", Repetition::REQUIRED, {list}, LogicalType::List());
+  auto element = GroupNode::Make("element", Repetition::REQUIRED, {items});
+  auto vector = GroupNode::Make("list", Repetition::VECTOR, {element},
+                                /*logical_type=*/nullptr, -1, 3);
+  std::vector<NodePtr> parquet_fields = {GroupNode::Make(
+      "embedding", Repetition::OPTIONAL, {vector}, LogicalType::Vector())};
+
+  ASSERT_RAISES(Invalid, ConvertSchema(parquet_fields));
+}
+
+TEST_F(TestConvertParquetSchema, VectorFixedSizeListStructWithRepeatedPrimitiveRejected) {
+  auto values = PrimitiveNode::Make("values", Repetition::REPEATED, ParquetType::INT32);
+  auto item = GroupNode::Make("element", Repetition::REQUIRED, {values});
+  auto vector = GroupNode::Make("list", Repetition::VECTOR, {item},
+                                /*logical_type=*/nullptr, -1, 3);
+  std::vector<NodePtr> parquet_fields = {GroupNode::Make(
+      "embedding", Repetition::OPTIONAL, {vector}, LogicalType::Vector())};
+
+  ASSERT_RAISES(Invalid, ConvertSchema(parquet_fields));
+}
+
 TEST_F(TestConvertParquetSchema, DuplicateFieldNames) {
   std::vector<NodePtr> parquet_fields;
   std::vector<std::shared_ptr<Field>> arrow_fields;
@@ -1755,11 +1937,278 @@ TEST_F(TestConvertArrowSchema, ParquetOtherLists) {
   AddListLikeField(::arrow::list_view(arrow_element));
   // LargeListView<String> (list-like non-null, elements nullable)
   AddListLikeField(::arrow::large_list_view(arrow_element));
-  // FixedSizeList[10]<String> (list-like non-null, elements nullable)
+  // FixedSizeList defaults to the legacy LIST encoding unless experimental VECTOR
+  // encoding is explicitly enabled.
   AddListLikeField(::arrow::fixed_size_list(arrow_element, 10));
 
   ASSERT_OK(ConvertSchema(arrow_fields));
 
+  ASSERT_NO_FATAL_FAILURE(CheckFlatSchema(parquet_fields));
+}
+
+TEST_F(TestConvertArrowSchema,
+       ParquetFixedSizeListVectorUnsupportedElementFallsBackToList) {
+  std::vector<NodePtr> parquet_fields;
+  std::vector<std::shared_ptr<Field>> arrow_fields;
+
+  auto element = PrimitiveNode::Make("element", Repetition::OPTIONAL,
+                                     ParquetType::BYTE_ARRAY, ConvertedType::UTF8);
+  auto list = GroupNode::Make("list", Repetition::REPEATED, {element});
+  parquet_fields.push_back(
+      GroupNode::Make("embedding", Repetition::OPTIONAL, {list}, ConvertedType::LIST));
+
+  auto arrow_element = ::arrow::field("string", UTF8, true);
+  auto arrow_list = ::arrow::fixed_size_list(arrow_element, 3);
+  arrow_fields.push_back(::arrow::field("embedding", arrow_list, true));
+
+  ArrowWriterProperties::Builder builder;
+  builder.enable_experimental_vector_encoding();
+  ASSERT_OK(ConvertSchema(arrow_fields, builder.build()));
+  ASSERT_NO_FATAL_FAILURE(CheckFlatSchema(parquet_fields));
+}
+
+TEST_F(TestConvertArrowSchema, ParquetFixedSizeListVectorZeroLengthFallsBackToList) {
+  std::vector<NodePtr> parquet_fields;
+  std::vector<std::shared_ptr<Field>> arrow_fields;
+
+  auto element = PrimitiveNode::Make("element", Repetition::REQUIRED, ParquetType::FLOAT);
+  auto list = GroupNode::Make("list", Repetition::REPEATED, {element});
+  parquet_fields.push_back(
+      GroupNode::Make("embedding", Repetition::OPTIONAL, {list}, ConvertedType::LIST));
+
+  auto arrow_element = ::arrow::field("element", FLOAT, false);
+  auto arrow_list = ::arrow::fixed_size_list(arrow_element, 0);
+  arrow_fields.push_back(::arrow::field("embedding", arrow_list, true));
+
+  ArrowWriterProperties::Builder builder;
+  builder.enable_experimental_vector_encoding();
+  ASSERT_OK(ConvertSchema(arrow_fields, builder.build()));
+  ASSERT_NO_FATAL_FAILURE(CheckFlatSchema(parquet_fields));
+}
+
+TEST_F(TestConvertArrowSchema,
+       ParquetFixedSizeListVectorOuterLengthOverflowFallsBackToList) {
+  auto inner_type =
+      ::arrow::fixed_size_list(::arrow::field("element", FLOAT, false), 46341);
+  auto outer_type = ::arrow::fixed_size_list(
+      ::arrow::field("inner", inner_type, /*nullable=*/false), 46341);
+  std::vector<std::shared_ptr<Field>> arrow_fields = {
+      ::arrow::field("embedding", outer_type, /*nullable=*/true)};
+
+  ArrowWriterProperties::Builder builder;
+  builder.enable_experimental_vector_encoding();
+  ASSERT_OK(ConvertSchema(arrow_fields, builder.build()));
+
+  ASSERT_EQ(1, result_schema_->num_columns());
+  // The outer FixedSizeList falls back to LIST because the nested VECTOR product
+  // would overflow, while the inner FixedSizeList can still use VECTOR.
+  EXPECT_EQ(46341, result_schema_->Column(0)->effective_vector_length());
+  const auto* field = result_schema_->group_node()->field(0).get();
+  ASSERT_TRUE(field->is_group());
+  EXPECT_TRUE(static_cast<const GroupNode*>(field)->logical_type()->is_list());
+}
+
+TEST_F(TestConvertArrowSchema, ParquetFixedSizeListVectorUnderList) {
+  // FixedSizeList values below a repeated field can use VECTOR encoding.
+  std::vector<NodePtr> parquet_fields;
+  std::vector<std::shared_ptr<Field>> arrow_fields;
+
+  auto inner_element =
+      PrimitiveNode::Make("element", Repetition::REQUIRED, ParquetType::INT32);
+  auto vector = GroupNode::Make("list", Repetition::VECTOR, {inner_element},
+                                /*logical_type=*/nullptr, -1, 2);
+  auto element =
+      GroupNode::Make("element", Repetition::REQUIRED, {vector}, LogicalType::Vector());
+  auto list = GroupNode::Make("list", Repetition::REPEATED, {element});
+  parquet_fields.push_back(
+      GroupNode::Make("embeddings", Repetition::OPTIONAL, {list}, ConvertedType::LIST));
+
+  auto vector_type =
+      ::arrow::fixed_size_list(::arrow::field("element", INT32, /*nullable=*/false), 2);
+  arrow_fields.push_back(::arrow::field(
+      "embeddings", ::arrow::list(::arrow::field("element", vector_type, false)), true));
+
+  ArrowWriterProperties::Builder builder;
+  builder.enable_experimental_vector_encoding();
+  ASSERT_OK(ConvertSchema(arrow_fields, builder.build()));
+  ASSERT_NO_FATAL_FAILURE(CheckFlatSchema(parquet_fields));
+}
+
+TEST_F(TestConvertArrowSchema, ParquetFixedSizeListVectorMixedSupportedAndFallback) {
+  std::vector<NodePtr> parquet_fields;
+  std::vector<std::shared_ptr<Field>> arrow_fields;
+
+  auto element = PrimitiveNode::Make("element", Repetition::REQUIRED, ParquetType::FLOAT);
+  auto vector = GroupNode::Make("list", Repetition::VECTOR, {element},
+                                /*logical_type=*/nullptr, -1, 3);
+  parquet_fields.push_back(GroupNode::Make("embedding", Repetition::OPTIONAL, {vector},
+                                           LogicalType::Vector()));
+
+  auto string_element = PrimitiveNode::Make("element", Repetition::OPTIONAL,
+                                            ParquetType::BYTE_ARRAY, ConvertedType::UTF8);
+  auto string_list = GroupNode::Make("list", Repetition::REPEATED, {string_element});
+  parquet_fields.push_back(GroupNode::Make("labels", Repetition::OPTIONAL, {string_list},
+                                           ConvertedType::LIST));
+
+  arrow_fields.push_back(::arrow::field(
+      "embedding", ::arrow::fixed_size_list(::arrow::field("element", FLOAT, false), 3),
+      true));
+  arrow_fields.push_back(::arrow::field(
+      "labels", ::arrow::fixed_size_list(::arrow::field("string", UTF8, true), 3), true));
+
+  ArrowWriterProperties::Builder builder;
+  builder.enable_experimental_vector_encoding();
+  ASSERT_OK(ConvertSchema(arrow_fields, builder.build()));
+  ASSERT_NO_FATAL_FAILURE(CheckFlatSchema(parquet_fields));
+}
+
+TEST_F(TestConvertArrowSchema, ParquetFixedSizeListVectorNullableElement) {
+  std::vector<NodePtr> parquet_fields;
+  std::vector<std::shared_ptr<Field>> arrow_fields;
+
+  auto item = PrimitiveNode::Make("element", Repetition::OPTIONAL, ParquetType::FLOAT,
+                                  ConvertedType::NONE, -1, -1, -1, -1, -1);
+  auto vector = GroupNode::Make("list", Repetition::VECTOR, {item},
+                                /*logical_type=*/nullptr, -1, 3);
+  parquet_fields.push_back(GroupNode::Make("embedding", Repetition::OPTIONAL, {vector},
+                                           LogicalType::Vector()));
+
+  auto arrow_element = ::arrow::field("element", FLOAT, true);
+  auto arrow_list = ::arrow::fixed_size_list(arrow_element, 3);
+  arrow_fields.push_back(::arrow::field("embedding", arrow_list, true));
+
+  ArrowWriterProperties::Builder builder;
+  builder.enable_experimental_vector_encoding();
+  ASSERT_OK(ConvertSchema(arrow_fields, builder.build()));
+  ASSERT_NO_FATAL_FAILURE(CheckFlatSchema(parquet_fields));
+}
+
+TEST_F(TestConvertArrowSchema, ParquetFixedSizeListVectorNullableStructElement) {
+  std::vector<NodePtr> parquet_fields;
+  std::vector<std::shared_ptr<Field>> arrow_fields;
+
+  auto x = PrimitiveNode::Make("x", Repetition::REQUIRED, ParquetType::FLOAT,
+                               ConvertedType::NONE, -1, -1, -1, -1, -1);
+  auto y = PrimitiveNode::Make("y", Repetition::OPTIONAL, ParquetType::INT32,
+                               ConvertedType::NONE, -1, -1, -1, -1, -1);
+  auto item = GroupNode::Make("element", Repetition::OPTIONAL, {x, y});
+  auto vector = GroupNode::Make("list", Repetition::VECTOR, {item},
+                                /*logical_type=*/nullptr, -1, 3);
+  parquet_fields.push_back(GroupNode::Make("embedding", Repetition::OPTIONAL, {vector},
+                                           LogicalType::Vector()));
+
+  auto arrow_element = ::arrow::field(
+      "element",
+      ::arrow::struct_({::arrow::field("x", FLOAT, false), ::arrow::field("y", INT32)}),
+      true);
+  auto arrow_list = ::arrow::fixed_size_list(arrow_element, 3);
+  arrow_fields.push_back(::arrow::field("embedding", arrow_list, true));
+
+  ArrowWriterProperties::Builder builder;
+  builder.enable_experimental_vector_encoding();
+  ASSERT_OK(ConvertSchema(arrow_fields, builder.build()));
+  ASSERT_NO_FATAL_FAILURE(CheckFlatSchema(parquet_fields));
+}
+
+TEST_F(TestConvertArrowSchema, ParquetFixedSizeListVectorNullableNestedStructElement) {
+  std::vector<NodePtr> parquet_fields;
+  std::vector<std::shared_ptr<Field>> arrow_fields;
+
+  auto x = PrimitiveNode::Make("x", Repetition::REQUIRED, ParquetType::FLOAT,
+                               ConvertedType::NONE, -1, -1, -1, -1, -1);
+  auto y = PrimitiveNode::Make("y", Repetition::OPTIONAL, ParquetType::INT32,
+                               ConvertedType::NONE, -1, -1, -1, -1, -1);
+  auto point = GroupNode::Make("point", Repetition::REQUIRED, {x, y});
+  auto z = PrimitiveNode::Make("z", Repetition::OPTIONAL, LogicalType::Int(16, true),
+                               ParquetType::INT32, -1, -1, -1);
+  auto item = GroupNode::Make("element", Repetition::OPTIONAL, {point, z});
+  auto vector = GroupNode::Make("list", Repetition::VECTOR, {item},
+                                /*logical_type=*/nullptr, -1, 3);
+  parquet_fields.push_back(GroupNode::Make("embedding", Repetition::OPTIONAL, {vector},
+                                           LogicalType::Vector()));
+
+  auto arrow_element = ::arrow::field(
+      "element",
+      ::arrow::struct_(
+          {::arrow::field("point",
+                          ::arrow::struct_({::arrow::field("x", FLOAT, false),
+                                            ::arrow::field("y", INT32, true)}),
+                          false),
+           ::arrow::field("z", ::arrow::int16(), true)}),
+      true);
+  auto arrow_list = ::arrow::fixed_size_list(arrow_element, 3);
+  arrow_fields.push_back(::arrow::field("embedding", arrow_list, true));
+
+  ArrowWriterProperties::Builder builder;
+  builder.enable_experimental_vector_encoding();
+  ASSERT_OK(ConvertSchema(arrow_fields, builder.build()));
+  ASSERT_NO_FATAL_FAILURE(CheckFlatSchema(parquet_fields));
+}
+
+TEST_F(TestConvertArrowSchema, ParquetFixedSizeListVectorStructWithListFallsBackToList) {
+  std::vector<NodePtr> parquet_fields;
+  std::vector<std::shared_ptr<Field>> arrow_fields;
+
+  auto item = PrimitiveNode::Make("element", Repetition::REQUIRED, ParquetType::INT32);
+  auto items_list = GroupNode::Make("list", Repetition::REPEATED, {item});
+  auto items =
+      GroupNode::Make("items", Repetition::REQUIRED, {items_list}, ConvertedType::LIST);
+  auto element = GroupNode::Make("element", Repetition::REQUIRED, {items});
+  auto list = GroupNode::Make("list", Repetition::REPEATED, {element});
+  parquet_fields.push_back(
+      GroupNode::Make("embedding", Repetition::OPTIONAL, {list}, ConvertedType::LIST));
+
+  auto arrow_element = ::arrow::field(
+      "element",
+      ::arrow::struct_({::arrow::field(
+          "items", ::arrow::list(::arrow::field("element", INT32, false)), false)}),
+      false);
+  auto arrow_list = ::arrow::fixed_size_list(arrow_element, 3);
+  arrow_fields.push_back(::arrow::field("embedding", arrow_list, true));
+
+  ArrowWriterProperties::Builder builder;
+  builder.enable_experimental_vector_encoding();
+  ASSERT_OK(ConvertSchema(arrow_fields, builder.build()));
+  ASSERT_NO_FATAL_FAILURE(CheckFlatSchema(parquet_fields));
+}
+
+TEST_F(TestConvertArrowSchema, ParquetFixedSizeListVector) {
+  std::vector<NodePtr> parquet_fields;
+  std::vector<std::shared_ptr<Field>> arrow_fields;
+
+  auto element = PrimitiveNode::Make("element", Repetition::REQUIRED, ParquetType::FLOAT);
+  auto vector = GroupNode::Make("list", Repetition::VECTOR, {element},
+                                /*logical_type=*/nullptr, -1, 3);
+  parquet_fields.push_back(GroupNode::Make("embedding", Repetition::OPTIONAL, {vector},
+                                           LogicalType::Vector()));
+
+  auto arrow_element = ::arrow::field("element", FLOAT, false);
+  auto arrow_list = ::arrow::fixed_size_list(arrow_element, 3);
+  arrow_fields.push_back(::arrow::field("embedding", arrow_list, true));
+
+  ArrowWriterProperties::Builder builder;
+  builder.enable_experimental_vector_encoding();
+  ASSERT_OK(ConvertSchema(arrow_fields, builder.build()));
+  ASSERT_NO_FATAL_FAILURE(CheckFlatSchema(parquet_fields));
+}
+
+TEST_F(TestConvertArrowSchema, ParquetFixedSizeListVectorElementNameCanonical) {
+  std::vector<NodePtr> parquet_fields;
+  std::vector<std::shared_ptr<Field>> arrow_fields;
+
+  auto element = PrimitiveNode::Make("element", Repetition::REQUIRED, ParquetType::FLOAT);
+  auto vector = GroupNode::Make("list", Repetition::VECTOR, {element},
+                                /*logical_type=*/nullptr, -1, 3);
+  parquet_fields.push_back(GroupNode::Make("embedding", Repetition::OPTIONAL, {vector},
+                                           LogicalType::Vector()));
+
+  auto arrow_element = ::arrow::field("value", FLOAT, false);
+  auto arrow_list = ::arrow::fixed_size_list(arrow_element, 3);
+  arrow_fields.push_back(::arrow::field("embedding", arrow_list, true));
+
+  ArrowWriterProperties::Builder builder;
+  builder.disable_compliant_nested_types()->enable_experimental_vector_encoding();
+  ASSERT_OK(ConvertSchema(arrow_fields, builder.build()));
   ASSERT_NO_FATAL_FAILURE(CheckFlatSchema(parquet_fields));
 }
 

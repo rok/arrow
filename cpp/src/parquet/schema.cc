@@ -19,6 +19,7 @@
 
 #include <algorithm>
 #include <cstring>
+#include <limits>
 #include <memory>
 #include <string>
 #include <type_traits>
@@ -47,6 +48,16 @@ void CheckColumnBounds(int column_index, size_t max_columns) {
     std::stringstream ss;
     ss << "Invalid Column Index: " << column_index << " Num columns: " << max_columns;
     throw ParquetException(ss.str());
+  }
+}
+
+void ValidateVectorProperties(Repetition::type repetition, int32_t vector_length) {
+  if (repetition == Repetition::VECTOR) {
+    if (vector_length <= 0) {
+      throw ParquetException("VECTOR nodes must specify a positive vector_length");
+    }
+  } else if (vector_length != -1) {
+    throw ParquetException("Only VECTOR nodes may specify vector_length");
   }
 }
 
@@ -117,7 +128,7 @@ const std::shared_ptr<ColumnPath> Node::path() const {
 bool Node::EqualsInternal(const Node* other) const {
   return type_ == other->type_ && name_ == other->name_ &&
          repetition_ == other->repetition_ && converted_type_ == other->converted_type_ &&
-         field_id_ == other->field_id() &&
+         field_id_ == other->field_id() && vector_length_ == other->vector_length() &&
          logical_type_->Equals(*(other->logical_type()));
 }
 
@@ -128,10 +139,15 @@ void Node::SetParent(const Node* parent) { parent_ = parent; }
 
 PrimitiveNode::PrimitiveNode(const std::string& name, Repetition::type repetition,
                              Type::type type, ConvertedType::type converted_type,
-                             int length, int precision, int scale, int id)
-    : Node(Node::PRIMITIVE, name, repetition, converted_type, id),
+                             int length, int precision, int scale, int id,
+                             int32_t vector_length)
+    : Node(Node::PRIMITIVE, name, repetition, converted_type, id, vector_length),
       physical_type_(type),
       type_length_(length) {
+  if (repetition == Repetition::VECTOR) {
+    throw ParquetException("VECTOR repetition is only allowed on group nodes");
+  }
+  ValidateVectorProperties(repetition, vector_length);
   std::stringstream ss;
 
   // PARQUET-842: In an earlier revision, decimal_metadata_.isset was being
@@ -241,10 +257,15 @@ PrimitiveNode::PrimitiveNode(const std::string& name, Repetition::type repetitio
 
 PrimitiveNode::PrimitiveNode(const std::string& name, Repetition::type repetition,
                              std::shared_ptr<const LogicalType> logical_type,
-                             Type::type physical_type, int physical_length, int id)
-    : Node(Node::PRIMITIVE, name, repetition, std::move(logical_type), id),
+                             Type::type physical_type, int physical_length, int id,
+                             int32_t vector_length)
+    : Node(Node::PRIMITIVE, name, repetition, std::move(logical_type), id, vector_length),
       physical_type_(physical_type),
       type_length_(physical_length) {
+  if (repetition == Repetition::VECTOR) {
+    throw ParquetException("VECTOR repetition is only allowed on group nodes");
+  }
+  ValidateVectorProperties(repetition, vector_length);
   std::stringstream error;
   if (logical_type_) {
     // Check for logical type <=> node type consistency
@@ -315,8 +336,14 @@ void PrimitiveNode::VisitConst(Node::ConstVisitor* visitor) const {
 // Group node
 
 GroupNode::GroupNode(const std::string& name, Repetition::type repetition,
-                     const NodeVector& fields, ConvertedType::type converted_type, int id)
-    : Node(Node::GROUP, name, repetition, converted_type, id), fields_(fields) {
+                     const NodeVector& fields, ConvertedType::type converted_type, int id,
+                     int32_t vector_length)
+    : Node(Node::GROUP, name, repetition, converted_type, id, vector_length),
+      fields_(fields) {
+  ValidateVectorProperties(repetition, vector_length);
+  if (repetition == Repetition::VECTOR && converted_type != ConvertedType::NONE) {
+    throw ParquetException("VECTOR-repeated groups must not have a converted type");
+  }
   // For forward compatibility, create an equivalent logical type
   logical_type_ = LogicalType::FromConvertedType(converted_type_);
   if (!(logical_type_ && (logical_type_->is_nested() || logical_type_->is_none()) &&
@@ -334,8 +361,14 @@ GroupNode::GroupNode(const std::string& name, Repetition::type repetition,
 
 GroupNode::GroupNode(const std::string& name, Repetition::type repetition,
                      const NodeVector& fields,
-                     std::shared_ptr<const LogicalType> logical_type, int id)
-    : Node(Node::GROUP, name, repetition, std::move(logical_type), id), fields_(fields) {
+                     std::shared_ptr<const LogicalType> logical_type, int id,
+                     int32_t vector_length)
+    : Node(Node::GROUP, name, repetition, std::move(logical_type), id, vector_length),
+      fields_(fields) {
+  ValidateVectorProperties(repetition, vector_length);
+  if (repetition == Repetition::VECTOR && logical_type_ && !logical_type_->is_none()) {
+    throw ParquetException("VECTOR-repeated groups must not have a logical type");
+  }
   if (logical_type_) {
     // Check for logical type <=> node type consistency
     if (logical_type_->is_nested()) {
@@ -423,19 +456,23 @@ std::unique_ptr<Node> GroupNode::FromParquet(const void* opaque_element,
   if (element->__isset.field_id) {
     field_id = element->field_id;
   }
+  int32_t vector_length = -1;
+  if (element->__isset.vector_length) {
+    vector_length = element->vector_length;
+  }
 
   std::unique_ptr<GroupNode> group_node;
   if (element->__isset.logicalType) {
     // updated writer with logical type present
-    group_node = std::unique_ptr<GroupNode>(
-        new GroupNode(element->name, LoadEnumSafe(&element->repetition_type), fields,
-                      LogicalType::FromThrift(element->logicalType), field_id));
+    group_node = std::unique_ptr<GroupNode>(new GroupNode(
+        element->name, LoadEnumSafe(&element->repetition_type), fields,
+        LogicalType::FromThrift(element->logicalType), field_id, vector_length));
   } else {
     group_node = std::unique_ptr<GroupNode>(new GroupNode(
         element->name, LoadEnumSafe(&element->repetition_type), fields,
         (element->__isset.converted_type ? LoadEnumSafe(&element->converted_type)
                                          : ConvertedType::NONE),
-        field_id));
+        field_id, vector_length));
   }
 
   return std::unique_ptr<Node>(group_node.release());
@@ -449,25 +486,30 @@ std::unique_ptr<Node> PrimitiveNode::FromParquet(const void* opaque_element) {
   if (element->__isset.field_id) {
     field_id = element->field_id;
   }
+  int32_t vector_length = -1;
+  if (element->__isset.vector_length) {
+    vector_length = element->vector_length;
+  }
 
   std::unique_ptr<PrimitiveNode> primitive_node;
   if (element->__isset.logicalType) {
     // updated writer with logical type present
-    primitive_node = std::unique_ptr<PrimitiveNode>(
-        new PrimitiveNode(element->name, LoadEnumSafe(&element->repetition_type),
-                          LogicalType::FromThrift(element->logicalType),
-                          LoadEnumSafe(&element->type), element->type_length, field_id));
-  } else if (element->__isset.converted_type) {
-    // legacy writer with converted type present
     primitive_node = std::unique_ptr<PrimitiveNode>(new PrimitiveNode(
         element->name, LoadEnumSafe(&element->repetition_type),
-        LoadEnumSafe(&element->type), LoadEnumSafe(&element->converted_type),
-        element->type_length, element->precision, element->scale, field_id));
+        LogicalType::FromThrift(element->logicalType), LoadEnumSafe(&element->type),
+        element->type_length, field_id, vector_length));
+  } else if (element->__isset.converted_type) {
+    // legacy writer with converted type present
+    primitive_node = std::unique_ptr<PrimitiveNode>(
+        new PrimitiveNode(element->name, LoadEnumSafe(&element->repetition_type),
+                          LoadEnumSafe(&element->type),
+                          LoadEnumSafe(&element->converted_type), element->type_length,
+                          element->precision, element->scale, field_id, vector_length));
   } else {
     // logical type not present
     primitive_node = std::unique_ptr<PrimitiveNode>(new PrimitiveNode(
         element->name, LoadEnumSafe(&element->repetition_type), NoLogicalType::Make(),
-        LoadEnumSafe(&element->type), element->type_length, field_id));
+        LoadEnumSafe(&element->type), element->type_length, field_id, vector_length));
   }
 
   // Return as unique_ptr to the base type
@@ -499,6 +541,9 @@ void GroupNode::ToParquet(void* opaque_element) const {
   if (field_id_ >= 0) {
     element->__set_field_id(field_id_);
   }
+  if (is_vector()) {
+    element->__set_vector_length(vector_length_);
+  }
   if (logical_type_ && logical_type_->is_serialized()) {
     element->__set_logicalType(logical_type_->ToThrift());
   }
@@ -523,6 +568,9 @@ void PrimitiveNode::ToParquet(void* opaque_element) const {
   }
   if (field_id_ >= 0) {
     element->__set_field_id(field_id_);
+  }
+  if (is_vector()) {
+    element->__set_vector_length(vector_length_);
   }
   if (logical_type_ && logical_type_->is_serialized() &&
       // TODO(tpboudreau): remove the following conjunct to enable serialization
@@ -634,6 +682,9 @@ static void PrintRepLevel(Repetition::type repetition, std::ostream& stream) {
     case Repetition::REPEATED:
       stream << "repeated";
       break;
+    case Repetition::VECTOR:
+      stream << "vector";
+      break;
     default:
       break;
   }
@@ -710,14 +761,19 @@ struct SchemaPrinter : public Node::ConstVisitor {
     stream_ << " ";
     PrintType(node, stream_);
     stream_ << " field_id=" << node->field_id() << " " << node->name();
+    if (node->is_vector()) {
+      stream_ << " [" << node->vector_length() << "]";
+    }
     PrintConvertedType(node, stream_);
     stream_ << ";" << std::endl;
   }
 
   void Visit(const GroupNode* node) {
     PrintRepLevel(node->repetition(), stream_);
-    stream_ << " group "
-            << "field_id=" << node->field_id() << " " << node->name();
+    stream_ << " group " << "field_id=" << node->field_id() << " " << node->name();
+    if (node->is_vector()) {
+      stream_ << " [" << node->vector_length() << "]";
+    }
     auto lt = node->converted_type();
     const auto& la = node->logical_type();
     if (la && la->is_valid() && !la->is_none()) {
@@ -836,6 +892,9 @@ void SchemaDescriptor::BuildTree(const NodePtr& node, int16_t max_def_level,
     // between an empty list and a list with an item in it.
     ++max_rep_level;
     ++max_def_level;
+  } else if (node->is_vector()) {
+    // VECTOR fields repeat a fixed number of times per parent value without
+    // increasing the maximum definition or repetition level.
   }
 
   // Now, walk the schema and create a ColumnDescriptor for each leaf node
@@ -848,8 +907,27 @@ void SchemaDescriptor::BuildTree(const NodePtr& node, int16_t max_def_level,
     node_to_leaf_index_[static_cast<const PrimitiveNode*>(node.get())] =
         static_cast<int>(leaves_.size());
 
+    // Determine the product of all VECTOR-repeated ancestors (including this leaf)
+    // so nested VECTOR shapes such as vector<3, vector<4, int32>> report the total
+    // number of physical leaf values contributed per parent record.
+    int32_t effective_vector_length = -1;
+    for (const Node* cursor = node.get(); cursor != nullptr; cursor = cursor->parent()) {
+      if (cursor->is_vector()) {
+        if (effective_vector_length < 0) {
+          effective_vector_length = cursor->vector_length();
+        } else {
+          if (effective_vector_length >
+              std::numeric_limits<int32_t>::max() / cursor->vector_length()) {
+            throw ParquetException("Nested VECTOR effective vector_length overflow");
+          }
+          effective_vector_length *= cursor->vector_length();
+        }
+      }
+    }
+
     // Primitive node, append to leaves
-    leaves_.push_back(ColumnDescriptor(node, max_def_level, max_rep_level, this));
+    leaves_.push_back(ColumnDescriptor(node, max_def_level, max_rep_level, this,
+                                       effective_vector_length));
     leaf_to_base_.emplace(static_cast<int>(leaves_.size()) - 1, base);
     leaf_to_idx_.emplace(node->path()->ToDotString(),
                          static_cast<int>(leaves_.size()) - 1);
@@ -866,10 +944,12 @@ int SchemaDescriptor::GetColumnIndex(const PrimitiveNode& node) const {
 
 ColumnDescriptor::ColumnDescriptor(schema::NodePtr node, int16_t max_definition_level,
                                    int16_t max_repetition_level,
-                                   const SchemaDescriptor* schema_descr)
+                                   const SchemaDescriptor* schema_descr,
+                                   int32_t effective_vector_length)
     : node_(std::move(node)),
       max_definition_level_(max_definition_level),
-      max_repetition_level_(max_repetition_level) {
+      max_repetition_level_(max_repetition_level),
+      effective_vector_length_(effective_vector_length) {
   if (!node_->is_primitive()) {
     throw ParquetException("Must be a primitive type");
   }
@@ -879,7 +959,8 @@ ColumnDescriptor::ColumnDescriptor(schema::NodePtr node, int16_t max_definition_
 bool ColumnDescriptor::Equals(const ColumnDescriptor& other) const {
   return primitive_node_->Equals(other.primitive_node_) &&
          max_repetition_level() == other.max_repetition_level() &&
-         max_definition_level() == other.max_definition_level();
+         max_definition_level() == other.max_definition_level() &&
+         effective_vector_length() == other.effective_vector_length();
 }
 
 const ColumnDescriptor* SchemaDescriptor::Column(int i) const {
@@ -930,8 +1011,13 @@ std::string ColumnDescriptor::ToString() const {
      << "  physical_type: " << TypeToString(physical_type()) << "," << std::endl
      << "  converted_type: " << ConvertedTypeToString(converted_type()) << ","
      << std::endl
-     << "  logical_type: " << logical_type()->ToString() << "," << std::endl
-     << "  max_definition_level: " << max_definition_level() << "," << std::endl
+     << "  logical_type: " << logical_type()->ToString() << "," << std::endl;
+
+  if (schema_node()->is_vector()) {
+    ss << "  vector_length: " << schema_node()->vector_length() << "," << std::endl;
+  }
+
+  ss << "  max_definition_level: " << max_definition_level() << "," << std::endl
      << "  max_repetition_level: " << max_repetition_level() << "," << std::endl;
 
   if (physical_type() == ::parquet::Type::FIXED_LEN_BYTE_ARRAY) {

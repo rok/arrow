@@ -94,6 +94,32 @@ struct MultipathLevelBuilderResult {
 
   /// Whether the leaf array is nullable.
   bool leaf_is_nullable;
+
+  /// Whether this leaf is produced from an Arrow FixedSizeList being written as
+  /// Parquet VECTOR.  For nullable VECTOR elements the physical Parquet leaf is
+  /// below the VECTOR node, so checking only the primitive schema node is not
+  /// sufficient.
+  bool leaf_is_vector = false;
+
+  /// Fixed number of physical leaf slots per logical VECTOR value for this leaf.
+  int32_t leaf_vector_length = 1;
+
+  /// Number of physical leaf slots for a VECTOR leaf: the definition levels at
+  /// or above the vector's stride definition level.  Equals def_rep_level_count
+  /// unless ancestors made some vector values absent (empty or null lists, null
+  /// structs), which contribute one definition level and no slot.
+  int64_t leaf_slot_count = 0;
+
+  /// Definition level after the last repeated ancestor of a VECTOR leaf (0
+  /// when there is none).  Definition levels below it mark absent ancestors
+  /// (empty or null lists) with no slot.
+  int16_t vector_repeated_ancestor_def_level = 0;
+
+  /// Definition level at or above which a VECTOR leaf slot carries a value
+  /// from the leaf array; slots between the repeated-ancestor level and this
+  /// level belong to null vector values at some nesting depth and carry no
+  /// value.
+  int16_t vector_values_def_level = 0;
 };
 
 /// \brief Logic for being able to write out nesting (rep/def level) data that is
@@ -132,7 +158,8 @@ class PARQUET_EXPORT MultipathLevelBuilder {
   ///   the array column as nullable (as determined by its type's parent
   ///   field).
   static ::arrow::Result<std::unique_ptr<MultipathLevelBuilder>> Make(
-      const ::arrow::Array& array, bool array_field_nullable);
+      const ::arrow::Array& array, bool array_field_nullable,
+      bool write_fixed_size_list_as_vector = false);
 
   virtual ~MultipathLevelBuilder() = default;
 

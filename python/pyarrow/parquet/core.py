@@ -876,6 +876,13 @@ write_batch_size : int, default None
 dictionary_pagesize_limit : int, default None
     Specify the dictionary page size limit per row group. If None, use the
     default 1MB.
+experimental_vector_encoding : bool, default False
+    EXPERIMENTAL: Encode supported fixed-size list values, including the storage
+    of fixed-shape tensor extension arrays, using the canonical 3-level Parquet
+    VECTOR layout. Unsupported fixed-size list values fall back to the standard
+    LIST encoding: zero-length lists, variable-width or dictionary or extension
+    elements, struct elements containing fixed-size lists, and fixed-size lists
+    below nullable groups.
 store_schema : bool, default True
     By default, the Arrow schema is serialized and stored in the Parquet
     file metadata (in the "ARROW:schema" key). When reading the file,
@@ -1083,6 +1090,7 @@ Examples
                  store_decimal_as_integer=False,
                  write_time_adjusted_to_utc=False,
                  max_rows_per_page=None,
+                 experimental_vector_encoding=False,
                  **options):
         if use_deprecated_int96_timestamps is None:
             # Use int96 timestamps for Spark
@@ -1138,6 +1146,7 @@ Examples
             store_decimal_as_integer=store_decimal_as_integer,
             write_time_adjusted_to_utc=write_time_adjusted_to_utc,
             max_rows_per_page=max_rows_per_page,
+            experimental_vector_encoding=experimental_vector_encoding,
             **options)
         self.is_open = True
 
@@ -2017,6 +2026,7 @@ def write_table(table, where, row_group_size=None, version='2.6',
                 write_time_adjusted_to_utc=False,
                 max_rows_per_page=None,
                 bloom_filter_options=None,
+                experimental_vector_encoding=False,
                 **kwargs):
     # Implementor's note: when adding keywords here / updating defaults, also
     # update it in write_to_dataset and _dataset_parquet.pyx ParquetFileWriteOptions
@@ -2051,6 +2061,7 @@ def write_table(table, where, row_group_size=None, version='2.6',
                 write_time_adjusted_to_utc=write_time_adjusted_to_utc,
                 max_rows_per_page=max_rows_per_page,
                 bloom_filter_options=bloom_filter_options,
+                experimental_vector_encoding=experimental_vector_encoding,
                 **kwargs) as writer:
             writer.write_table(table, row_group_size=row_group_size)
     except Exception:
