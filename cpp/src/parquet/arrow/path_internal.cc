@@ -683,10 +683,10 @@ struct PathInfo {
   // The vectors are expected to the same length info.
 
   // Note index order matters here.
-  using Node = std::variant<NullableTerminalNode, ListNode, LargeListNode, ListViewNode,
-                            LargeListViewNode, FixedSizeListNode, NullableNode,
-                            VectorNullableNode, AllPresentTerminalNode,
-                            AllNullsTerminalNode, NoLevelTerminalNode>;
+  using Node =
+      std::variant<NullableTerminalNode, ListNode, LargeListNode, ListViewNode,
+                   LargeListViewNode, FixedSizeListNode, NullableNode, VectorNullableNode,
+                   AllPresentTerminalNode, AllNullsTerminalNode, NoLevelTerminalNode>;
 
   std::vector<Node> path;
   std::shared_ptr<Array> primitive_array;
@@ -1002,6 +1002,7 @@ class PathBuilder {
     // Increment necessary due to empty lists.
     info_.max_def_level++;
     info_.max_rep_level++;
+    info_.repeated_ancestor_def_level = info_.max_def_level;
     // raw_value_offsets() and raw_value_sizes() account for any slice offset.
     ListPathNode<ListViewRangeSelector<typename T::offset_type>> node(
         ListViewRangeSelector<typename T::offset_type>{array.raw_value_offsets(),
@@ -1009,7 +1010,11 @@ class PathBuilder {
         info_.max_rep_level, info_.max_def_level - 1);
     info_.path.emplace_back(std::move(node));
     nullable_in_parent_ = array.list_view_type()->value_field()->nullable();
-    return VisitInline(*array.values());
+    const bool saved_nullable_group = nullable_group_since_repeated_;
+    nullable_group_since_repeated_ = false;
+    Status status = VisitInline(*array.values());
+    nullable_group_since_repeated_ = saved_nullable_group;
+    return status;
   }
 
   Status Visit(const ::arrow::DictionaryArray& array) {

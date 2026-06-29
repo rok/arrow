@@ -2883,8 +2883,8 @@ TEST(TestArrowReadWrite, ScanContentsVector) {
       ::arrow::schema({::arrow::field("id", ::arrow::int32(), /*nullable=*/false),
                        ::arrow::field("embedding", vector_type, /*nullable=*/true)}),
       {::arrow::ArrayFromJSON(::arrow::int32(), "[0, 1, 2, 3]"),
-       ::arrow::ArrayFromJSON(
-           vector_type, R"([[1, 2, 3], null, [7, 8, 9], [10, 11, 12]])")});
+       ::arrow::ArrayFromJSON(vector_type,
+                              R"([[1, 2, 3], null, [7, 8, 9], [10, 11, 12]])")});
 
   ArrowWriterProperties::Builder builder;
   builder.enable_experimental_vector_encoding();
@@ -3487,6 +3487,78 @@ TEST(ArrowReadWrite, LargeListView) {
                          ::arrow::large_list(::arrow::int32()), reader_props);
 }
 
+TEST(ArrowReadWrite, ListViewOfVectorsRoundTrip) {
+  auto vector_type = ::arrow::fixed_size_list(
+      ::arrow::field("element", ::arrow::int32(), /*nullable=*/false), 2);
+  auto list_view_type =
+      ::arrow::list_view(::arrow::field("item", vector_type, /*nullable=*/false));
+  auto values = ::arrow::ArrayFromJSON(
+      vector_type, R"([[1, 2], [3, 4], [5, 6], [7, 8], [9, 10], [11, 12]])");
+  auto offsets = ::arrow::ArrayFromJSON(::arrow::int32(), "[0, 2, 0, 4, 1]");
+  auto sizes = ::arrow::ArrayFromJSON(::arrow::int32(), "[2, 0, null, 2, 1]");
+  ASSERT_OK_AND_ASSIGN(auto array, ::arrow::ListViewArray::FromArrays(
+                                       list_view_type, *offsets, *sizes, *values,
+                                       ::arrow::default_memory_pool()));
+  auto table = ::arrow::Table::Make(
+      ::arrow::schema({::arrow::field("root", list_view_type, /*nullable=*/true)}),
+      {array});
+
+  ArrowWriterProperties::Builder builder;
+  builder.store_schema()->enable_experimental_vector_encoding();
+  ASSERT_OK_AND_ASSIGN(auto buffer,
+                       WriteTableToBuffer(table, /*row_group_size=*/2,
+                                          VectorWriterProperties(), builder.build()));
+  auto parquet_reader = ParquetFileReader::Open(std::make_shared<BufferReader>(buffer));
+  ASSERT_TRUE(parquet_reader->metadata()->schema()->Column(0)->in_vector_column());
+
+  std::shared_ptr<Table> result;
+  ASSERT_NO_FATAL_FAILURE(DoRoundtrip(table, /*row_group_size=*/2, &result,
+                                      VectorWriterProperties(), builder.build()));
+  ::arrow::AssertTablesEqual(*table, *result, /*same_chunk_layout=*/false);
+}
+
+TEST(ArrowReadWrite, ListViewOfVectorsUnderNullableStructRoundTrip) {
+  auto vector_type = ::arrow::fixed_size_list(
+      ::arrow::field("element", ::arrow::int32(), /*nullable=*/false), 2);
+  auto list_view_type =
+      ::arrow::list_view(::arrow::field("item", vector_type, /*nullable=*/false));
+  auto values = ::arrow::ArrayFromJSON(vector_type, R"([[1, 2], [3, 4], [5, 6]])");
+  auto offsets = ::arrow::ArrayFromJSON(::arrow::int32(), "[0, 0, 0, 2]");
+  auto sizes = ::arrow::ArrayFromJSON(::arrow::int32(), "[2, 0, 0, 1]");
+  ASSERT_OK_AND_ASSIGN(
+      auto list_view_array,
+      ::arrow::ListViewArray::FromArrays(list_view_type, *offsets, *sizes, *values,
+                                         ::arrow::default_memory_pool()));
+  auto list_view_field = ::arrow::field("vectors", list_view_type, /*nullable=*/false);
+
+  ::arrow::TypedBufferBuilder<bool> bitmap_builder;
+  ASSERT_OK(bitmap_builder.Append(true));
+  ASSERT_OK(bitmap_builder.Append(false));
+  ASSERT_OK(bitmap_builder.Append(true));
+  ASSERT_OK(bitmap_builder.Append(true));
+  ASSERT_OK_AND_ASSIGN(auto null_bitmap, bitmap_builder.Finish());
+  ASSERT_OK_AND_ASSIGN(
+      auto struct_array,
+      ::arrow::StructArray::Make({list_view_array}, {list_view_field}, null_bitmap));
+  auto struct_type = ::arrow::struct_({list_view_field});
+  auto table = ::arrow::Table::Make(
+      ::arrow::schema({::arrow::field("root", struct_type, /*nullable=*/true)}),
+      {struct_array});
+
+  ArrowWriterProperties::Builder builder;
+  builder.store_schema()->enable_experimental_vector_encoding();
+  ASSERT_OK_AND_ASSIGN(auto buffer,
+                       WriteTableToBuffer(table, /*row_group_size=*/2,
+                                          VectorWriterProperties(), builder.build()));
+  auto parquet_reader = ParquetFileReader::Open(std::make_shared<BufferReader>(buffer));
+  ASSERT_TRUE(parquet_reader->metadata()->schema()->Column(0)->in_vector_column());
+
+  std::shared_ptr<Table> result;
+  ASSERT_NO_FATAL_FAILURE(DoRoundtrip(table, /*row_group_size=*/2, &result,
+                                      VectorWriterProperties(), builder.build()));
+  ::arrow::AssertTablesEqual(*table, *result, /*same_chunk_layout=*/false);
+}
+
 TEST(ArrowReadWrite, EmptyListView) {
   auto type = ::arrow::list_view(::arrow::int32());
   auto array = ArrayFromJSON(type, "[]");
@@ -3642,8 +3714,8 @@ TEST(ArrowReadWrite, FixedSizeListVectorRestoresStoredChildMetadata) {
   ASSERT_OK(reader_builder.Build(&reader));
   ASSERT_OK_AND_ASSIGN(auto result, reader->ReadTable());
 
-  const auto& result_type =
-      checked_cast<const ::arrow::FixedSizeListType&>(*result->schema()->field(0)->type());
+  const auto& result_type = checked_cast<const ::arrow::FixedSizeListType&>(
+      *result->schema()->field(0)->type());
   ASSERT_NE(nullptr, result_type.value_field()->metadata());
   ASSERT_TRUE(result_type.value_field()->metadata()->Equals(*child_metadata));
 }

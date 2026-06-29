@@ -353,9 +353,9 @@ TEST_F(TestConvertParquetSchema, VectorElementNameRejected) {
 
 TEST_F(TestConvertParquetSchema, VectorMiddleGroupLogicalTypeRejected) {
   auto element = PrimitiveNode::Make("element", Repetition::REQUIRED, ParquetType::FLOAT);
-  ASSERT_THROW(GroupNode::Make("list", Repetition::VECTOR, {element},
-                               LogicalType::List(), -1, 3),
-               ParquetException);
+  ASSERT_THROW(
+      GroupNode::Make("list", Repetition::VECTOR, {element}, LogicalType::List(), -1, 3),
+      ParquetException);
 }
 
 TEST_F(TestConvertParquetSchema, VectorOnPrimitiveRejected) {
