@@ -614,3 +614,22 @@ def test_undefined_logical_type(parquet_test_datadir):
         b"unknown string 2",
         b"unknown string 3"
     ]
+
+
+def test_fixed_size_list_logical_type_write_flag(tempdir):
+    values = pa.array([1, 2, 3, 4, 5, 6], type=pa.int32())
+    list_type = pa.list_(pa.field("element", pa.int32(), nullable=False), 3)
+    table = pa.table({"fsl": pa.FixedSizeListArray.from_arrays(values, type=list_type)})
+
+    legacy_path = tempdir / "fixed_size_list_legacy.parquet"
+    pq.write_table(table, legacy_path, store_schema=False)
+    legacy_read = pq.read_table(legacy_path)
+    assert pa.types.is_list(legacy_read.schema.field("fsl").type)
+
+    annotated_path = tempdir / "fixed_size_list_annotated.parquet"
+    pq.write_table(table, annotated_path, store_schema=False,
+                   write_fixed_size_list_logical_type=True)
+    annotated_read = pq.read_table(annotated_path)
+    assert annotated_read.schema.field("fsl").type == list_type
+    assert annotated_read.column("fsl").combine_chunks().equals(
+        table.column("fsl").combine_chunks())
