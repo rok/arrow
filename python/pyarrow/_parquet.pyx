@@ -2281,7 +2281,8 @@ cdef shared_ptr[ArrowWriterProperties] _create_arrow_writer_properties(
         writer_engine_version=None,
         use_compliant_nested_type=True,
         store_schema=True,
-        write_time_adjusted_to_utc=False) except *:
+        write_time_adjusted_to_utc=False,
+        experimental_vector_encoding=False) except *:
     """Arrow writer properties"""
     cdef:
         shared_ptr[ArrowWriterProperties] arrow_properties
@@ -2321,6 +2322,11 @@ cdef shared_ptr[ArrowWriterProperties] _create_arrow_writer_properties(
         arrow_props.enable_compliant_nested_types()
     else:
         arrow_props.disable_compliant_nested_types()
+
+    # experimental_vector_encoding
+
+    if experimental_vector_encoding:
+        arrow_props.enable_experimental_vector_encoding()
 
     # writer_engine_version
 
@@ -2396,7 +2402,8 @@ cdef class ParquetWriter(_Weakrefable):
                   store_decimal_as_integer=False,
                   use_content_defined_chunking=False,
                   write_time_adjusted_to_utc=False,
-                  bloom_filter_options=None):
+                  bloom_filter_options=None,
+                  experimental_vector_encoding=False):
         cdef:
             shared_ptr[WriterProperties] properties
             shared_ptr[ArrowWriterProperties] arrow_properties
@@ -2443,6 +2450,7 @@ cdef class ParquetWriter(_Weakrefable):
             use_compliant_nested_type=use_compliant_nested_type,
             store_schema=store_schema,
             write_time_adjusted_to_utc=write_time_adjusted_to_utc,
+            experimental_vector_encoding=experimental_vector_encoding,
         )
 
         pool = maybe_unbox_memory_pool(memory_pool)

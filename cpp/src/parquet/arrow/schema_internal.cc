@@ -17,9 +17,12 @@
 
 #include "parquet/arrow/schema_internal.h"
 
+#include <limits>
+
 #include "arrow/extension/json.h"
 #include "arrow/extension/uuid.h"
 #include "arrow/type.h"
+#include "arrow/type_traits.h"
 #include "arrow/util/key_value_metadata.h"
 #include "arrow/util/logging.h"
 #include "arrow/util/string.h"
@@ -36,6 +39,78 @@ namespace parquet::arrow {
 using ::arrow::Result;
 using ::arrow::Status;
 using ::arrow::internal::checked_cast;
+
+namespace {
+
+// Whether a type may appear inside a struct VECTOR element.  This must mirror
+// the writer-side schema validation (ValidateSupportedVectorStructNode):
+// list/map descendants require repetition levels and force the whole column
+// back to the standard LIST encoding.  Both the schema conversion and the
+// write-path level generation gate on this predicate so they cannot disagree
+// about the VECTOR-vs-LIST fallback.
+bool IsSupportedVectorStructFieldType(const ::arrow::DataType& type) {
+  switch (type.id()) {
+    case ::arrow::Type::LIST:
+    case ::arrow::Type::LARGE_LIST:
+    case ::arrow::Type::LIST_VIEW:
+    case ::arrow::Type::LARGE_LIST_VIEW:
+    case ::arrow::Type::MAP:
+      return false;
+    case ::arrow::Type::FIXED_SIZE_LIST:
+      // A fixed-size list nested inside a struct element would give the
+      // struct's leaves different per-row multiplicities, which the write-path
+      // level generation does not support; fall back to LIST encoding.
+      return false;
+    case ::arrow::Type::STRUCT: {
+      const auto& struct_type = checked_cast<const ::arrow::StructType&>(type);
+      for (const auto& field : struct_type.fields()) {
+        if (!IsSupportedVectorStructFieldType(*field->type())) {
+          return false;
+        }
+      }
+      return true;
+    }
+    case ::arrow::Type::DICTIONARY:
+      return IsSupportedVectorStructFieldType(
+          *checked_cast<const ::arrow::DictionaryType&>(type).value_type());
+    case ::arrow::Type::EXTENSION:
+      return IsSupportedVectorStructFieldType(
+          *checked_cast<const ::arrow::ExtensionType&>(type).storage_type());
+    default:
+      return true;
+  }
+}
+
+}  // namespace
+
+Result<int32_t> VectorLeafSlotMultiplier(const ::arrow::DataType& type) {
+  if (type.id() != ::arrow::Type::FIXED_SIZE_LIST) {
+    return 1;
+  }
+  const auto& list_type = checked_cast<const ::arrow::FixedSizeListType&>(type);
+  if (list_type.list_size() <= 0) {
+    return Status::Invalid("VECTOR repetition requires positive vector_length");
+  }
+  ARROW_ASSIGN_OR_RAISE(int32_t child_multiplier,
+                        VectorLeafSlotMultiplier(*list_type.value_type()));
+  if (child_multiplier > std::numeric_limits<int32_t>::max() / list_type.list_size()) {
+    return Status::Invalid("Nested VECTOR leaf slot multiplier overflow");
+  }
+  return child_multiplier * list_type.list_size();
+}
+
+bool IsSupportedVectorElementType(const ::arrow::DataType& type) {
+  if (type.id() == ::arrow::Type::FIXED_SIZE_LIST) {
+    const auto& list_type = checked_cast<const ::arrow::FixedSizeListType&>(type);
+    return list_type.list_size() > 0 && VectorLeafSlotMultiplier(type).ok() &&
+           IsSupportedVectorElementType(*list_type.value_type());
+  }
+  if (type.id() == ::arrow::Type::STRUCT) {
+    return IsSupportedVectorStructFieldType(type);
+  }
+  return !::arrow::is_nested(type) && ::arrow::is_fixed_width(type) &&
+         type.id() != ::arrow::Type::DICTIONARY && type.id() != ::arrow::Type::EXTENSION;
+}
 
 namespace {
 

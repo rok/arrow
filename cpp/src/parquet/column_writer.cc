@@ -83,6 +83,43 @@ namespace parquet {
 
 namespace {
 
+int64_t CountVectorSlots(const int16_t* def_levels, int64_t level_offset,
+                         int64_t levels_to_write, int16_t repeated_ancestor_def_level) {
+  if (def_levels == nullptr || repeated_ancestor_def_level <= 0) {
+    return levels_to_write;
+  }
+  int64_t slots = 0;
+  for (int64_t i = level_offset; i < level_offset + levels_to_write; ++i) {
+    slots += def_levels[i] >= repeated_ancestor_def_level;
+  }
+  return slots;
+}
+
+std::vector<::parquet::internal::Chunk> AlignCdcChunksToVectorBoundaries(
+    std::vector<::parquet::internal::Chunk> chunks, const int16_t* def_levels,
+    int32_t vector_length, int16_t repeated_ancestor_def_level) {
+  if (vector_length <= 1 || chunks.size() <= 1) {
+    return chunks;
+  }
+
+  std::vector<::parquet::internal::Chunk> aligned;
+  aligned.reserve(chunks.size());
+  auto pending = chunks.front();
+  for (size_t i = 1; i < chunks.size(); ++i) {
+    const int64_t pending_slots =
+        CountVectorSlots(def_levels, pending.level_offset, pending.levels_to_write,
+                         repeated_ancestor_def_level);
+    if (pending_slots % vector_length == 0) {
+      aligned.push_back(pending);
+      pending = chunks[i];
+    } else {
+      pending.levels_to_write += chunks[i].levels_to_write;
+    }
+  }
+  aligned.push_back(pending);
+  return aligned;
+}
+
 // Visitor that extracts the value buffer from a FlatArray at a given offset.
 struct ValueBufferSlicer {
   template <typename T>
@@ -1185,6 +1222,38 @@ inline void DoInBatchesNonRepeated(int64_t num_levels, int64_t batch_size,
   }
 }
 
+// DoInBatches for VECTOR columns without repeated ancestors.  num_levels
+// counts physical leaf slots and must be a whole number of vectors; batching
+// happens on vector boundaries so a vector value is never split across pages.
+template <typename Action, typename GetBufferedRows>
+inline void DoInBatchesVectorNonRepeated(int64_t num_levels, int64_t batch_size,
+                                         int64_t max_rows_per_page, int32_t vector_length,
+                                         Action&& action,
+                                         GetBufferedRows&& curr_page_buffered_rows) {
+  ARROW_DCHECK_GT(vector_length, 0);
+  if (num_levels % vector_length != 0) {
+    throw ParquetException("VECTOR columns must be written in whole-vector batches");
+  }
+  const int64_t total_rows = num_levels / vector_length;
+  int64_t row_offset = 0;
+  while (row_offset < total_rows) {
+    int64_t page_buffered_rows = curr_page_buffered_rows();
+    ARROW_DCHECK_LE(page_buffered_rows, max_rows_per_page);
+
+    int64_t max_batch_rows = std::max<int64_t>(1, batch_size / vector_length);
+    max_batch_rows = std::min(max_batch_rows, total_rows - row_offset);
+    max_batch_rows = std::min(max_batch_rows, max_rows_per_page - page_buffered_rows);
+    if (max_batch_rows == 0) {
+      max_batch_rows = 1;
+    }
+    int64_t level_offset = row_offset * vector_length;
+    int64_t level_count = max_batch_rows * vector_length;
+
+    action(level_offset, level_count, /*check_page_limit=*/true);
+    row_offset += max_batch_rows;
+  }
+}
+
 // DoInBatches for repeated columns
 template <typename Action, typename GetBufferedRows>
 inline void DoInBatchesRepeated(const int16_t* def_levels, const int16_t* rep_levels,
@@ -1240,12 +1309,20 @@ inline void DoInBatchesRepeated(const int16_t* def_levels, const int16_t* rep_le
 template <typename Action, typename GetBufferedRows>
 inline void DoInBatches(const int16_t* def_levels, const int16_t* rep_levels,
                         int64_t num_levels, int64_t batch_size, int64_t max_rows_per_page,
-                        bool pages_change_on_record_boundaries, Action&& action,
+                        bool pages_change_on_record_boundaries, bool is_vector,
+                        int32_t vector_length, Action&& action,
                         GetBufferedRows&& curr_page_buffered_rows) {
   if (!rep_levels) {
-    DoInBatchesNonRepeated(num_levels, batch_size, max_rows_per_page,
-                           std::forward<Action>(action),
-                           std::forward<GetBufferedRows>(curr_page_buffered_rows));
+    if (is_vector) {
+      DoInBatchesVectorNonRepeated(
+          num_levels, batch_size, max_rows_per_page, vector_length,
+          std::forward<Action>(action),
+          std::forward<GetBufferedRows>(curr_page_buffered_rows));
+    } else {
+      DoInBatchesNonRepeated(num_levels, batch_size, max_rows_per_page,
+                             std::forward<Action>(action),
+                             std::forward<GetBufferedRows>(curr_page_buffered_rows));
+    }
   } else {
     DoInBatchesRepeated(def_levels, rep_levels, num_levels, batch_size, max_rows_per_page,
                         pages_change_on_record_boundaries, std::forward<Action>(action),
@@ -1323,7 +1400,11 @@ class TypedColumnWriterImpl : public ColumnWriterImpl,
     }
     pages_change_on_record_boundaries_ =
         properties->data_page_version() == ParquetDataPageVersion::V2 ||
-        properties->page_index_enabled(descr_->path());
+        properties->page_index_enabled(descr_->path()) ||
+        // A vector value must not be split across pages; for VECTOR columns
+        // below repeated ancestors a record contains whole vectors, so
+        // breaking pages on record boundaries preserves the invariant.
+        descr_->in_vector_column();
   }
 
   int64_t Close() override { return ColumnWriterImpl::Close(); }
@@ -1366,7 +1447,8 @@ class TypedColumnWriterImpl : public ColumnWriterImpl,
     };
     DoInBatches(def_levels, rep_levels, num_values, properties_->write_batch_size(),
                 properties_->max_rows_per_page(), pages_change_on_record_boundaries(),
-                WriteChunk, [this]() { return num_buffered_rows_; });
+                descr_->in_vector_column(), descr_->effective_vector_length(), WriteChunk,
+                [this]() { return num_buffered_rows_; });
     return value_offset;
   }
 
@@ -1417,16 +1499,20 @@ class TypedColumnWriterImpl : public ColumnWriterImpl,
     };
     DoInBatches(def_levels, rep_levels, num_values, properties_->write_batch_size(),
                 properties_->max_rows_per_page(), pages_change_on_record_boundaries(),
-                WriteChunk, [this]() { return num_buffered_rows_; });
+                descr_->in_vector_column(), descr_->effective_vector_length(), WriteChunk,
+                [this]() { return num_buffered_rows_; });
   }
 
   Status WriteArrow(const int16_t* def_levels, const int16_t* rep_levels,
                     int64_t num_levels, const ::arrow::Array& leaf_array,
                     ArrowWriteContext* ctx, bool leaf_field_nullable) override {
     BEGIN_PARQUET_CATCH_EXCEPTIONS
+    const bool is_vector = descr_->in_vector_column();
     // Leaf nulls are canonical when there is only a single null element after a list
-    // and it is at the leaf.
+    // and it is at the leaf. VECTOR parent nulls may also be materialized as spaced
+    // null slots in the leaf array, so do not treat those as single nullable elements.
     bool single_nullable_element =
+        !is_vector &&
         (level_info_.def_level == level_info_.repeated_ancestor_def_level + 1) &&
         leaf_field_nullable;
     if (!leaf_field_nullable && leaf_array.null_count() != 0) {
@@ -1446,6 +1532,11 @@ class TypedColumnWriterImpl : public ColumnWriterImpl,
       DCHECK(content_defined_chunker_.has_value());
       auto chunks = content_defined_chunker_->GetChunks(def_levels, rep_levels,
                                                         num_levels, leaf_array);
+      if (is_vector) {
+        chunks = AlignCdcChunksToVectorBoundaries(
+            std::move(chunks), def_levels, descr_->effective_vector_length(),
+            level_info_.repeated_ancestor_def_level);
+      }
       for (size_t i = 0; i < chunks.size(); i++) {
         auto chunk = chunks[i];
         auto chunk_array = leaf_array.Slice(chunk.value_offset);
@@ -1700,6 +1791,13 @@ class TypedColumnWriterImpl : public ColumnWriterImpl,
       }
 
       WriteRepetitionLevels(num_levels, rep_levels);
+    } else if (descr_->in_vector_column()) {
+      const int32_t vector_length = descr_->effective_vector_length();
+      if (vector_length <= 0 || num_levels % vector_length != 0) {
+        throw ParquetException("VECTOR columns must be written in whole-vector batches");
+      }
+      rows_written_ += num_levels / vector_length;
+      num_buffered_rows_ += num_levels / vector_length;
     } else {
       // Each value is exactly one row
       rows_written_ += num_levels;
@@ -1794,6 +1892,13 @@ class TypedColumnWriterImpl : public ColumnWriterImpl,
         }
       }
       WriteRepetitionLevels(num_levels, rep_levels);
+    } else if (descr_->in_vector_column()) {
+      const int32_t vector_length = descr_->effective_vector_length();
+      if (vector_length <= 0 || num_levels % vector_length != 0) {
+        throw ParquetException("VECTOR columns must be written in whole-vector batches");
+      }
+      rows_written_ += num_levels / vector_length;
+      num_buffered_rows_ += num_levels / vector_length;
     } else {
       // Each value is exactly one row
       rows_written_ += num_levels;
@@ -2078,6 +2183,7 @@ Status TypedColumnWriterImpl<ParquetType>::WriteArrowDictionary(
   PARQUET_CATCH_NOT_OK(
       DoInBatches(def_levels, rep_levels, num_levels, properties_->write_batch_size(),
                   properties_->max_rows_per_page(), pages_change_on_record_boundaries(),
+                  descr_->in_vector_column(), descr_->effective_vector_length(),
                   WriteIndicesChunk, [this]() { return num_buffered_rows_; }));
   return Status::OK();
 }
@@ -2540,6 +2646,7 @@ Status TypedColumnWriterImpl<ByteArrayType>::WriteArrowDense(
   PARQUET_CATCH_NOT_OK(
       DoInBatches(def_levels, rep_levels, num_levels, properties_->write_batch_size(),
                   properties_->max_rows_per_page(), pages_change_on_record_boundaries(),
+                  descr_->in_vector_column(), descr_->effective_vector_length(),
                   WriteChunk, [this]() { return num_buffered_rows_; }));
   return Status::OK();
 }

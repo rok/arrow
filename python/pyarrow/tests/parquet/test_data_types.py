@@ -581,6 +581,34 @@ def test_json_extension_type(storage_type):
         store_schema=False)
 
 
+def test_fixed_shape_tensor_vector_encoding(tempdir):
+    tensor_type = pa.fixed_shape_tensor(pa.float32(), [2, 3])
+    storage = pa.array([
+        [1, 2, 3, 4, 5, 6],
+        None,
+        [7, 8, 9, 10, 11, 12],
+    ], pa.list_(pa.float32(), 6))
+    arr = pa.ExtensionArray.from_storage(tensor_type, storage)
+    table = pa.table({"tensor": arr})
+
+    sink = pa.BufferOutputStream()
+    pq.write_table(table, sink, experimental_vector_encoding=True)
+    buf = sink.getvalue()
+
+    metadata = pq.read_metadata(pa.BufferReader(buf))
+    assert "vector" in str(metadata.schema).lower()
+
+    result = pq.read_table(pa.BufferReader(buf))
+    assert result.schema == table.schema
+    assert result.equals(table)
+
+    dataset_dir = tempdir / "vector_dataset"
+    pq.write_to_dataset(table, dataset_dir, experimental_vector_encoding=True)
+    dataset_result = pq.read_table(dataset_dir)
+    assert dataset_result.schema == table.schema
+    assert dataset_result.equals(table)
+
+
 def test_uuid_extension_type():
     data = [
         b'\xe4`\xf9p\x83QGN\xac\x7f\xa4g>K\xa8\xcb',

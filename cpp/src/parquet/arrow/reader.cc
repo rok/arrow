@@ -19,6 +19,7 @@
 
 #include <algorithm>
 #include <cstring>
+#include <limits>
 #include <memory>
 #include <random>
 #include <unordered_set>
@@ -26,6 +27,8 @@
 #include <vector>
 
 #include "arrow/array.h"
+#include "arrow/array/concatenate.h"
+#include "arrow/array/util.h"
 #include "arrow/buffer.h"
 #include "arrow/extension_type.h"
 #include "arrow/io/memory.h"
@@ -136,6 +139,16 @@ std::shared_ptr<std::unordered_set<int>> VectorToSharedSet(
   std::shared_ptr<std::unordered_set<int>> result(new std::unordered_set<int>());
   result->insert(values.begin(), values.end());
   return result;
+}
+
+Result<int64_t> MultiplyVectorLength(int64_t value, int32_t list_size) {
+  if (list_size <= 0) {
+    return Status::Invalid("VECTOR FixedSizeList must have positive list_size");
+  }
+  if (value > std::numeric_limits<int64_t>::max() / list_size) {
+    return Status::Invalid("VECTOR FixedSizeList length overflow");
+  }
+  return value * list_size;
 }
 
 // Forward declaration
@@ -274,10 +287,24 @@ class FileReaderImpl : public FileReader {
     // TODO(wesm): This calculation doesn't make much sense when we have repeated
     // schema nodes
     int64_t records_to_read = 0;
+    DCHECK(dynamic_cast<ColumnReaderImpl*>(reader) != nullptr);
+    const bool has_repeated_child =
+        static_cast<ColumnReaderImpl*>(reader)->IsOrHasRepeatedChild();
     for (auto row_group : row_groups) {
-      // Can throw exception
-      records_to_read +=
-          reader_->metadata()->RowGroup(row_group)->ColumnChunk(i)->num_values();
+      // Can throw exception.  The column chunk metadata is deserialized
+      // unconditionally to keep upstream behavior (for example its decryption
+      // side effects for encrypted columns).
+      auto row_group_metadata = reader_->metadata()->RowGroup(row_group);
+      auto column_chunk = row_group_metadata->ColumnChunk(i);
+      // ColumnReader::NextBatch takes logical parent records.  For readers
+      // without repeated children (flat and VECTOR columns) the row group row
+      // count is an exact bound; for VECTOR columns in particular, ColumnChunk
+      // num_values would over-count records by the vector length.
+      if (has_repeated_child) {
+        records_to_read += column_chunk->num_values();
+      } else {
+        records_to_read += row_group_metadata->num_rows();
+      }
     }
 #ifdef ARROW_WITH_OPENTELEMETRY
     std::string column_name = reader_->metadata()->schema()->Column(i)->name();
@@ -739,6 +766,344 @@ class PARQUET_NO_EXPORT FixedSizeListReader : public ListReader<int32_t> {
   }
 };
 
+// Reads Parquet VECTOR columns into Arrow FixedSizeList arrays.
+//
+// VECTOR stores one definition level per element even though the public Arrow result is a
+// single FixedSizeList slot per row. For nullable VECTOR rows, the child reader therefore
+// materializes spaced child slots and this reader collapses each vector's per-element def
+// levels back into a parent validity bitmap.
+class PARQUET_NO_EXPORT VectorFixedSizeListReader : public ColumnReaderImpl {
+ public:
+  VectorFixedSizeListReader(std::shared_ptr<ReaderContext> ctx,
+                            std::shared_ptr<Field> field,
+                            ::parquet::internal::LevelInfo level_info,
+                            int16_t vector_stride_def_level,
+                            std::unique_ptr<ColumnReaderImpl> child_reader)
+      : ctx_(std::move(ctx)),
+        field_(std::move(field)),
+        level_info_(level_info),
+        vector_stride_def_level_(vector_stride_def_level),
+        item_reader_(std::move(child_reader)),
+        list_size_(checked_cast<const ::arrow::FixedSizeListType&>(*field_->type())
+                       .list_size()) {}
+
+  Status GetDefLevels(const int16_t** data, int64_t* length) override {
+    if (collapsed_def_levels_.empty()) {
+      *data = nullptr;
+      *length = vector_rows_;
+    } else {
+      *data = collapsed_def_levels_.data();
+      *length = static_cast<int64_t>(collapsed_def_levels_.size());
+    }
+    return Status::OK();
+  }
+
+  Status GetRepLevels(const int16_t** data, int64_t* length) override {
+    if (collapsed_rep_levels_.empty()) {
+      *data = nullptr;
+      *length = vector_rows_;
+    } else {
+      *data = collapsed_rep_levels_.data();
+      *length = static_cast<int64_t>(collapsed_rep_levels_.size());
+    }
+    return Status::OK();
+  }
+
+  bool IsOrHasRepeatedChild() const final { return false; }
+
+  Status LoadBatch(int64_t number_of_records) final {
+    vector_rows_ = 0;
+    collapsed_def_levels_.clear();
+    collapsed_rep_levels_.clear();
+    vector_def_levels_.clear();
+    int64_t child_records_to_read = number_of_records;
+    if (level_info_.rep_level == 0) {
+      ARROW_ASSIGN_OR_RAISE(child_records_to_read,
+                            MultiplyVectorLength(number_of_records, list_size_));
+    }
+    RETURN_NOT_OK(item_reader_->LoadBatch(child_records_to_read));
+
+    const int16_t* def_levels = nullptr;
+    int64_t num_levels = 0;
+    RETURN_NOT_OK(item_reader_->GetDefLevels(&def_levels, &num_levels));
+    const int16_t* rep_levels = nullptr;
+    int64_t num_rep_levels = 0;
+    RETURN_NOT_OK(item_reader_->GetRepLevels(&rep_levels, &num_rep_levels));
+    const bool collapse_rep_levels = level_info_.rep_level > 0 && rep_levels != nullptr;
+    if (collapse_rep_levels && num_rep_levels != num_levels) {
+      return Status::Invalid("VECTOR child produced ", num_rep_levels,
+                             " repetition levels for ", num_levels, " definition levels");
+    }
+    if (def_levels == nullptr || num_levels == 0) {
+      // No level information; the row count comes from the child array length.
+      return Status::OK();
+    }
+
+    // Existing vector values (present, or null when the vector field is
+    // nullable) occupy exactly list_size_ definition levels.  Levels below
+    // the vector stride level mark ancestors that made the vector value absent
+    // (empty/null lists or null structs); they occupy a single level entry with
+    // no physical VECTOR slots and pass through unchanged for the parent reader.
+    const int16_t stride_def_level = vector_stride_def_level_;
+    const size_t reserve_hint = static_cast<size_t>(num_levels / list_size_) + 1;
+    collapsed_def_levels_.reserve(reserve_hint);
+    vector_def_levels_.reserve(reserve_hint);
+    if (collapse_rep_levels) {
+      collapsed_rep_levels_.reserve(reserve_hint);
+    }
+    int64_t i = 0;
+    while (i < num_levels) {
+      const int16_t def = def_levels[i];
+      // Definition levels arrive in long runs (RLE on disk), so scan the
+      // maximal run of identical levels and process it in bulk.
+      int64_t run_end = i + 1;
+      while (run_end < num_levels && def_levels[run_end] == def) {
+        ++run_end;
+      }
+      if (def < stride_def_level) {
+        // A run of absent-ancestor markers passes through one-to-one.
+        const int64_t run_length = run_end - i;
+        collapsed_def_levels_.insert(collapsed_def_levels_.end(), run_length, def);
+        if (collapse_rep_levels) {
+          collapsed_rep_levels_.insert(collapsed_rep_levels_.end(), rep_levels + i,
+                                       rep_levels + run_end);
+        }
+        i = run_end;
+        continue;
+      }
+      if (i + list_size_ > num_levels) {
+        return Status::Invalid("VECTOR column ended mid-vector: ", num_levels - i,
+                               " definition levels remaining for list_size=", list_size_);
+      }
+      const bool is_present = def >= level_info_.def_level;
+      const int16_t collapsed = is_present ? level_info_.def_level : def;
+      const int64_t run_vectors = (run_end - i) / list_size_;
+      if (run_vectors > 0) {
+        // Whole vectors covered by one run of equal levels: equal levels imply
+        // uniform parent validity, so the per-slot validation is subsumed.
+        collapsed_def_levels_.insert(collapsed_def_levels_.end(), run_vectors, collapsed);
+        vector_def_levels_.insert(vector_def_levels_.end(), run_vectors, collapsed);
+        if (collapse_rep_levels) {
+          for (int64_t v = 0; v < run_vectors; ++v) {
+            collapsed_rep_levels_.push_back(rep_levels[i + v * list_size_]);
+          }
+        }
+        vector_rows_ += run_vectors;
+        i += run_vectors * list_size_;
+        continue;
+      }
+      // The run ends inside this vector (for example nullable elements mix
+      // definition levels); validate parent-validity uniformity per slot.
+      for (int32_t k = 1; k < list_size_; ++k) {
+        const bool slot_is_present = def_levels[i + k] >= level_info_.def_level;
+        if (slot_is_present != is_present) {
+          return Status::Invalid(
+              "VECTOR parent validity changed within one fixed-size vector at row ",
+              vector_rows_,
+              "; null VECTOR rows must still emit exactly list_size null child "
+              "slots and all slots for one parent must agree on parent "
+              "validity");
+        }
+      }
+      collapsed_def_levels_.push_back(collapsed);
+      vector_def_levels_.push_back(collapsed);
+      if (collapse_rep_levels) {
+        collapsed_rep_levels_.push_back(rep_levels[i]);
+      }
+      ++vector_rows_;
+      i += list_size_;
+    }
+    return Status::OK();
+  }
+
+  Status BuildArray(int64_t length_upper_bound,
+                    std::shared_ptr<ChunkedArray>* out) override {
+    std::shared_ptr<ChunkedArray> child_out;
+    ARROW_ASSIGN_OR_RAISE(const int64_t child_length_upper_bound,
+                          MultiplyVectorLength(length_upper_bound, list_size_));
+    RETURN_NOT_OK(item_reader_->BuildArray(child_length_upper_bound, &child_out));
+    ARROW_ASSIGN_OR_RAISE(std::shared_ptr<ArrayData> child_data,
+                          ChunksToSingle(*child_out));
+    std::shared_ptr<Array> child_array = ::arrow::MakeArray(child_data);
+    if (vector_rows_ == 0 && vector_def_levels_.empty()) {
+      // No level information was loaded; derive the row count from the child.
+      if (child_array->length() % list_size_ != 0) {
+        return Status::Invalid("VECTOR FixedSizeList child length ",
+                               child_array->length(),
+                               " was not divisible by list_size=", list_size_);
+      }
+      vector_rows_ = child_array->length() / list_size_;
+    }
+
+    int64_t output_rows = vector_rows_;
+    std::vector<int16_t> expanded_def_levels;
+    // Nullable struct ancestors can contribute a single absent level marker for
+    // a VECTOR value whose Arrow parent still requires child slots.  Expand such
+    // markers here, while leaving empty/null list markers in their compact form.
+    const std::vector<int16_t>* output_def_levels = &vector_def_levels_;
+    int64_t expandable_absent_count = 0;
+    for (const int16_t def_level : collapsed_def_levels_) {
+      if (def_level >= level_info_.repeated_ancestor_def_level &&
+          def_level < vector_stride_def_level_) {
+        ++expandable_absent_count;
+      }
+    }
+    // The expansion only triggers below struct (or root) parents: a list
+    // parent requests exactly the existing vector values, so
+    // length_upper_bound never exceeds vector_rows_ there, while a struct
+    // parent requests one output row per logical entry including nullable
+    // struct markers.
+    const bool expand_absent_ancestors =
+        expandable_absent_count > 0 && length_upper_bound > vector_rows_;
+    if (expand_absent_ancestors) {
+      const int64_t extra_rows = length_upper_bound - vector_rows_;
+      if (extra_rows % expandable_absent_count != 0) {
+        return Status::Invalid("VECTOR FixedSizeList cannot evenly expand ",
+                               expandable_absent_count, " absent ancestor markers to ",
+                               extra_rows, " child rows");
+      }
+      const int64_t rows_per_absent = extra_rows / expandable_absent_count;
+      // The child array may take one of three shapes, depending on the child
+      // reader that produced it:
+      // - exactly the slots of existing vectors (a nested VECTOR reader that
+      //   saw no expandable markers);
+      // - one placeholder slot per expandable marker in addition (a leaf reader
+      //   without repeated ancestors materializes a slot for every definition
+      //   level entry);
+      // - rows_per_absent * list_size_ null slots per expandable marker in
+      //   addition (a nested reader that has itself expanded the markers).
+      ARROW_ASSIGN_OR_RAISE(const int64_t expected_child_slots,
+                            MultiplyVectorLength(vector_rows_, list_size_));
+      if (expected_child_slots >
+          std::numeric_limits<int64_t>::max() - expandable_absent_count) {
+        return Status::Invalid("VECTOR FixedSizeList length overflow");
+      }
+      const int64_t expected_child_slots_with_placeholders =
+          expected_child_slots + expandable_absent_count;
+      ARROW_ASSIGN_OR_RAISE(const int64_t materialized_absent_slots,
+                            MultiplyVectorLength(extra_rows, list_size_));
+      if (expected_child_slots >
+          std::numeric_limits<int64_t>::max() - materialized_absent_slots) {
+        return Status::Invalid("VECTOR FixedSizeList length overflow");
+      }
+      const int64_t expected_child_slots_with_materialized_absent =
+          expected_child_slots + materialized_absent_slots;
+      const bool child_has_absent_placeholders =
+          child_array->length() == expected_child_slots_with_placeholders;
+      const bool child_has_materialized_absent_slots =
+          child_array->length() == expected_child_slots_with_materialized_absent;
+      if (child_array->length() != expected_child_slots &&
+          !child_has_absent_placeholders && !child_has_materialized_absent_slots) {
+        return Status::Invalid("VECTOR FixedSizeList child length ",
+                               child_array->length(), " did not match expected ",
+                               expected_child_slots);
+      }
+
+      ::arrow::ArrayVector parts;
+      parts.reserve(static_cast<size_t>(length_upper_bound));
+      expanded_def_levels.reserve(static_cast<size_t>(length_upper_bound));
+      ARROW_ASSIGN_OR_RAISE(const int64_t null_slot_count,
+                            MultiplyVectorLength(rows_per_absent, list_size_));
+      int64_t child_offset = 0;
+      for (const int16_t def_level : collapsed_def_levels_) {
+        if (def_level < vector_stride_def_level_) {
+          if (def_level < level_info_.repeated_ancestor_def_level) {
+            continue;
+          }
+          if (child_has_absent_placeholders) {
+            ++child_offset;
+          } else if (child_has_materialized_absent_slots) {
+            child_offset += null_slot_count;
+          }
+          ARROW_ASSIGN_OR_RAISE(
+              auto null_values,
+              ::arrow::MakeArrayOfNull(child_array->type(), null_slot_count, ctx_->pool));
+          parts.push_back(std::move(null_values));
+          expanded_def_levels.insert(expanded_def_levels.end(), rows_per_absent,
+                                     def_level);
+        } else {
+          parts.push_back(child_array->Slice(child_offset, list_size_));
+          child_offset += list_size_;
+          expanded_def_levels.push_back(def_level);
+        }
+      }
+      if (child_offset != child_array->length()) {
+        return Status::Invalid(
+            "VECTOR FixedSizeList child values out of sync with "
+            "definition levels");
+      }
+      ARROW_ASSIGN_OR_RAISE(child_array, ::arrow::Concatenate(parts, ctx_->pool));
+      child_data = child_array->data();
+      output_rows = length_upper_bound;
+      output_def_levels = &expanded_def_levels;
+    } else {
+      ARROW_ASSIGN_OR_RAISE(const int64_t expected_child_slots,
+                            MultiplyVectorLength(vector_rows_, list_size_));
+      if (child_array->length() != expected_child_slots) {
+        return Status::Invalid("VECTOR FixedSizeList child length ",
+                               child_array->length(), " did not match expected ",
+                               expected_child_slots);
+      }
+    }
+
+    ARROW_ASSIGN_OR_RAISE(const int64_t expected_output_child_slots,
+                          MultiplyVectorLength(output_rows, list_size_));
+    if (child_array->length() != expected_output_child_slots) {
+      return Status::Invalid("VECTOR FixedSizeList child length ", child_array->length(),
+                             " did not match expected ", expected_output_child_slots);
+    }
+
+    std::shared_ptr<ResizableBuffer> validity_buffer;
+    int64_t null_count = 0;
+    if (field_->nullable()) {
+      ARROW_ASSIGN_OR_RAISE(
+          validity_buffer,
+          AllocateResizableBuffer(bit_util::BytesForBits(output_rows), ctx_->pool));
+      memset(validity_buffer->mutable_data(), 0,
+             static_cast<size_t>(bit_util::BytesForBits(output_rows)));
+      if (output_def_levels->empty()) {
+        bit_util::SetBitsTo(validity_buffer->mutable_data(), 0, output_rows, true);
+      } else {
+        for (int64_t row = 0; row < output_rows; ++row) {
+          if ((*output_def_levels)[row] == level_info_.def_level) {
+            bit_util::SetBit(validity_buffer->mutable_data(), row);
+          } else {
+            ++null_count;
+          }
+        }
+      }
+      validity_buffer->ZeroPadding();
+    }
+
+    auto data = std::make_shared<ArrayData>(
+        field_->type(), output_rows,
+        std::vector<std::shared_ptr<Buffer>>{null_count > 0 ? validity_buffer : nullptr},
+        null_count);
+    data->child_data.push_back(child_data);
+    *out = std::make_shared<ChunkedArray>(::arrow::MakeArray(std::move(data)));
+    return Status::OK();
+  }
+
+  const std::shared_ptr<Field> field() override { return field_; }
+
+ private:
+  std::shared_ptr<ReaderContext> ctx_;
+  std::shared_ptr<Field> field_;
+  ::parquet::internal::LevelInfo level_info_;
+  int16_t vector_stride_def_level_;
+  std::unique_ptr<ColumnReaderImpl> item_reader_;
+  int32_t list_size_;
+  // Number of existing vector values (present or null); absent ancestors do
+  // not count.
+  int64_t vector_rows_ = 0;
+  // One entry per logical entry (existing vector or absent ancestor), for the
+  // parent reader.
+  std::vector<int16_t> collapsed_def_levels_;
+  std::vector<int16_t> collapsed_rep_levels_;
+  // One entry per existing vector value, for this reader's validity bitmap.
+  std::vector<int16_t> vector_def_levels_;
+};
+
 class PARQUET_NO_EXPORT StructReader : public ColumnReaderImpl {
  public:
   explicit StructReader(std::shared_ptr<ReaderContext> ctx,
@@ -917,8 +1282,12 @@ Status GetReader(const SchemaField& field, const std::shared_ptr<Field>& arrow_f
     }
     std::unique_ptr<FileColumnIterator> input(
         ctx->iterator_factory(field.column_index, ctx->reader));
-    *out = std::make_unique<LeafReader>(ctx, arrow_field, std::move(input),
-                                        field.level_info);
+    auto leaf_field = arrow_field;
+    if (field.is_vector && field.level_info.def_level > 0) {
+      leaf_field = leaf_field->WithNullable(true);
+    }
+    *out =
+        std::make_unique<LeafReader>(ctx, leaf_field, std::move(input), field.level_info);
   } else if (type_id == ::arrow::Type::LIST || type_id == ::arrow::Type::MAP ||
              type_id == ::arrow::Type::FIXED_SIZE_LIST ||
              type_id == ::arrow::Type::LARGE_LIST ||
@@ -999,8 +1368,17 @@ Status GetReader(const SchemaField& field, const std::shared_ptr<Field>& arrow_f
             list_field->WithType(::arrow::fixed_size_list(reader_child_type, list_size));
       }
 
-      *out = std::make_unique<FixedSizeListReader>(ctx, list_field, field.level_info,
-                                                   std::move(child_reader));
+      if (field.is_vector) {
+        if (child->is_leaf() && child->column_index >= 0 && list_field->nullable()) {
+          DCHECK(child_reader->field()->nullable());
+        }
+        *out = std::make_unique<VectorFixedSizeListReader>(
+            ctx, list_field, field.level_info, field.vector_stride_def_level,
+            std::move(child_reader));
+      } else {
+        *out = std::make_unique<FixedSizeListReader>(ctx, list_field, field.level_info,
+                                                     std::move(child_reader));
+      }
     } else {
       return Status::UnknownError("Unknown list type: ", field.field->ToString());
     }

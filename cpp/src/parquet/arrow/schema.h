@@ -96,6 +96,14 @@ struct PARQUET_EXPORT SchemaField {
 
   parquet::internal::LevelInfo level_info;
 
+  // True when this Arrow field is backed by a Parquet VECTOR logical group.
+  bool is_vector = false;
+
+  // For VECTOR fields, the definition level at or above which a vector value
+  // exists (present or null).  Definition levels below this are absent
+  // ancestors, such as null structs or empty/null lists, and carry no slots.
+  int16_t vector_stride_def_level = 0;
+
   bool is_leaf() const { return column_index != -1; }
 };
 

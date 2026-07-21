@@ -980,9 +980,17 @@ int64_t ScanFileContents(std::vector<int> columns, const int32_t column_batch_si
               total_rows[col]++;
             }
           }
-        } else {
+        } else if (!col_reader->descr()->in_vector_column()) {
           total_rows[col] += levels_read;
         }
+      }
+      if (col_reader->descr()->max_repetition_level() == 0 &&
+          col_reader->descr()->in_vector_column()) {
+        // VECTOR columns without repeated ancestors have one level entry per
+        // physical vector slot, so levels_read would over-count rows by the
+        // vector length.  Use the row-group row count after still scanning the
+        // column contents above.
+        total_rows[col] += group_reader->metadata()->num_rows();
       }
       col++;
     }

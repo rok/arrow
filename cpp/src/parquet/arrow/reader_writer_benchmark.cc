@@ -812,5 +812,84 @@ static void BM_ReadMultipleRowGroupsGenerator(::benchmark::State& state) {
 
 BENCHMARK(BM_ReadMultipleRowGroupsGenerator);
 
+//
+// Benchmark writing and reading fixed-size list (embedding) columns with the
+// experimental VECTOR encoding versus the standard LIST encoding.
+//
+
+constexpr int32_t kVectorBenchmarkDim = 128;
+
+static std::shared_ptr<Table> MakeFixedSizeListTable(bool nullable) {
+  const int64_t num_rows = BENCHMARK_SIZE / kVectorBenchmarkDim;
+  auto type = ::arrow::fixed_size_list(
+      ::arrow::field("element", ::arrow::float32(), /*nullable=*/false),
+      kVectorBenchmarkDim);
+  ::arrow::random::RandomArrayGenerator generator(/*seed=*/42);
+  auto array = generator.ArrayOf(type, num_rows, nullable ? 0.05 : 0.0);
+  auto schema = ::arrow::schema({::arrow::field("column", type, nullable)});
+  return Table::Make(schema, {array});
+}
+
+static std::shared_ptr<ArrowWriterProperties> VectorBenchmarkArrowProperties(
+    bool use_vector) {
+  ArrowWriterProperties::Builder builder;
+  builder.store_schema();
+  if (use_vector) {
+    builder.enable_experimental_vector_encoding();
+  }
+  return builder.build();
+}
+
+template <bool use_vector, bool nullable>
+static void BM_WriteFixedSizeListColumn(::benchmark::State& state) {
+  auto table = MakeFixedSizeListTable(nullable);
+  auto arrow_properties = VectorBenchmarkArrowProperties(use_vector);
+
+  while (state.KeepRunning()) {
+    auto output = CreateOutputStream();
+    EXIT_NOT_OK(WriteTable(*table, ::arrow::default_memory_pool(), output,
+                           table->num_rows(), default_writer_properties(),
+                           arrow_properties));
+  }
+  state.SetBytesProcessed(BENCHMARK_SIZE * sizeof(float) * state.iterations());
+  state.SetItemsProcessed(table->num_rows() * state.iterations());
+}
+
+BENCHMARK_TEMPLATE2(BM_WriteFixedSizeListColumn, false, false);
+BENCHMARK_TEMPLATE2(BM_WriteFixedSizeListColumn, true, false);
+// There is no nullable LIST-encoding baseline: writing null FixedSizeList
+// rows through the LIST encoding is NotImplemented upstream ("Lists with
+// non-zero length null components"); the VECTOR encoding supports them.
+BENCHMARK_TEMPLATE2(BM_WriteFixedSizeListColumn, true, true);
+
+template <bool use_vector, bool nullable>
+static void BM_ReadFixedSizeListColumn(::benchmark::State& state) {
+  auto table = MakeFixedSizeListTable(nullable);
+  auto arrow_properties = VectorBenchmarkArrowProperties(use_vector);
+
+  auto output = CreateOutputStream();
+  EXIT_NOT_OK(WriteTable(*table, ::arrow::default_memory_pool(), output,
+                         table->num_rows(), default_writer_properties(),
+                         arrow_properties));
+  PARQUET_ASSIGN_OR_THROW(auto buffer, output->Finish());
+
+  for (auto _ : state) {
+    auto reader =
+        ParquetFileReader::Open(std::make_shared<::arrow::io::BufferReader>(buffer));
+    auto arrow_reader_result =
+        FileReader::Make(::arrow::default_memory_pool(), std::move(reader));
+    EXIT_NOT_OK(arrow_reader_result.status());
+    auto arrow_reader = std::move(*arrow_reader_result);
+    auto table_result = arrow_reader->ReadTable();
+    EXIT_NOT_OK(table_result.status());
+  }
+  state.SetBytesProcessed(BENCHMARK_SIZE * sizeof(float) * state.iterations());
+  state.SetItemsProcessed(table->num_rows() * state.iterations());
+}
+
+BENCHMARK_TEMPLATE2(BM_ReadFixedSizeListColumn, false, false);
+BENCHMARK_TEMPLATE2(BM_ReadFixedSizeListColumn, true, false);
+BENCHMARK_TEMPLATE2(BM_ReadFixedSizeListColumn, true, true);
+
 }  // namespace benchmarks
 }  // namespace parquet

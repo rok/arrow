@@ -576,6 +576,88 @@ TEST_F(MultipathLevelBuilderTest, TestFixedSizeList) {
   EXPECT_THAT(results_[0].post_list_elements[0].end, Eq(6));
 }
 
+TEST_F(MultipathLevelBuilderTest, TestFixedSizeListExperimentalVector) {
+  ArrowWriterProperties::Builder builder;
+  builder.enable_experimental_vector_encoding();
+  arrow_properties_ = builder.build();
+  context_ = ArrowWriteContext(default_memory_pool(), arrow_properties_.get());
+
+  auto entries = field("Entries", ::arrow::int64(), /*nullable=*/false);
+  auto list_type = fixed_size_list(entries, 2);
+  auto array = ArrayFromJSON(list_type, "[[1, 2], [3, 4], [5, 6]]");
+
+  ASSERT_OK(
+      MultipathLevelBuilder::Write(*array, /*nullable=*/false, &context_, callback_));
+  ASSERT_THAT(results_, SizeIs(1));
+  EXPECT_TRUE(results_[0].null_rep_levels);
+  EXPECT_TRUE(results_[0].null_def_levels);
+  ASSERT_THAT(results_[0].post_list_elements, SizeIs(1));
+  EXPECT_EQ(results_[0].post_list_elements[0].start, 0);
+  EXPECT_EQ(results_[0].post_list_elements[0].end, 6);
+}
+
+TEST_F(MultipathLevelBuilderTest, TestFixedSizeListExperimentalVectorNullableElements) {
+  ArrowWriterProperties::Builder builder;
+  builder.enable_experimental_vector_encoding();
+  arrow_properties_ = builder.build();
+  context_ = ArrowWriteContext(default_memory_pool(), arrow_properties_.get());
+
+  auto entries = field("Entries", ::arrow::int64(), /*nullable=*/true);
+  auto list_type = fixed_size_list(entries, 2);
+  auto array = ArrayFromJSON(list_type, "[[1, null], [3, 4], [null, 6]]");
+
+  ASSERT_OK(
+      MultipathLevelBuilder::Write(*array, /*nullable=*/false, &context_, callback_));
+  ASSERT_THAT(results_, SizeIs(1));
+  results_[0].CheckLevelsWithNullRepLevels(std::vector<int16_t>{1, 0, 1, 1, 0, 1});
+  ASSERT_THAT(results_[0].post_list_elements, SizeIs(1));
+  EXPECT_EQ(results_[0].post_list_elements[0].start, 0);
+  EXPECT_EQ(results_[0].post_list_elements[0].end, 6);
+}
+
+TEST_F(MultipathLevelBuilderTest,
+       TestFixedSizeListExperimentalVectorNullableRowsAndElements) {
+  ArrowWriterProperties::Builder builder;
+  builder.enable_experimental_vector_encoding();
+  arrow_properties_ = builder.build();
+  context_ = ArrowWriteContext(default_memory_pool(), arrow_properties_.get());
+
+  auto entries = field("Entries", ::arrow::int64(), /*nullable=*/true);
+  auto list_type = fixed_size_list(entries, 2);
+  auto array = ArrayFromJSON(list_type, "[[1, null], null, [null, 6]]");
+
+  ASSERT_OK(
+      MultipathLevelBuilder::Write(*array, /*nullable=*/true, &context_, callback_));
+  ASSERT_THAT(results_, SizeIs(1));
+  results_[0].CheckLevelsWithNullRepLevels(std::vector<int16_t>{2, 1, 0, 0, 1, 2});
+  ASSERT_THAT(results_[0].post_list_elements, SizeIs(2));
+  EXPECT_EQ(results_[0].post_list_elements[0].start, 0);
+  EXPECT_EQ(results_[0].post_list_elements[0].end, 2);
+  EXPECT_EQ(results_[0].post_list_elements[1].start, 4);
+  EXPECT_EQ(results_[0].post_list_elements[1].end, 6);
+}
+
+TEST_F(MultipathLevelBuilderTest, TestFixedSizeListExperimentalVectorNullable) {
+  ArrowWriterProperties::Builder builder;
+  builder.enable_experimental_vector_encoding();
+  arrow_properties_ = builder.build();
+  context_ = ArrowWriteContext(default_memory_pool(), arrow_properties_.get());
+
+  auto entries = field("Entries", ::arrow::int64(), /*nullable=*/false);
+  auto list_type = fixed_size_list(entries, 2);
+  auto array = ArrayFromJSON(list_type, "[[1, 2], null, [5, 6]]");
+
+  ASSERT_OK(
+      MultipathLevelBuilder::Write(*array, /*nullable=*/true, &context_, callback_));
+  ASSERT_THAT(results_, SizeIs(1));
+  results_[0].CheckLevelsWithNullRepLevels(std::vector<int16_t>{1, 1, 0, 0, 1, 1});
+  ASSERT_THAT(results_[0].post_list_elements, SizeIs(2));
+  EXPECT_EQ(results_[0].post_list_elements[0].start, 0);
+  EXPECT_EQ(results_[0].post_list_elements[0].end, 2);
+  EXPECT_EQ(results_[0].post_list_elements[1].start, 4);
+  EXPECT_EQ(results_[0].post_list_elements[1].end, 6);
+}
+
 TEST_F(MultipathLevelBuilderTest, TestFixedSizeListMissingMiddleHasTwoVisitedRanges) {
   auto entries = field("Entries", ::arrow::int64(), /*nullable=*/false);
   auto list_type = fixed_size_list(entries, 2);

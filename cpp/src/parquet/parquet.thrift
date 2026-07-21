@@ -190,6 +190,35 @@ enum FieldRepetitionType {
 
   /** The field is repeated and can contain 0 or more values */
   REPEATED = 2;
+
+  // EXPERIMENTAL: fixed-size repetition.
+  //
+  // VECTOR is used for the middle group of a fixed-size vector encoded with
+  // the canonical 3-level structure:
+  //
+  //   <required|optional> group <name> (VECTOR) {
+  //     vector group list [vector_length] {
+  //       <required|optional> <element-type> element;
+  //     }
+  //   }
+  //
+  // The outer group MUST be REQUIRED or OPTIONAL, MUST be annotated with
+  // LogicalType.VECTOR, and MUST contain exactly one field named "list". The
+  // middle group MUST have repetition_type = VECTOR, MUST be named "list",
+  // MUST carry a positive SchemaElement.vector_length, MUST have exactly one
+  // field named "element", and MUST NOT have a logical or converted type.
+  // The element field encodes the vector element type and MUST be REQUIRED or
+  // OPTIONAL. Repeated fields are not allowed inside the vector element subtree.
+  //
+  // A VECTOR level contributes no definition or repetition level. Each vector
+  // occurrence contributes exactly vector_length element slots / level entries
+  // to each primitive leaf in the element subtree, including null vector values
+  // and null element slots. Column chunk and page num_values count those slots,
+  // not necessarily the number of physical values. Writers MUST NOT split the
+  // slots of one vector value across data pages.
+  //
+  // Readers that do not understand VECTOR are expected to reject the file.
+  VECTOR = 3;
 }
 
 /**
@@ -469,6 +498,13 @@ struct GeographyType {
   2: optional EdgeInterpolationAlgorithm algorithm;
 }
 
+// EXPERIMENTAL: Embedded Vector logical type annotation.
+//
+// The VECTOR annotation marks the outer group of a fixed-size vector field;
+// see FieldRepetitionType.VECTOR for the full canonical structure and data
+// layout rules.
+struct VectorType {}  // allowed for group nodes only
+
 /**
  * LogicalType annotations to replace ConvertedType.
  *
@@ -502,6 +538,7 @@ union LogicalType {
   16: VariantType VARIANT     // no compatible ConvertedType
   17: GeometryType GEOMETRY   // no compatible ConvertedType
   18: GeographyType GEOGRAPHY // no compatible ConvertedType
+  19: VectorType VECTOR       // no compatible ConvertedType
 }
 
 /**
@@ -564,6 +601,11 @@ struct SchemaElement {
    * for some logical types to ensure forward-compatibility in format v1.
    */
   10: optional LogicalType logicalType
+
+  // EXPERIMENTAL: For VECTOR repetition, the fixed number of element slots per
+  // parent occurrence. This MUST be set, and positive, when repetition_type is
+  // VECTOR and MUST NOT be set otherwise.
+  11: optional i32 vector_length;
 }
 
 /**
