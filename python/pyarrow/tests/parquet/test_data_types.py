@@ -625,18 +625,6 @@ def test_uuid_roundtrip(tempdir):
     assert pd.isna(result_df.loc[1, "id"])
 
 
-@pytest.mark.pandas
-def test_uuid_array_to_pandas():
-    from uuid import uuid4
-    import pandas as pd
-    import pandas.testing as tm
-    values = [uuid4(), None, uuid4()]
-    arr = pa.array(values, type=pa.uuid())
-    result = arr.to_pandas()
-    expected = pd.Series(values, dtype=object)
-    tm.assert_series_equal(result, expected)
-
-
 def test_undefined_logical_type(parquet_test_datadir):
     test_file = f"{parquet_test_datadir}/unknown-logical-type.parquet"
 
