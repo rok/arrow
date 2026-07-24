@@ -604,6 +604,23 @@ def test_uuid_extension_type():
         store_schema=False)
 
 
+def test_fixed_size_list_as_vector(tempdir):
+    typ = pa.list_(pa.field("element", pa.float32(), nullable=False), 3)
+    arr = pa.array([[1, 2, 3], None, [4, 5, 6]], type=typ)
+    table = pa.table({"embedding": arr})
+    path = tempdir / "vector.parquet"
+
+    pq.write_table(table, path, write_fixed_size_list_as_vector=True)
+
+    metadata = pq.read_metadata(path)
+    col = metadata.schema[0]
+    assert col.physical_type == "FIXED_LEN_BYTE_ARRAY"
+    assert col.logical_type.type == "VECTOR"
+
+    result = pq.read_table(path)
+    assert result.equals(table)
+
+
 def test_undefined_logical_type(parquet_test_datadir):
     test_file = f"{parquet_test_datadir}/unknown-logical-type.parquet"
 

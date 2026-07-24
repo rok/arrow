@@ -191,10 +191,90 @@ Result<std::shared_ptr<ArrowType>> FromByteArray(
   }
 }
 
+Result<std::shared_ptr<ArrowType>> FromVectorElement(
+    const VectorLogicalType& vector_type,
+    const ArrowReaderProperties& reader_properties) {
+  const auto element_logical_type = vector_type.element_logical_type();
+  const bool has_logical_type = element_logical_type != nullptr;
+
+  switch (vector_type.element_type()) {
+    case ParquetType::INT32:
+      if (!has_logical_type) {
+        return ::arrow::int32();
+      }
+      if (element_logical_type->is_int()) {
+        const auto& integer = checked_cast<const IntLogicalType&>(*element_logical_type);
+        if (integer.bit_width() != 32) {
+          return Status::NotImplemented("VECTOR IntType elements with bit width ",
+                                        integer.bit_width(),
+                                        " require value conversion from physical INT32");
+        }
+        return integer.is_signed() ? ::arrow::int32() : ::arrow::uint32();
+      }
+      break;
+    case ParquetType::INT64:
+      if (!has_logical_type) {
+        return ::arrow::int64();
+      }
+      if (element_logical_type->is_int()) {
+        const auto& integer = checked_cast<const IntLogicalType&>(*element_logical_type);
+        if (integer.bit_width() != 64) {
+          return Status::NotImplemented("VECTOR IntType elements with bit width ",
+                                        integer.bit_width(),
+                                        " require value conversion from physical INT64");
+        }
+        return integer.is_signed() ? ::arrow::int64() : ::arrow::uint64();
+      }
+      break;
+    case ParquetType::FLOAT:
+      if (!has_logical_type) {
+        return ::arrow::float32();
+      }
+      break;
+    case ParquetType::DOUBLE:
+      if (!has_logical_type) {
+        return ::arrow::float64();
+      }
+      break;
+    case ParquetType::FIXED_LEN_BYTE_ARRAY:
+      if (!has_logical_type) {
+        return ::arrow::fixed_size_binary(vector_type.element_type_length());
+      }
+      if (element_logical_type->is_float16()) {
+        return ::arrow::float16();
+      }
+      if (element_logical_type->is_UUID()) {
+        if (vector_type.element_type_length() == 16 &&
+            reader_properties.get_arrow_extensions_enabled()) {
+          return ::arrow::extension::uuid();
+        }
+        return ::arrow::fixed_size_binary(vector_type.element_type_length());
+      }
+      break;
+    default:
+      break;
+  }
+
+  return Status::NotImplemented("Unsupported VECTOR element logical type ",
+                                has_logical_type ? element_logical_type->ToString()
+                                                 : LogicalType::None()->ToString(),
+                                " for physical element type ",
+                                TypeToString(vector_type.element_type()));
+}
+
 Result<std::shared_ptr<ArrowType>> FromFLBA(
     const LogicalType& logical_type, int32_t physical_length,
     const ArrowReaderProperties& reader_properties) {
   switch (logical_type.type()) {
+    case LogicalType::Type::VECTOR: {
+      const auto& vector_type =
+          ::arrow::internal::checked_cast<const VectorLogicalType&>(logical_type);
+      ARROW_ASSIGN_OR_RAISE(auto value_type,
+                            FromVectorElement(vector_type, reader_properties));
+      return ::arrow::fixed_size_list(
+          ::arrow::field("element", std::move(value_type), /*nullable=*/false),
+          vector_type.length());
+    }
     case LogicalType::Type::DECIMAL:
       return MakeArrowDecimal(logical_type, reader_properties.smallest_decimal_enabled());
     case LogicalType::Type::FLOAT16:
