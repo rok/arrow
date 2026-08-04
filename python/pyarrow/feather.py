@@ -16,21 +16,28 @@
 # under the License.
 
 
-from collections.abc import Sequence
-import os
 import warnings
 
-from pyarrow.pandas_compat import _pandas_api  # noqa
-from pyarrow.lib import (Codec, Table,  # noqa
-                         concat_tables, schema)
-import pyarrow.lib as ext
-from pyarrow import _feather
+from pyarrow.lib import concat_tables
+import pyarrow.ipc as ipc
 from pyarrow._feather import FeatherError  # noqa: F401
+
+
+def _warn_deprecated(name, replacement):
+    warnings.warn(
+        f"pyarrow.feather.{name} is deprecated as of 26.0.0. "
+        f"Use {replacement} instead.",
+        DeprecationWarning,
+        stacklevel=3
+    )
 
 
 class FeatherDataset:
     """
     Encapsulates details of reading a list of Feather files.
+
+    .. deprecated:: 26.0.0
+       Use :func:`pyarrow.dataset.dataset` with ``format='ipc'`` instead.
 
     Parameters
     ----------
@@ -41,6 +48,10 @@ class FeatherDataset:
     """
 
     def __init__(self, path_or_paths, validate_schema=True):
+        _warn_deprecated(
+            "FeatherDataset",
+            "pyarrow.dataset.dataset() with format='ipc'"
+        )
         self.paths = path_or_paths
         self.validate_schema = validate_schema
 
@@ -94,29 +105,17 @@ class FeatherDataset:
             use_threads=use_threads)
 
 
-def check_chunked_overflow(name, col):
-    if col.num_chunks == 1:
-        return
-
-    if col.type in (ext.binary(), ext.string()):
-        raise ValueError(f"Column '{name}' exceeds 2GB maximum capacity of "
-                         "a Feather binary column. This restriction may be "
-                         "lifted in the future")
-    else:
-        # TODO(wesm): Not sure when else this might be reached
-        raise ValueError(
-            f"Column '{name}' of type {col.type} was chunked on conversion to Arrow "
-            "and cannot be currently written to Feather format"
-        )
-
-
-_FEATHER_SUPPORTED_CODECS = {'lz4', 'zstd', 'uncompressed'}
+# Preserve the existing helper name for compatibility.
+check_chunked_overflow = ipc._check_chunked_overflow
 
 
 def write_feather(df, dest, compression=None, compression_level=None,
                   chunksize=None, version=2):
     """
     Write a pandas.DataFrame to Feather format.
+
+    .. deprecated:: 26.0.0
+       Use :func:`pyarrow.ipc.write_file` instead.
 
     Parameters
     ----------
@@ -142,70 +141,15 @@ def write_feather(df, dest, compression=None, compression_level=None,
            Writing Feather V1 files is deprecated. Use the default
            ``version=2`` to write Arrow IPC files instead.
     """
-    if version == 1:
-        warnings.warn(
-            "Feather V1 files are deprecated as of 25.0.0 and support will "
-            "be removed in a future version. Use the default version=2 to "
-            "write Arrow IPC files instead.",
-            DeprecationWarning,
-            stacklevel=2
-        )
-    if _pandas_api.have_pandas:
-        if (_pandas_api.has_sparse and
-                isinstance(df, _pandas_api.pd.SparseDataFrame)):
-            df = df.to_dense()
+    if version not in (1, 2):
+        raise ValueError("Version value should either be 1 or 2")
 
-    if _pandas_api.is_data_frame(df):
-        # Feather v1 creates a new column in the resultant Table to
-        # store index information if index type is not RangeIndex
+    _warn_deprecated("write_feather", "pyarrow.ipc.write_file")
 
-        if version == 1:
-            preserve_index = False
-        elif version == 2:
-            preserve_index = None
-        else:
-            raise ValueError("Version value should either be 1 or 2")
-
-        table = Table.from_pandas(df, preserve_index=preserve_index)
-
-        if version == 1:
-            # Version 1 does not chunking
-            for i, name in enumerate(table.schema.names):
-                col = table[i]
-                check_chunked_overflow(name, col)
-    else:
-        table = df
-
-    if version == 1:
-        if len(table.column_names) > len(set(table.column_names)):
-            raise ValueError("cannot serialize duplicate column names")
-
-        if compression is not None:
-            raise ValueError("Feather V1 files do not support compression "
-                             "option")
-
-        if chunksize is not None:
-            raise ValueError("Feather V1 files do not support chunksize "
-                             "option")
-    else:
-        if compression is None and Codec.is_available('lz4_frame'):
-            compression = 'lz4'
-        elif (compression is not None and
-              compression not in _FEATHER_SUPPORTED_CODECS):
-            raise ValueError(f'compression="{compression}" not supported, must be '
-                             f'one of {_FEATHER_SUPPORTED_CODECS}')
-
-    try:
-        _feather.write_feather(table, dest, compression=compression,
-                               compression_level=compression_level,
-                               chunksize=chunksize, version=version)
-    except Exception:
-        if isinstance(dest, str):
-            try:
-                os.remove(dest)
-            except os.error:
-                pass
-        raise
+    return ipc._write_file(
+        df, dest, compression=compression,
+        compression_level=compression_level, chunksize=chunksize,
+        version=version)
 
 
 def read_feather(source, columns=None, use_threads=True,
@@ -213,6 +157,10 @@ def read_feather(source, columns=None, use_threads=True,
     """
     Read a pandas.DataFrame from Feather format. To read as pyarrow.Table use
     feather.read_table.
+
+    .. deprecated:: 26.0.0
+       Use :func:`pyarrow.ipc.read_file` and convert the resulting table with
+       :meth:`pyarrow.Table.to_pandas` instead.
 
     Parameters
     ----------
@@ -235,6 +183,8 @@ def read_feather(source, columns=None, use_threads=True,
     df : pandas.DataFrame
         The contents of the Feather file as a pandas.DataFrame
     """
+    _warn_deprecated(
+        "read_feather", "pyarrow.ipc.read_file(...).to_pandas()")
     return (_read_table_internal(
         source, columns=columns, memory_map=memory_map,
         use_threads=use_threads).to_pandas(use_threads=use_threads, **kwargs))
@@ -242,53 +192,18 @@ def read_feather(source, columns=None, use_threads=True,
 
 def _read_table_internal(source, columns=None, memory_map=False,
                          use_threads=True):
-    """
-    Internal implementation for reading a Feather file as a pyarrow.Table.
-    Emits a deprecation warning if the file is a legacy Feather V1 file.
-    """
-    reader = _feather.FeatherReader(
-        source, use_memory_map=memory_map, use_threads=use_threads)
-
-    if reader.version < 3:
-        warnings.warn(
-            "Feather V1 files are deprecated as of 25.0.0 and support will "
-            "be removed in a future version. Consider rewriting this file "
-            "in the Arrow IPC file format (Feather V2).",
-            DeprecationWarning,
-            stacklevel=3
-        )
-
-    if columns is None:
-        return reader.read()
-
-    if not isinstance(columns, Sequence):
-        raise TypeError("Columns must be a sequence but, got {}"
-                        .format(type(columns).__name__))
-
-    column_types = [type(column) for column in columns]
-    if all(map(lambda t: t == int, column_types)):
-        table = reader.read_indices(columns)
-    elif all(map(lambda t: t == str, column_types)):
-        table = reader.read_names(columns)
-    else:
-        column_type_names = [t.__name__ for t in column_types]
-        raise TypeError("Columns must be indices or names. "
-                        f"Got columns {columns} of types {column_type_names}")
-
-    # Feather v1 already respects the column selection
-    if reader.version < 3:
-        return table
-    # Feather v2 reads with sorted / deduplicated selection
-    elif sorted(set(columns)) == columns:
-        return table
-    else:
-        # follow exact order / selection of names
-        return table.select(columns)
+    """Internal compatibility implementation without duplicate warnings."""
+    return ipc._read_file(
+        source, columns=columns, memory_map=memory_map,
+        use_threads=use_threads, _warn_v1=False)
 
 
 def read_table(source, columns=None, memory_map=False, use_threads=True):
     """
     Read a pyarrow.Table from Feather format
+
+    .. deprecated:: 26.0.0
+       Use :func:`pyarrow.ipc.read_file` instead.
 
     Parameters
     ----------
@@ -307,6 +222,7 @@ def read_table(source, columns=None, memory_map=False, use_threads=True):
     table : pyarrow.Table
         The contents of the Feather file as a pyarrow.Table
     """
+    _warn_deprecated("read_table", "pyarrow.ipc.read_file")
     return _read_table_internal(source, columns=columns,
                                 memory_map=memory_map,
                                 use_threads=use_threads)

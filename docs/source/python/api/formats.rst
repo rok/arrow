@@ -42,10 +42,13 @@ CSV Files
 
 .. _api.feather:
 
-Feather Files
--------------
+Feather Files (Deprecated)
+--------------------------
 
 .. currentmodule:: pyarrow.feather
+
+.. deprecated:: 26.0.0
+   Use the high-level file APIs in :mod:`pyarrow.ipc` instead.
 
 .. autosummary::
    :toctree: ../generated/

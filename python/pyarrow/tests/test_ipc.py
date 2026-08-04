@@ -23,6 +23,7 @@ import pytest
 import random
 import socket
 import threading
+import warnings
 import weakref
 
 try:
@@ -246,6 +247,84 @@ def test_file_read_pandas(file_fixture):
 
     expected = pd.concat(frames).reset_index(drop=True)
     assert_frame_equal(result, expected)
+
+
+def test_high_level_file_roundtrip(tempdir):
+    table = pa.table({"a": [1, 2, 3], "b": ["x", "y", "z"]})
+    path = tempdir / "data.arrow"
+
+    pa.ipc.write_file(
+        table, path, compression="uncompressed", chunksize=2)
+
+    with pa.ipc.open_file(path) as reader:
+        assert reader.num_record_batches == 2
+
+    for memory_map in (False, True):
+        result = pa.ipc.read_file(
+            path, columns=["b", "a", "b"], memory_map=memory_map)
+        assert result.equals(table.select(["b", "a", "b"]))
+
+
+def test_high_level_file_rejects_uncompressed_compression_level():
+    table = pa.table({"a": [1, 2, 3]})
+
+    with pytest.raises(pa.ArrowInvalid, match="doesn't support"):
+        pa.ipc.write_file(
+            table, pa.BufferOutputStream(), compression="uncompressed",
+            compression_level=1)
+
+
+def test_high_level_file_no_deprecation_warning(tempdir):
+    table = pa.table({"a": [1, 2, 3]})
+    path = tempdir / "data.arrow"
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", DeprecationWarning)
+        pa.ipc.write_file(table, path)
+        assert pa.ipc.read_file(path).equals(table)
+
+
+def test_high_level_file_buffer_roundtrip():
+    table = pa.table({"a": [1, 2, 3]})
+    sink = pa.BufferOutputStream()
+
+    pa.ipc.write_file(table, sink)
+    result = pa.ipc.read_file(sink.getvalue())
+
+    assert result.equals(table)
+
+
+@pytest.mark.pandas
+def test_high_level_file_pandas_roundtrip(tempdir):
+    frame = pd.DataFrame({"a": [1, 2, 3], "b": ["x", "y", "z"]})
+    path = tempdir / "data.arrow"
+
+    pa.ipc.write_file(frame, path)
+    result = pa.ipc.read_file(path).to_pandas()
+
+    assert_frame_equal(result, frame)
+
+
+@pytest.mark.parametrize("memory_map", [False, True])
+def test_high_level_file_reads_feather_v1(tempdir, memory_map):
+    from pyarrow import feather
+
+    table = pa.table({"a": [1, 2, 3], "b": ["x", "y", "z"]})
+    path = tempdir / "data.feather"
+    with pytest.warns(DeprecationWarning,
+                      match="write_feather is deprecated"):
+        feather.write_feather(table, path, version=1)
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always", DeprecationWarning)
+        result = pa.ipc.read_file(
+            path, columns=["b", "a"], memory_map=memory_map)
+
+    v1_warnings = [warning for warning in caught
+                   if issubclass(warning.category, DeprecationWarning)]
+    assert len(v1_warnings) == 1
+    assert "Feather V1" in str(v1_warnings[0].message)
+    assert result.equals(table.select(["b", "a"]))
 
 
 def test_file_pathlib(file_fixture, tmpdir):
