@@ -125,12 +125,12 @@ writing or reading a complete :class:`~pyarrow.Table` or
    result = pa.ipc.read_file("data.arrow")
    dataframe = pa.ipc.read_file("data.arrow").to_pandas()
 
-:func:`~pyarrow.ipc.write_file` uses LZ4 compression by default when it is
-available and supports compression and record batch chunking options.
-:func:`~pyarrow.ipc.read_file` can select columns by name or index. It can
-also read legacy Feather V1 files to support migration, although V1 support is
-deprecated. For multiple files, use the :mod:`pyarrow.dataset` module with
-``format='ipc'``.
+:func:`~pyarrow.ipc.write_file` writes uncompressed files by default and
+supports explicit compression and record batch chunking options.
+:func:`~pyarrow.ipc.read_file` can select columns by name or index. These
+functions read and write Arrow IPC files; use :mod:`pyarrow.feather` only when
+legacy Feather V1 compatibility is required. For multiple files, use the
+:mod:`pyarrow.dataset` module with ``format='ipc'``.
 
 For incremental writes or random access to individual record batches, use the
 lower-level reader and writer APIs described below.

@@ -254,7 +254,7 @@ def test_high_level_file_roundtrip(tempdir):
     path = tempdir / "data.arrow"
 
     pa.ipc.write_file(
-        table, path, compression="uncompressed", chunksize=2)
+        table, path, compression="uncompressed", max_chunksize=2)
 
     with pa.ipc.open_file(path) as reader:
         assert reader.num_record_batches == 2
@@ -265,13 +265,60 @@ def test_high_level_file_roundtrip(tempdir):
         assert result.equals(table.select(["b", "a", "b"]))
 
 
-def test_high_level_file_rejects_uncompressed_compression_level():
+@pytest.mark.parametrize("compression", [None, "uncompressed"])
+def test_high_level_file_rejects_uncompressed_compression_level(compression):
     table = pa.table({"a": [1, 2, 3]})
 
     with pytest.raises(pa.ArrowInvalid, match="doesn't support"):
         pa.ipc.write_file(
-            table, pa.BufferOutputStream(), compression="uncompressed",
+            table, pa.BufferOutputStream(), compression=compression,
             compression_level=1)
+
+
+def test_high_level_file_defaults_to_uncompressed():
+    options = pa.ipc._get_write_file_options(None, None)
+    assert options.compression is None
+
+
+@pytest.mark.parametrize("max_chunksize", [0, -1])
+def test_high_level_file_rejects_nonpositive_max_chunksize(max_chunksize):
+    table = pa.table({"a": [1, 2, 3]})
+
+    with pytest.raises(ValueError, match="greater than zero"):
+        pa.ipc.write_file(
+            table, pa.BufferOutputStream(), max_chunksize=max_chunksize)
+
+
+@pytest.mark.parametrize("max_chunksize", [True, 1.5])
+def test_high_level_file_rejects_noninteger_max_chunksize(max_chunksize):
+    table = pa.table({"a": [1, 2, 3]})
+
+    with pytest.raises(TypeError, match="must be an integer"):
+        pa.ipc.write_file(
+            table, pa.BufferOutputStream(), max_chunksize=max_chunksize)
+
+
+def test_high_level_file_options_are_keyword_only():
+    table = pa.table({"a": [1, 2, 3]})
+    sink = pa.BufferOutputStream()
+
+    with pytest.raises(TypeError):
+        pa.ipc.write_file(table, sink, "uncompressed")
+
+    pa.ipc.write_file(table, sink)
+    with pytest.raises(TypeError):
+        pa.ipc.read_file(sink.getvalue(), ["a"])
+
+
+def test_high_level_file_empty_column_projection():
+    table = pa.table({"a": [1, 2, 3], "b": [4, 5, 6]})
+    sink = pa.BufferOutputStream()
+    pa.ipc.write_file(table, sink)
+
+    for columns in ([], (), range(0)):
+        result = pa.ipc.read_file(sink.getvalue(), columns=columns)
+        assert result.num_rows == table.num_rows
+        assert result.num_columns == 0
 
 
 def test_high_level_file_no_deprecation_warning(tempdir):
@@ -306,25 +353,21 @@ def test_high_level_file_pandas_roundtrip(tempdir):
 
 
 @pytest.mark.parametrize("memory_map", [False, True])
-def test_high_level_file_reads_feather_v1(tempdir, memory_map):
+def test_high_level_file_rejects_feather_v1(tempdir, memory_map):
     from pyarrow import feather
 
     table = pa.table({"a": [1, 2, 3], "b": ["x", "y", "z"]})
     path = tempdir / "data.feather"
-    with pytest.warns(DeprecationWarning,
-                      match="write_feather is deprecated"):
+    with pytest.warns(DeprecationWarning, match="Feather V1 writing"):
         feather.write_feather(table, path, version=1)
 
-    with warnings.catch_warnings(record=True) as caught:
-        warnings.simplefilter("always", DeprecationWarning)
-        result = pa.ipc.read_file(
-            path, columns=["b", "a"], memory_map=memory_map)
+    with pytest.raises(pa.ArrowInvalid):
+        pa.ipc.read_file(path, memory_map=memory_map)
 
-    v1_warnings = [warning for warning in caught
-                   if issubclass(warning.category, DeprecationWarning)]
-    assert len(v1_warnings) == 1
-    assert "Feather V1" in str(v1_warnings[0].message)
-    assert result.equals(table.select(["b", "a"]))
+
+def test_high_level_file_preserves_invalid_ipc_error():
+    with pytest.raises(pa.ArrowInvalid):
+        pa.ipc.read_file(b"")
 
 
 def test_file_pathlib(file_fixture, tmpdir):

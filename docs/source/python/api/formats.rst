@@ -42,13 +42,13 @@ CSV Files
 
 .. _api.feather:
 
-Feather Files (Deprecated)
+Feather Compatibility APIs
 --------------------------
 
 .. currentmodule:: pyarrow.feather
 
-.. deprecated:: 26.0.0
-   Use the high-level file APIs in :mod:`pyarrow.ipc` instead.
+Feather V2 files use the Arrow IPC file format. For new code, prefer the
+high-level file APIs in :mod:`pyarrow.ipc`.
 
 .. autosummary::
    :toctree: ../generated/

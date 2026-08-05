@@ -41,9 +41,10 @@ try:
 except ImportError:
     pass
 
-# Suppress warnings for tests that exercise the deprecated compatibility APIs.
+# Suppress deprecation warnings for existing tests that intentionally
+# exercise the deprecated Feather V1 format.
 pytestmark = pytest.mark.filterwarnings(
-    "ignore:pyarrow.feather:DeprecationWarning"
+    "ignore:Feather V1:DeprecationWarning"
 )
 
 
@@ -792,6 +793,31 @@ def test_read_column_duplicated_selection(tempdir, version):
         assert result.equals(expected)
 
 
+def test_read_empty_column_selection_v2(tempdir):
+    table = pa.table({'a': [1, 2, 3], 'b': [4, 5, 6]})
+    path = tempdir / "data.feather"
+    write_feather(table, path)
+
+    # Preserve the historical distinction between an empty list and other
+    # empty sequences in the compatibility API.
+    assert read_table(path, columns=[]).equals(table)
+    for columns in ((), range(0)):
+        result = read_table(path, columns=columns)
+        assert result.num_rows == table.num_rows
+        assert result.num_columns == 0
+
+
+def test_read_invalid_ipc_does_not_try_legacy_reader(monkeypatch):
+    import pyarrow.feather as feather
+
+    def fail_if_called(*args, **kwargs):
+        pytest.fail("Feather V1 reader was called for an IPC file")
+
+    monkeypatch.setattr(feather._feather, "FeatherReader", fail_if_called)
+    with pytest.raises(pa.ArrowInvalid):
+        read_table(pa.py_buffer(b"ARROW1 invalid"))
+
+
 def test_read_column_duplicated_in_file(tempdir):
     # duplicated columns in feather file (only works for feather v2)
     table = pa.table([[1, 2, 3], [4, 5, 6], [7, 8, 9]], names=['a', 'b', 'a'])
@@ -893,27 +919,30 @@ def test_feather_datetime_resolution_arrow_to_pandas(tempdir):
 # --- Deprecation warning tests ---
 
 @pytest.mark.pandas
-@pytest.mark.filterwarnings("default:pyarrow.feather:DeprecationWarning")
-def test_feather_deprecation_warnings(tempdir):
+@pytest.mark.filterwarnings("default:Feather V1:DeprecationWarning")
+def test_feather_v1_deprecation_warnings(tempdir):
     table = pa.table({"a": [1, 2, 3]})
     path = str(tempdir / "test.feather")
 
-    with pytest.warns(DeprecationWarning,
-                      match="write_feather is deprecated"):
-        write_feather(table, path)
+    with pytest.warns(DeprecationWarning, match="Feather V1 writing"):
+        write_feather(table, path, version=1)
 
-    with pytest.warns(DeprecationWarning, match="read_table is deprecated"):
+    with pytest.warns(DeprecationWarning, match="Feather V1 reading"):
         read_table(path)
 
-    with pytest.warns(DeprecationWarning, match="read_feather is deprecated"):
+    with pytest.warns(DeprecationWarning, match="Feather V1 reading"):
         read_feather(path)
 
 
-@pytest.mark.filterwarnings("default:pyarrow.feather:DeprecationWarning")
-def test_feather_dataset_deprecated():
-    with pytest.warns(DeprecationWarning,
-                      match="FeatherDataset is deprecated"):
-        FeatherDataset([])
+def test_feather_v2_no_deprecation_warning(tempdir):
+    table = pa.table({"a": [1, 2, 3]})
+    path = str(tempdir / "test.feather")
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", DeprecationWarning)
+        write_feather(table, path)
+        read_table(path)
+        FeatherDataset([path]).read_table()
 
 
 @pytest.mark.parametrize("version", [None, 0, 3])
@@ -925,7 +954,7 @@ def test_feather_invalid_version(tempdir, version):
 
 
 @pytest.mark.pandas
-@pytest.mark.filterwarnings("default:pyarrow.feather:DeprecationWarning")
+@pytest.mark.filterwarnings("default:Feather V1:DeprecationWarning")
 def test_read_feather_v1_no_double_warning(tempdir):
     """Verify reading a V1 file emits one DeprecationWarning, not two."""
     table = pa.table({"a": [1, 2, 3]})
@@ -939,7 +968,7 @@ def test_read_feather_v1_no_double_warning(tempdir):
         v1_warnings = [x for x in w if issubclass(x.category,
                                                   DeprecationWarning)]
         assert len(v1_warnings) == 1
-        assert "read_feather is deprecated" in str(v1_warnings[0].message)
+        assert "Feather V1 reading" in str(v1_warnings[0].message)
 
 
 def test_feather_dataset_v1_single_warning(tempdir):
@@ -956,4 +985,4 @@ def test_feather_dataset_v1_single_warning(tempdir):
     v1_warnings = [warning for warning in caught
                    if issubclass(warning.category, DeprecationWarning)]
     assert len(v1_warnings) == 1
-    assert "FeatherDataset is deprecated" in str(v1_warnings[0].message)
+    assert "Feather V1 reading" in str(v1_warnings[0].message)

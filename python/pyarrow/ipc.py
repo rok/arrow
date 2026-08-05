@@ -18,8 +18,8 @@
 # Arrow file and stream reader/writer classes, and other messaging tools
 
 from collections.abc import Sequence
+import operator
 import os
-import warnings
 
 import pyarrow as pa
 
@@ -250,35 +250,15 @@ def _ensure_table(data, preserve_index=None):
     return data
 
 
-def _check_chunked_overflow(name, col):
-    if col.num_chunks == 1:
-        return
-
-    if col.type in (pa.binary(), pa.string()):
-        raise ValueError(f"Column '{name}' exceeds 2GB maximum capacity of "
-                         "a Feather binary column. This restriction may be "
-                         "lifted in the future")
-    else:
-        # TODO(wesm): Not sure when else this might be reached
-        raise ValueError(
-            f"Column '{name}' of type {col.type} was chunked on conversion "
-            "to Arrow and cannot be currently written to Feather format"
-        )
-
-
 def _get_write_file_options(compression, compression_level):
-    if compression is None:
-        if pa.Codec.is_available('lz4_frame'):
-            compression = 'lz4'
-        else:
-            compression = 'uncompressed'
-    elif compression not in _FILE_SUPPORTED_CODECS:
+    if (compression is not None and
+            compression not in _FILE_SUPPORTED_CODECS):
         raise ValueError(
             f'compression="{compression}" not supported, must be one of '
             f'{_FILE_SUPPORTED_CODECS}'
         )
 
-    if compression == 'uncompressed':
+    if compression is None or compression == 'uncompressed':
         if compression_level is not None:
             raise pa.ArrowInvalid(
                 "Codec 'uncompressed' doesn't support setting a compression "
@@ -293,63 +273,22 @@ def _get_write_file_options(compression, compression_level):
         allow_64bit=True, compression=codec, unify_dictionaries=True)
 
 
-def _write_feather_v1(data, dest, compression, compression_level,
-                      chunksize):
-    from pyarrow import _feather
-
-    table = _ensure_table(data, preserve_index=False)
-    if table is not data:
-        # Feather V1 does not support chunked columns created during pandas
-        # conversion.
-        for i, name in enumerate(table.schema.names):
-            _check_chunked_overflow(name, table[i])
-
-    if len(table.column_names) > len(set(table.column_names)):
-        raise ValueError("cannot serialize duplicate column names")
-    if compression is not None:
-        raise ValueError("Feather V1 files do not support compression option")
-    if chunksize is not None:
-        raise ValueError("Feather V1 files do not support chunksize option")
-
+def _normalize_max_chunksize(max_chunksize):
+    if max_chunksize is None:
+        return _DEFAULT_MAX_CHUNKSIZE
+    if isinstance(max_chunksize, bool):
+        raise TypeError("max_chunksize must be an integer")
     try:
-        _feather.write_feather(
-            table, dest, compression_level=compression_level, version=1)
-    except Exception:
-        if isinstance(dest, (str, os.PathLike)):
-            try:
-                os.remove(dest)
-            except OSError:
-                pass
-        raise
+        max_chunksize = operator.index(max_chunksize)
+    except TypeError:
+        raise TypeError("max_chunksize must be an integer") from None
+    if max_chunksize <= 0:
+        raise ValueError("max_chunksize must be greater than zero")
+    return max_chunksize
 
 
-def _write_file(data, dest, compression=None, compression_level=None,
-                chunksize=None, version=2):
-    if version not in (1, 2):
-        raise ValueError("Version value should either be 1 or 2")
-    if version == 1:
-        return _write_feather_v1(
-            data, dest, compression, compression_level, chunksize)
-
-    table = _ensure_table(data)
-    options = _get_write_file_options(compression, compression_level)
-    if chunksize is None:
-        chunksize = _DEFAULT_MAX_CHUNKSIZE
-
-    try:
-        with new_file(dest, table.schema, options=options) as writer:
-            writer.write_table(table, max_chunksize=chunksize)
-    except Exception:
-        if isinstance(dest, (str, os.PathLike)):
-            try:
-                os.remove(dest)
-            except OSError:
-                pass
-        raise
-
-
-def write_file(data, dest, compression=None, compression_level=None,
-               chunksize=None):
+def write_file(data, sink, *, compression=None, compression_level=None,
+               max_chunksize=None):
     """
     Write a pandas.DataFrame or pyarrow.Table to an Arrow IPC file.
 
@@ -357,21 +296,32 @@ def write_file(data, dest, compression=None, compression_level=None,
     ----------
     data : pandas.DataFrame or pyarrow.Table
         Data to write.
-    dest : str, path-like or file-like object
+    sink : str, path-like or file-like object
         Destination path or writable file object.
     compression : str, default None
         Can be one of {"zstd", "lz4", "uncompressed"}. The default of None
-        uses LZ4 if it is available, otherwise uncompressed.
+        writes an uncompressed file.
     compression_level : int, default None
         Use a compression level particular to the chosen compressor. If None,
         use the default compression level.
-    chunksize : int, default None
-        Maximum size of Arrow RecordBatch chunks. None uses the default of
-        64K.
+    max_chunksize : int, default None
+        Maximum size of Arrow RecordBatch chunks. Must be greater than zero.
+        None uses the default of 64K.
     """
-    return _write_file(
-        data, dest, compression=compression,
-        compression_level=compression_level, chunksize=chunksize)
+    table = _ensure_table(data)
+    options = _get_write_file_options(compression, compression_level)
+    max_chunksize = _normalize_max_chunksize(max_chunksize)
+
+    try:
+        with new_file(sink, table.schema, options=options) as writer:
+            writer.write_table(table, max_chunksize=max_chunksize)
+    except Exception:
+        if isinstance(sink, (str, os.PathLike)):
+            try:
+                os.remove(sink)
+            except OSError:
+                pass
+        raise
 
 
 def _validate_columns(columns):
@@ -406,10 +356,10 @@ def _read_ipc_file(reader, source, columns, use_threads):
                 raise pa.ArrowInvalid(f"Field named {column} is not found")
             column_indices.append(index)
 
-    # An empty included_fields option means all fields. Preserve that existing
-    # behavior for an empty column selection.
+    # An empty included_fields option means all fields. Read the table before
+    # selecting no columns so that the result retains the correct row count.
     if not column_indices:
-        return reader.read_all()
+        return reader.read_all().select([])
 
     included_fields = sorted(set(column_indices))
     options = IpcReadOptions(
@@ -424,50 +374,9 @@ def _read_ipc_file(reader, source, columns, use_threads):
     return table.select([projected_indices[index] for index in column_indices])
 
 
-def _read_feather_v1(reader, columns):
-    if columns is None:
-        return reader.read()
-
-    column_kind = _validate_columns(columns)
-    if column_kind == "indices":
-        return reader.read_indices(columns)
-    return reader.read_names(columns)
-
-
-def _read_file(source, columns=None, memory_map=False, use_threads=True,
-               *, _warn_v1=True, _warning_stacklevel=3):
-    if memory_map and isinstance(source, (str, os.PathLike)):
-        source = pa.memory_map(os.fspath(source), 'r')
-
-    options = IpcReadOptions(use_threads=use_threads)
-    try:
-        reader = open_file(source, options=options)
-    except pa.ArrowInvalid as ipc_error:
-        from pyarrow import _feather
-
-        reader = _feather.FeatherReader(
-            source, use_memory_map=memory_map, use_threads=use_threads)
-        if reader.version >= 3:
-            raise ipc_error
-
-        if _warn_v1:
-            warnings.warn(
-                "Feather V1 files are deprecated as of 25.0.0 and support "
-                "will be removed in a future version. Consider rewriting "
-                "this file in the Arrow IPC file format (Feather V2).",
-                DeprecationWarning,
-                stacklevel=_warning_stacklevel
-            )
-        return _read_feather_v1(reader, columns)
-
-    return _read_ipc_file(reader, source, columns, use_threads)
-
-
-def read_file(source, columns=None, memory_map=False, use_threads=True):
+def read_file(source, *, columns=None, memory_map=False, use_threads=True):
     """
     Read an Arrow IPC file as a pyarrow.Table.
-
-    Legacy Feather V1 files can also be read but are deprecated.
 
     Parameters
     ----------
@@ -476,6 +385,7 @@ def read_file(source, columns=None, memory_map=False, use_threads=True):
         seeking.
     columns : sequence, optional
         Column indices or names to read. If not provided, read all columns.
+        An empty sequence reads no columns.
     memory_map : bool, default False
         Use memory mapping when opening a source path.
     use_threads : bool, default True
@@ -486,8 +396,12 @@ def read_file(source, columns=None, memory_map=False, use_threads=True):
     pyarrow.Table
         The contents of the file.
     """
-    return _read_file(source, columns=columns, memory_map=memory_map,
-                      use_threads=use_threads)
+    if memory_map and isinstance(source, (str, os.PathLike)):
+        source = pa.memory_map(os.fspath(source), 'r')
+
+    options = IpcReadOptions(use_threads=use_threads)
+    reader = open_file(source, options=options)
+    return _read_ipc_file(reader, source, columns, use_threads)
 
 
 def serialize_pandas(df, *, nthreads=None, preserve_index=None):

@@ -1927,7 +1927,6 @@ def test_fragments_parquet_subset_with_nested_fields(tempdir):
 
 @pytest.mark.pandas
 @pytest.mark.parquet
-@pytest.mark.filterwarnings("ignore:pyarrow.feather:DeprecationWarning")
 def test_fragments_repr(tempdir, dataset):
     # partitioned parquet dataset
     fragment = list(dataset.get_fragments())[0]
@@ -1952,9 +1951,9 @@ def test_fragments_repr(tempdir, dataset):
     )
 
     # non-parquet format
-    path = tempdir / "data.feather"
-    pa.feather.write_feather(table, path)
-    dataset = ds.dataset(path, format="feather")
+    path = tempdir / "data.arrow"
+    pa.ipc.write_file(table, path)
+    dataset = ds.dataset(path, format="ipc")
     fragment = list(dataset.get_fragments())[0]
     assert (
         repr(fragment) ==
@@ -3700,7 +3699,7 @@ def test_column_names_encoding(tempdir, dataset_reader):
     assert dataset_transcoded.to_table().equals(expected_table)
 
 
-@pytest.mark.filterwarnings("ignore:pyarrow.feather:DeprecationWarning")
+@pytest.mark.filterwarnings("ignore:Feather V1:DeprecationWarning")
 def test_feather_format(tempdir, dataset_reader):
     from pyarrow.feather import write_feather
 
@@ -4082,14 +4081,12 @@ def test_dataset_project_null_column(tempdir, dataset_reader):
     assert dataset_reader.to_table(dataset).equals(expected)
 
 
-@pytest.mark.filterwarnings("ignore:pyarrow.feather:DeprecationWarning")
 def test_dataset_project_columns(tempdir, dataset_reader):
     # basic column re-projection with expressions
-    from pyarrow import feather
     table = pa.table({"A": [1, 2, 3], "B": [1., 2., 3.], "C": ["a", "b", "c"]})
-    feather.write_feather(table, tempdir / "data.feather")
+    pa.ipc.write_file(table, tempdir / "data.arrow")
 
-    dataset = ds.dataset(tempdir / "data.feather", format="feather")
+    dataset = ds.dataset(tempdir / "data.arrow", format="ipc")
     result = dataset_reader.to_table(dataset, columns={
         'A_renamed': ds.field('A'),
         'B_as_int': ds.field('B').cast("int32", safe=False),
@@ -4434,7 +4431,6 @@ def test_write_dataset_with_dataset(tempdir):
 
 
 @pytest.mark.pandas
-@pytest.mark.filterwarnings("ignore:pyarrow.feather:DeprecationWarning")
 def test_write_dataset_existing_data(tempdir):
     directory = tempdir / 'ds'
     table = pa.table({'b': ['x', 'y', 'z'], 'c': [1, 2, 3]})
@@ -4458,7 +4454,7 @@ def test_write_dataset_existing_data(tempdir):
 
     extra_table = pa.table({'b': ['e']})
     extra_file = directory / 'c=2' / 'foo.arrow'
-    pyarrow.feather.write_feather(extra_table, extra_file)
+    pa.ipc.write_file(extra_table, extra_file)
 
     # Should be ok and overwrite with overwrite behavior
     ds.write_dataset(table, directory, partitioning=partitioning,
@@ -5099,16 +5095,13 @@ def test_write_dataset_arrow_schema_metadata(tempdir):
     assert result["a"].type.tz == "Europe/Brussels"
 
 
-@pytest.mark.filterwarnings("ignore:pyarrow.feather:DeprecationWarning")
 def test_write_dataset_schema_metadata(tempdir):
     # ensure that schema metadata gets written
-    from pyarrow import feather
-
     table = pa.table({'a': [1, 2, 3]})
     table = table.replace_schema_metadata({b'key': b'value'})
-    ds.write_dataset(table, tempdir, format="feather")
+    ds.write_dataset(table, tempdir, format="ipc")
 
-    schema = feather.read_table(tempdir / "part-0.feather").schema
+    schema = pa.ipc.read_file(tempdir / "part-0.arrow").schema
     assert schema.metadata == {b'key': b'value'}
 
 
