@@ -110,6 +110,31 @@ An important point is that if the input source supports zero-copy reads
 (e.g. like a memory map, or ``pyarrow.BufferReader``), then the returned
 batches are also zero-copy and do not allocate any new memory on read.
 
+Writing and Reading Complete Tables
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Use :func:`~pyarrow.ipc.write_file` and :func:`~pyarrow.ipc.read_file` when
+writing or reading a complete :class:`~pyarrow.Table` or
+``pandas.DataFrame``:
+
+.. code-block:: python
+
+   table = pa.table({"col1": [1, 2, 3], "col2": ["a", "b", "c"]})
+
+   pa.ipc.write_file(table, "data.arrow")
+   result = pa.ipc.read_file("data.arrow")
+   dataframe = pa.ipc.read_file("data.arrow").to_pandas()
+
+:func:`~pyarrow.ipc.write_file` writes uncompressed files by default and
+supports explicit compression and record batch chunking options.
+:func:`~pyarrow.ipc.read_file` can select columns by name or index. These
+functions read and write Arrow IPC files; use :mod:`pyarrow.feather` only when
+legacy Feather V1 compatibility is required. For multiple files, use the
+:mod:`pyarrow.dataset` module with ``format='ipc'``.
+
+For incremental writes or random access to individual record batches, use the
+lower-level reader and writer APIs described below.
+
 Writing and Reading Random Access Files
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

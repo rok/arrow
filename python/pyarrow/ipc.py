@@ -17,6 +17,8 @@
 
 # Arrow file and stream reader/writer classes, and other messaging tools
 
+from collections.abc import Sequence
+import operator
 import os
 
 import pyarrow as pa
@@ -229,6 +231,177 @@ def open_file(source, footer_offset=None, *, options=None, memory_pool=None):
     return RecordBatchFileReader(
         source, footer_offset=footer_offset,
         options=options, memory_pool=memory_pool)
+
+
+_FILE_SUPPORTED_CODECS = {'lz4', 'zstd', 'uncompressed'}
+_DEFAULT_MAX_CHUNKSIZE = 1 << 16
+
+
+def _ensure_table(data, preserve_index=None):
+    from pyarrow.pandas_compat import _pandas_api
+
+    if _pandas_api.have_pandas:
+        if (_pandas_api.has_sparse and
+                isinstance(data, _pandas_api.pd.SparseDataFrame)):
+            data = data.to_dense()
+
+    if _pandas_api.is_data_frame(data):
+        return pa.Table.from_pandas(data, preserve_index=preserve_index)
+    return data
+
+
+def _get_write_file_options(compression, compression_level):
+    if (compression is not None and
+            compression not in _FILE_SUPPORTED_CODECS):
+        raise ValueError(
+            f'compression="{compression}" not supported, must be one of '
+            f'{_FILE_SUPPORTED_CODECS}'
+        )
+
+    if compression is None or compression == 'uncompressed':
+        if compression_level is not None:
+            raise pa.ArrowInvalid(
+                "Codec 'uncompressed' doesn't support setting a compression "
+                "level.")
+        codec = None
+    elif compression_level is None:
+        codec = compression
+    else:
+        codec = pa.Codec(compression, compression_level=compression_level)
+
+    return IpcWriteOptions(
+        allow_64bit=True, compression=codec, unify_dictionaries=True)
+
+
+def _normalize_max_chunksize(max_chunksize):
+    if max_chunksize is None:
+        return _DEFAULT_MAX_CHUNKSIZE
+    if isinstance(max_chunksize, bool):
+        raise TypeError("max_chunksize must be an integer")
+    try:
+        max_chunksize = operator.index(max_chunksize)
+    except TypeError:
+        raise TypeError("max_chunksize must be an integer") from None
+    if max_chunksize <= 0:
+        raise ValueError("max_chunksize must be greater than zero")
+    return max_chunksize
+
+
+def write_file(data, sink, *, compression=None, compression_level=None,
+               max_chunksize=None):
+    """
+    Write a pandas.DataFrame or pyarrow.Table to an Arrow IPC file.
+
+    Parameters
+    ----------
+    data : pandas.DataFrame or pyarrow.Table
+        Data to write.
+    sink : str, path-like or file-like object
+        Destination path or writable file object.
+    compression : str, default None
+        Can be one of {"zstd", "lz4", "uncompressed"}. The default of None
+        writes an uncompressed file.
+    compression_level : int, default None
+        Use a compression level particular to the chosen compressor. If None,
+        use the default compression level.
+    max_chunksize : int, default None
+        Maximum size of Arrow RecordBatch chunks. Must be greater than zero.
+        None uses the default of 64K.
+    """
+    table = _ensure_table(data)
+    options = _get_write_file_options(compression, compression_level)
+    max_chunksize = _normalize_max_chunksize(max_chunksize)
+
+    try:
+        with new_file(sink, table.schema, options=options) as writer:
+            writer.write_table(table, max_chunksize=max_chunksize)
+    except Exception:
+        if isinstance(sink, (str, os.PathLike)):
+            try:
+                os.remove(sink)
+            except OSError:
+                pass
+        raise
+
+
+def _validate_columns(columns):
+    if not isinstance(columns, Sequence):
+        raise TypeError("Columns must be a sequence but, got {}"
+                        .format(type(columns).__name__))
+
+    column_types = [type(column) for column in columns]
+    if all(column_type == int for column_type in column_types):
+        return "indices"
+    if all(column_type == str for column_type in column_types):
+        return "names"
+
+    column_type_names = [column_type.__name__
+                         for column_type in column_types]
+    raise TypeError("Columns must be indices or names. "
+                    f"Got columns {columns} of types {column_type_names}")
+
+
+def _read_ipc_file(reader, source, columns, use_threads):
+    if columns is None:
+        return reader.read_all()
+
+    column_kind = _validate_columns(columns)
+    if column_kind == "indices":
+        column_indices = columns
+    else:
+        column_indices = []
+        for column in columns:
+            index = reader.schema.get_field_index(column)
+            if index < 0:
+                raise pa.ArrowInvalid(f"Field named {column} is not found")
+            column_indices.append(index)
+
+    # An empty included_fields option means all fields. Read the table before
+    # selecting no columns so that the result retains the correct row count.
+    if not column_indices:
+        return reader.read_all().select([])
+
+    included_fields = sorted(set(column_indices))
+    options = IpcReadOptions(
+        included_fields=included_fields, use_threads=use_threads)
+    table = open_file(source, options=options).read_all()
+
+    # IPC projection sorts and deduplicates field indices. Restore the exact
+    # order and any repeated columns requested by the caller.
+    projected_indices = {source_index: projected_index
+                         for projected_index, source_index
+                         in enumerate(included_fields)}
+    return table.select([projected_indices[index] for index in column_indices])
+
+
+def read_file(source, *, columns=None, memory_map=False, use_threads=True):
+    """
+    Read an Arrow IPC file as a pyarrow.Table.
+
+    Parameters
+    ----------
+    source : str, path-like or file-like object
+        Source path or readable file object. A file-like source must support
+        seeking.
+    columns : sequence, optional
+        Column indices or names to read. If not provided, read all columns.
+        An empty sequence reads no columns.
+    memory_map : bool, default False
+        Use memory mapping when opening a source path.
+    use_threads : bool, default True
+        Whether to parallelize reading using multiple threads.
+
+    Returns
+    -------
+    pyarrow.Table
+        The contents of the file.
+    """
+    if memory_map and isinstance(source, (str, os.PathLike)):
+        source = pa.memory_map(os.fspath(source), 'r')
+
+    options = IpcReadOptions(use_threads=use_threads)
+    reader = open_file(source, options=options)
+    return _read_ipc_file(reader, source, columns, use_threads)
 
 
 def serialize_pandas(df, *, nthreads=None, preserve_index=None):

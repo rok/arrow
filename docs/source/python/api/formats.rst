@@ -42,10 +42,13 @@ CSV Files
 
 .. _api.feather:
 
-Feather Files
--------------
+Feather Compatibility APIs
+--------------------------
 
 .. currentmodule:: pyarrow.feather
+
+Feather V2 files use the Arrow IPC file format. For new code, prefer the
+high-level file APIs in :mod:`pyarrow.ipc`.
 
 .. autosummary::
    :toctree: ../generated/

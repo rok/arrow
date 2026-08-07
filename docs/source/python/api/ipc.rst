@@ -28,6 +28,8 @@ Inter-Process Communication
 .. autosummary::
    :toctree: ../generated/
 
+   ipc.write_file
+   ipc.read_file
    ipc.new_file
    ipc.open_file
    ipc.new_stream

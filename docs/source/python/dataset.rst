@@ -142,20 +142,20 @@ provides a consistent interface across multiple file formats and filesystems.
 Currently, Parquet, ORC, Feather / Arrow IPC, and CSV file formats are
 supported; more formats are planned in the future.
 
-If we save the table as Feather files instead of Parquet files:
+If we save the table as an Arrow IPC file instead of a Parquet file:
 
 .. code-block:: python
 
-    >>> import pyarrow.feather as feather
+    >>> import pyarrow.ipc as ipc
     >>>
-    >>> feather.write_feather(table, base / "data.feather")
+    >>> ipc.write_file(table, base / "data.arrow")
 
-…then we can read the Feather file using the same functions, but with specifying
-``format="feather"``:
+…then we can read the Arrow IPC file using the same functions, but with
+``format="ipc"``:
 
 .. code-block:: python
 
-    >>> dataset = ds.dataset(base / "data.feather", format="feather")
+    >>> dataset = ds.dataset(base / "data.arrow", format="ipc")
     >>> dataset.to_table().to_pandas().head()
        a         b  c
     0  0  1.764052  1

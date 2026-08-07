@@ -19,8 +19,8 @@
 
 .. _feather:
 
-Feather File Format
-===================
+Feather Compatibility API and File Format
+=========================================
 
 Feather is a portable file format for storing Arrow tables or data frames (from
 languages like Python or R) that utilizes the :ref:`Arrow IPC format <ipc>`
@@ -35,11 +35,12 @@ R. There are two file format versions for Feather:
 * Version 1 (V1), a legacy version available starting in 2016, replaced by
   V2. V1 files are distinct from Arrow IPC files and lack many features, such
   as the ability to store all Arrow data types. V1 files also lack compression
-  support. Reading and writing V1 files is deprecated as of 25.0.0 and will
+  support. Reading and writing V1 files are deprecated as of 25.0.0 and will
   be removed in a future version.
 
-The ``pyarrow.feather`` module contains the read and write functions for the
-format. :func:`~pyarrow.feather.write_feather` accepts either a
+For new Arrow IPC files, prefer the high-level functions in
+:mod:`pyarrow.ipc`. The ``pyarrow.feather`` module provides compatibility with
+both Feather versions. :func:`~pyarrow.feather.write_feather` accepts either a
 :class:`~pyarrow.Table` or ``pandas.DataFrame`` object:
 
 .. code-block:: python
@@ -48,10 +49,8 @@ format. :func:`~pyarrow.feather.write_feather` accepts either a
    feather.write_feather(df, '/path/to/file')
 
 :func:`~pyarrow.feather.read_feather` reads a Feather file as a
-``pandas.DataFrame``. :func:`~pyarrow.feather.read_table` reads a Feather file
-as a :class:`~pyarrow.Table`. Internally, :func:`~pyarrow.feather.read_feather`
-simply calls :func:`~pyarrow.feather.read_table` and the result is converted to
-pandas:
+``pandas.DataFrame``, while :func:`~pyarrow.feather.read_table` reads it as a
+:class:`~pyarrow.Table`:
 
 .. code-block:: python
 
@@ -112,17 +111,11 @@ Writing Version 1 (V1) Files
 For compatibility with libraries without support for Version 2 files, you can
 write the version 1 format by passing ``version=1`` to ``write_feather``.
 
-Migration to IPC
-----------------
+Using the Arrow IPC API Directly
+--------------------------------
 
-.. note::
-
-   ``pyarrow.feather.write_feather`` and ``pyarrow.feather.read_table``
-   equivalents will be provided in :mod:`pyarrow.ipc` before the
-   ``pyarrow.feather`` module is deprecated.
-
-Since Feather V2 is the Arrow IPC file format, you can use the
-:mod:`pyarrow.ipc` module as a direct replacement:
+Since Feather V2 is the Arrow IPC file format, new code can use the high-level
+functions in :mod:`pyarrow.ipc` directly:
 
 .. code-block:: python
 
@@ -131,21 +124,14 @@ Since Feather V2 is the Arrow IPC file format, you can use the
 
    table = pa.table({"col1": [1, 2, 3], "col2": ["a", "b", "c"]})
 
-   # Writing (replaces feather.write_feather)
-   options = pa.ipc.IpcWriteOptions(compression='lz4')
-   with pa.ipc.new_file("data.arrow", table.schema, options=options) as writer:
-       writer.write_table(table)
+   # Writing (replaces feather.write_feather for V2 files)
+   pa.ipc.write_file(table, "data.arrow")
 
-   # Reading (replaces feather.read_table)
-   with pa.ipc.open_file("data.arrow") as reader:
-       result = reader.read_all()
+   # Reading (replaces feather.read_table for V2 files)
+   result = pa.ipc.read_file("data.arrow")
 
-.. note::
-
-   ``feather.write_feather`` defaults to LZ4 compression, while
-   ``ipc.new_file`` does not compress by default. To preserve the same
-   behavior, pass ``compression='lz4'`` via
-   :class:`~pyarrow.ipc.IpcWriteOptions` as shown above.
+   # Convert the result to pandas (replaces feather.read_feather)
+   dataframe = pa.ipc.read_file("data.arrow").to_pandas()
 
 For reading multiple files, use the :mod:`pyarrow.dataset` module with
 ``format='ipc'`` instead of :class:`~pyarrow.feather.FeatherDataset`.
