@@ -884,6 +884,10 @@ store_schema : bool, default True
     it will restore the timezone (Parquet only stores the UTC values without
     timezone), or columns with duration type will be restored from the int64
     Parquet column.
+write_fixed_size_list_as_fixed_len_byte_array : bool, default False
+    EXPERIMENTAL: If True, write eligible Arrow FixedSizeList columns as
+    Parquet FIXED_LEN_BYTE_ARRAY columns annotated with FIXED_SIZE_LIST. If
+    False, write them as regular Parquet LIST columns for compatibility.
 write_page_index : bool, default False
     Whether to write a page index in general for all columns.
     Writing statistics to the page index disables the old method of writing
@@ -1077,6 +1081,7 @@ Examples
                  write_batch_size=None,
                  dictionary_pagesize_limit=None,
                  store_schema=True,
+                 write_fixed_size_list_as_fixed_len_byte_array=False,
                  write_page_index=False,
                  write_page_checksum=False,
                  sorting_columns=None,
@@ -1132,6 +1137,8 @@ Examples
             write_batch_size=write_batch_size,
             dictionary_pagesize_limit=dictionary_pagesize_limit,
             store_schema=store_schema,
+            write_fixed_size_list_as_fixed_len_byte_array=(
+                write_fixed_size_list_as_fixed_len_byte_array),
             write_page_index=write_page_index,
             write_page_checksum=write_page_checksum,
             sorting_columns=sorting_columns,
@@ -2010,6 +2017,7 @@ def write_table(table, where, row_group_size=None, version='2.6',
                 write_batch_size=None,
                 dictionary_pagesize_limit=None,
                 store_schema=True,
+                write_fixed_size_list_as_fixed_len_byte_array=False,
                 write_page_index=False,
                 write_page_checksum=False,
                 sorting_columns=None,
@@ -2044,6 +2052,8 @@ def write_table(table, where, row_group_size=None, version='2.6',
                 write_batch_size=write_batch_size,
                 dictionary_pagesize_limit=dictionary_pagesize_limit,
                 store_schema=store_schema,
+                write_fixed_size_list_as_fixed_len_byte_array=(
+                    write_fixed_size_list_as_fixed_len_byte_array),
                 write_page_index=write_page_index,
                 write_page_checksum=write_page_checksum,
                 sorting_columns=sorting_columns,

@@ -162,6 +162,7 @@ class PARQUET_EXPORT LogicalType {
       GEOMETRY,
       GEOGRAPHY,
       VARIANT,
+      FIXED_SIZE_LIST,
       NONE  // Not a real logical type; should always be last element
     };
   };
@@ -230,6 +231,8 @@ class PARQUET_EXPORT LogicalType {
   static std::shared_ptr<const LogicalType> Float16();
   static std::shared_ptr<const LogicalType> Variant(
       int8_t specVersion = kVariantSpecVersion);
+  static std::shared_ptr<const LogicalType> FixedSizeList(
+      parquet::Type::type element_type, int32_t num_values);
 
   static std::shared_ptr<const LogicalType> Geometry(std::string crs = "");
 
@@ -293,6 +296,7 @@ class PARQUET_EXPORT LogicalType {
   bool is_geometry() const;
   bool is_geography() const;
   bool is_variant() const;
+  bool is_fixed_size_list() const;
   bool is_none() const;
   /// \brief Return true if this logical type is of a known type.
   bool is_valid() const;
@@ -507,6 +511,19 @@ class PARQUET_EXPORT VariantLogicalType : public LogicalType {
 
  private:
   VariantLogicalType() = default;
+};
+
+/// \brief Allowed for FIXED_LEN_BYTE_ARRAY primitive nodes only.
+class PARQUET_EXPORT FixedSizeListLogicalType : public LogicalType {
+ public:
+  static std::shared_ptr<const LogicalType> Make(parquet::Type::type element_type,
+                                                 int32_t num_values);
+
+  parquet::Type::type element_type() const;
+  int32_t num_values() const;
+
+ private:
+  FixedSizeListLogicalType() = default;
 };
 
 /// \brief Allowed for any physical type.
