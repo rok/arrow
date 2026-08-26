@@ -34,6 +34,7 @@
 #include "arrow/io/util_internal.h"
 #include "arrow/record_batch.h"
 #include "arrow/table.h"
+#include "arrow/testing/builder.h"
 #include "arrow/testing/gtest_util.h"
 #include "arrow/testing/util.h"
 #include "arrow/type.h"
@@ -745,6 +746,44 @@ TEST_P(TestParquetFileFormatScan, PredicatePushdownRowGroupFragments) {
                            less(field_ref(FieldRef("struct", "i32")), literal(6)));
   CountRowGroupsInFragment(fragment, {1},
                            equal(field_ref(FieldRef("struct", "str")), literal("2")));
+}
+
+TEST_P(TestParquetFileFormatScan, IsInLargeValueSetPredicatePushdown) {
+  auto dataset_schema = schema({field("i64", int64())});
+  std::vector<std::shared_ptr<RecordBatch>> batches{
+      RecordBatchFromJSON(dataset_schema,
+                          R"([[0], [1], [2], [3], [4], [5], [6], [7], [8], [9]])"),
+      RecordBatchFromJSON(
+          dataset_schema,
+          R"([[10], [11], [12], [13], [14], [15], [16], [17], [18], [19]])"),
+      RecordBatchFromJSON(
+          dataset_schema,
+          R"([[20], [21], [22], [23], [24], [25], [26], [27], [28], [29]])"),
+      RecordBatchFromJSON(
+          dataset_schema,
+          R"([[30], [31], [32], [33], [34], [35], [36], [37], [38], [39]])"),
+  };
+  ASSERT_OK_AND_ASSIGN(auto reader,
+                       RecordBatchReader::Make(std::move(batches), dataset_schema));
+  auto source = GetFileSource(reader.get());
+
+  SetSchema(dataset_schema->fields());
+  ASSERT_OK_AND_ASSIGN(auto fragment, format_->MakeFragment(*source));
+
+  // Duplicates keep this value set above the exact-simplification threshold while
+  // giving it narrow bounds. Only the second row group overlaps [12, 15].
+  std::vector<int64_t> values(100);
+  for (size_t i = 0; i < values.size(); ++i) {
+    values[i] = i % 2 == 0 ? 12 : 15;
+  }
+  std::shared_ptr<Array> value_set;
+  ArrayFromVector<Int64Type>(values, &value_set);
+  SetFilter(call("is_in", {field_ref("i64")}, compute::SetLookupOptions{value_set}));
+  auto parquet_fragment = checked_pointer_cast<ParquetFileFragment>(fragment);
+  ASSERT_OK_AND_ASSIGN(auto fragments, parquet_fragment->SplitByRowGroup(opts_->filter));
+  ASSERT_EQ(fragments.size(), 1);
+  EXPECT_EQ(checked_pointer_cast<ParquetFileFragment>(fragments[0])->row_groups(),
+            std::vector<int>{1});
 }
 
 TEST_P(TestParquetFileFormatScan, ExplicitRowGroupSelection) {

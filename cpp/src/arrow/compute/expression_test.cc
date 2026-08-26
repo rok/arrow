@@ -90,6 +90,12 @@ std::string make_range_json(int start, int end) {
   return result;
 }
 
+std::string make_range_json_with_null(int start, int end) {
+  auto result = make_range_json(start, end);
+  result.insert(1, "null,");
+  return result;
+}
+
 const auto no_change = std::nullopt;
 
 TEST(ExpressionUtils, Comparison) {
@@ -1915,12 +1921,43 @@ TEST(Expression, SimplifyIsIn) {
         .WithGuarantee(greater(field_ref("u32"), literal(10)))
         .Expect(is_in(field_ref("u32"), int64(), make_range_json(11, 40), null_matching));
 
-    // For large ranges we don't do any simplification, see
-    // `kIsInSimplificationMaxValueSet` in expression.cc.
+    // Large sets use their precomputed bounds to detect disjoint guarantees,
+    // without filtering and rebuilding the value set for each guarantee.
     Simplify{is_in(field_ref("u32"), int64(), make_range_json(1, 100), null_matching)}
         .WithGuarantee(greater(field_ref("u32"), literal(3)))
         .ExpectUnchanged();
+    Simplify{is_in(field_ref("u32"), int64(), make_range_json(1, 100), null_matching)}
+        .WithGuarantee(greater(field_ref("u32"), literal(100)))
+        .Expect(false);
+    Simplify{is_in(field_ref("u32"), int64(), make_range_json(1, 100), null_matching)}
+        .WithGuarantee(greater_equal(field_ref("u32"), literal(101)))
+        .Expect(false);
+    Simplify{is_in(field_ref("u32"), int64(), make_range_json(1, 100), null_matching)}
+        .WithGuarantee(less(field_ref("u32"), literal(1)))
+        .Expect(false);
+    Simplify{is_in(field_ref("u32"), int64(), make_range_json(1, 100), null_matching)}
+        .WithGuarantee(less_equal(field_ref("u32"), literal(0)))
+        .Expect(false);
   }
+
+  auto nullable_large_set_guarantee =
+      or_(greater(field_ref("i32"), literal(100)), is_null(field_ref("i32")));
+  Simplify{is_in(field_ref("i32"), int32(), make_range_json_with_null(1, 100),
+                 SetLookupOptions::MATCH)}
+      .WithGuarantee(nullable_large_set_guarantee)
+      .ExpectUnchanged();
+  Simplify{is_in(field_ref("i32"), int32(), make_range_json_with_null(1, 100),
+                 SetLookupOptions::SKIP)}
+      .WithGuarantee(nullable_large_set_guarantee)
+      .Expect(false);
+  Simplify{is_in(field_ref("i32"), int32(), make_range_json_with_null(1, 100),
+                 SetLookupOptions::EMIT_NULL)}
+      .WithGuarantee(nullable_large_set_guarantee)
+      .ExpectUnchanged();
+  Simplify{is_in(field_ref("i32"), int32(), make_range_json_with_null(1, 100),
+                 SetLookupOptions::INCONCLUSIVE)}
+      .WithGuarantee(nullable_large_set_guarantee)
+      .ExpectUnchanged();
 
   Simplify{
       is_in(field_ref("i32"), int32(), "[1,2,3]", SetLookupOptions::MATCH),

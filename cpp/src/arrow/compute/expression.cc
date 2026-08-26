@@ -30,6 +30,7 @@
 #include "arrow/compute/exec_internal.h"
 #include "arrow/compute/expression_internal.h"
 #include "arrow/compute/function_internal.h"
+#include "arrow/compute/kernels/scalar_set_lookup_internal.h"
 #include "arrow/compute/util.h"
 #include "arrow/io/memory.h"
 #ifdef ARROW_IPC
@@ -1244,6 +1245,73 @@ struct Inequality {
                             /*insert_implicit_casts=*/false, &exec_context);
   }
 
+  /// For a large value set, use its precomputed bounds to prove that none of its
+  /// values can satisfy an inequality. Unlike filtering the value set, this is O(1)
+  /// for every row-group guarantee.
+  static Result<std::optional<Expression>> SimplifyLargeIsIn(
+      const Inequality& guarantee, const Expression::Call* is_in_call,
+      const SetLookupOptions& options) {
+    if (!is_in_call->kernel_state) return std::nullopt;
+
+    const auto& state =
+        checked_cast<const internal::SetLookupStateBase&>(*is_in_call->kernel_state);
+    if (!state.value_set_min || !state.value_set_max) return std::nullopt;
+
+    switch (options.null_matching_behavior) {
+      case SetLookupOptions::MATCH:
+        // A null in the value set can match nulls allowed by the guarantee.
+        if (guarantee.nullable && state.value_set_has_null) return std::nullopt;
+        break;
+      case SetLookupOptions::SKIP:
+        break;
+      case SetLookupOptions::EMIT_NULL:
+        if (guarantee.nullable) return std::nullopt;
+        break;
+      case SetLookupOptions::INCONCLUSIVE:
+        if (guarantee.nullable || state.value_set_has_null) return std::nullopt;
+        break;
+    }
+
+    auto compare =
+        [&](const std::shared_ptr<Scalar>& value) -> std::optional<Comparison::type> {
+      auto maybe_comparison = Comparison::Execute(Datum(value), guarantee.bound);
+      if (!maybe_comparison.ok() || *maybe_comparison == Comparison::NA) {
+        return std::nullopt;
+      }
+      return *maybe_comparison;
+    };
+
+    bool disjoint = false;
+    switch (guarantee.cmp) {
+      case Comparison::LESS:
+      case Comparison::LESS_EQUAL: {
+        auto min_comparison = compare(state.value_set_min);
+        if (!min_comparison) return std::nullopt;
+        disjoint = (guarantee.cmp & *min_comparison) == 0;
+        break;
+      }
+      case Comparison::GREATER:
+      case Comparison::GREATER_EQUAL: {
+        auto max_comparison = compare(state.value_set_max);
+        if (!max_comparison) return std::nullopt;
+        disjoint = (guarantee.cmp & *max_comparison) == 0;
+        break;
+      }
+      case Comparison::EQUAL: {
+        auto min_comparison = compare(state.value_set_min);
+        auto max_comparison = compare(state.value_set_max);
+        if (!min_comparison || !max_comparison) return std::nullopt;
+        disjoint =
+            *min_comparison == Comparison::GREATER || *max_comparison == Comparison::LESS;
+        break;
+      }
+      case Comparison::NA:
+      case Comparison::NOT_EQUAL:
+        return std::nullopt;
+    }
+    return disjoint ? std::optional<Expression>(literal(false)) : std::nullopt;
+  }
+
   /// Simplify an `is_in` call against an inequality guarantee.
   ///
   /// We avoid the complexity of fully simplifying EQUAL comparisons to true
@@ -1260,18 +1328,13 @@ struct Inequality {
 
     auto options = checked_pointer_cast<SetLookupOptions>(is_in_call->options);
 
-    // The maximum number of values in the is_in expression set of values
-    // in order to use the simplification.
-    // If the set is large there are performance implications, see:
-    // https://github.com/apache/arrow/issues/46777
-    constexpr int16_t kIsInSimplificationMaxValueSet = 50;
-    if (options->value_set.length() > kIsInSimplificationMaxValueSet) {
-      return std::nullopt;
-    }
-
     const auto& lhs = Comparison::StripOrderPreservingCasts(is_in_call->arguments[0]);
     if (!lhs.field_ref()) return std::nullopt;
     if (*lhs.field_ref() != guarantee.target) return std::nullopt;
+
+    if (options->value_set.length() > internal::kIsInSimplificationMaxValueSet) {
+      return SimplifyLargeIsIn(guarantee, is_in_call, *options);
+    }
 
     FilterOptions::NullSelectionBehavior null_selection{};
     switch (options->null_matching_behavior) {

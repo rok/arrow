@@ -15,10 +15,14 @@
 // specific language governing permissions and limitations
 // under the License.
 
+#include <cmath>
+
 #include "arrow/array/array_base.h"
+#include "arrow/compute/api_aggregate.h"
 #include "arrow/compute/api_scalar.h"
 #include "arrow/compute/cast.h"
 #include "arrow/compute/kernels/common_internal.h"
+#include "arrow/compute/kernels/scalar_set_lookup_internal.h"
 #include "arrow/compute/kernels/util_internal.h"
 #include "arrow/compute/registry_internal.h"
 #include "arrow/type.h"
@@ -36,10 +40,15 @@ using internal::HashTraits;
 namespace compute::internal {
 namespace {
 
-// This base class enables non-templated access to the value set type
-struct SetLookupStateBase : public KernelState {
-  std::shared_ptr<DataType> value_set_type;
-};
+bool IsNan(const Scalar& value) {
+  if (value.type->id() == Type::FLOAT) {
+    return std::isnan(checked_cast<const FloatScalar&>(value).value);
+  }
+  if (value.type->id() == Type::DOUBLE) {
+    return std::isnan(checked_cast<const DoubleScalar&>(value).value);
+  }
+  return false;
+}
 
 template <typename Type>
 struct SetLookupState : public SetLookupStateBase {
@@ -69,8 +78,8 @@ struct SetLookupState : public SetLookupStateBase {
     } else {
       return Status::Invalid("value_set should be an array or chunked array");
     }
-    if (this->null_matching_behavior != SetLookupOptions::SKIP &&
-        lookup_table->GetNull() >= 0) {
+    value_set_has_null = lookup_table->GetNull() >= 0;
+    if (this->null_matching_behavior != SetLookupOptions::SKIP && value_set_has_null) {
       null_index = memo_index_to_value_index[lookup_table->GetNull()];
     }
     value_set_type = options.value_set.type();
@@ -130,13 +139,11 @@ struct SetLookupState<NullType> : public SetLookupStateBase {
 
   Status Init(SetLookupOptions& options) {
     null_matching_behavior = options.GetNullMatchingBehavior();
-    value_set_has_null = (options.value_set.length() > 0) &&
-                         this->null_matching_behavior != SetLookupOptions::SKIP;
+    value_set_has_null = options.value_set.length() > 0;
     value_set_type = null();
     return Status::OK();
   }
 
-  bool value_set_has_null;
   SetLookupOptions::NullMatchingBehavior null_matching_behavior;
 };
 
@@ -171,10 +178,12 @@ struct InitStateVisitor {
   TypeHolder arg_type;
   std::unique_ptr<KernelState> result;
 
-  InitStateVisitor(KernelContext* ctx, const KernelInitArgs& args)
+  InitStateVisitor(KernelContext* ctx, const KernelInitArgs& args,
+                   bool compute_value_set_bounds)
       : ctx(ctx),
         options(*checked_cast<const SetLookupOptions*>(args.options)),
-        arg_type(args.inputs[0]) {}
+        arg_type(args.inputs[0]),
+        compute_value_set_bounds(compute_value_set_bounds) {}
 
   template <typename Type>
   Status Init() {
@@ -254,18 +263,48 @@ struct InitStateVisitor {
     }
 
     RETURN_NOT_OK(VisitTypeInline(*options.value_set.type(), this));
+
+    if (compute_value_set_bounds &&
+        options.value_set.length() > kIsInSimplificationMaxValueSet) {
+      // This is best-effort: is_in supports some types for which min_max is not
+      // implemented. A missing bound only disables the bounds-only simplification.
+      auto maybe_min_max = MinMax(options.value_set, ScalarAggregateOptions::Defaults(),
+                                  ctx->exec_context());
+      if (maybe_min_max.ok()) {
+        const auto& min_max = maybe_min_max->scalar_as<StructScalar>();
+        if (min_max.value[0]->is_valid && min_max.value[1]->is_valid &&
+            !IsNan(*min_max.value[0]) && !IsNan(*min_max.value[1])) {
+          auto* state = checked_cast<SetLookupStateBase*>(result.get());
+          state->value_set_min = min_max.value[0];
+          state->value_set_max = min_max.value[1];
+        }
+      }
+    }
     return std::move(result);
   }
+
+  bool compute_value_set_bounds;
 };
 
 Result<std::unique_ptr<KernelState>> InitSetLookup(KernelContext* ctx,
-                                                   const KernelInitArgs& args) {
+                                                   const KernelInitArgs& args,
+                                                   bool compute_value_set_bounds) {
   if (args.options == nullptr) {
     return Status::Invalid(
         "Attempted to call a set lookup function without SetLookupOptions");
   }
 
-  return InitStateVisitor{ctx, args}.GetResult();
+  return InitStateVisitor{ctx, args, compute_value_set_bounds}.GetResult();
+}
+
+Result<std::unique_ptr<KernelState>> InitIsIn(KernelContext* ctx,
+                                              const KernelInitArgs& args) {
+  return InitSetLookup(ctx, args, /*compute_value_set_bounds=*/true);
+}
+
+Result<std::unique_ptr<KernelState>> InitIndexIn(KernelContext* ctx,
+                                                 const KernelInitArgs& args) {
+  return InitSetLookup(ctx, args, /*compute_value_set_bounds=*/false);
 }
 
 struct IndexInVisitor {
@@ -648,7 +687,7 @@ void RegisterScalarSetLookup(FunctionRegistry* registry) {
   // IsIn writes its boolean output into preallocated memory
   {
     ScalarKernel isin_base;
-    isin_base.init = InitSetLookup;
+    isin_base.init = InitIsIn;
     isin_base.exec = ExecIsIn;
     isin_base.null_handling = NullHandling::COMPUTED_PREALLOCATE;
     auto is_in = std::make_shared<SetLookupFunction>("is_in", Arity::Unary(), is_in_doc);
@@ -665,7 +704,7 @@ void RegisterScalarSetLookup(FunctionRegistry* registry) {
   // IndexIn writes its int32 output into preallocated memory
   {
     ScalarKernel index_in_base;
-    index_in_base.init = InitSetLookup;
+    index_in_base.init = InitIndexIn;
     index_in_base.exec = ExecIndexIn;
     index_in_base.null_handling = NullHandling::COMPUTED_PREALLOCATE;
     auto index_in =
