@@ -89,6 +89,11 @@ jobs:
           name: wheel
           path: arrow/python/repaired_wheels/*.whl
 
+      - uses: actions/upload-artifact@v4
+        with:
+          name: debug-symbols
+          path: arrow/python/debug_symbols/*.tar.gz
+
       # TODO(kszucs): auditwheel show
       - name: Test wheel
         shell: bash
@@ -143,7 +148,10 @@ jobs:
             -e TEST_WHEELS=1 \
             ubuntu-verify-rc
 
-      {{ macros.github_upload_releases("arrow/python/repaired_wheels/*.whl")|indent }}
+      {{ macros.github_upload_releases([
+          "arrow/python/repaired_wheels/*.whl",
+          "arrow/python/debug_symbols/*.tar.gz"
+        ])|indent }}
       {{ macros.github_upload_wheel_scientific_python("arrow/python/repaired_wheels/*.whl")|indent }}
 
       {% if arrow.is_default_branch() %}
