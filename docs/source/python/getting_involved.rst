@@ -29,7 +29,7 @@ integrations in other projects, we'd be happy to have you involved:
 * Join the mailing list: send an email to
   `dev-subscribe@arrow.apache.org <mailto:dev-subscribe@arrow.apache.org>`_.
   Share your ideas and use cases for the project or read through the
-  `Archive <http://mail-archives.apache.org/mod_mbox/arrow-dev/>`_.
+  `Archive <https://lists.apache.org/list.html?dev@arrow.apache.org>`_.
 * Follow our activity on `GitHub <https://github.com/apache/arrow/issues>`_
 * Learn the `Format / Specification
   <https://github.com/apache/arrow/tree/main/format>`_

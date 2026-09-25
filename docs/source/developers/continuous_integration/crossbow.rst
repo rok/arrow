@@ -25,7 +25,6 @@ The content of ``arrow/dev/tasks`` directory aims for automating the process of
 Arrow packaging and integration testing.
 
 Packages:
-  - C++ and Python `conda-forge packages`_ for Linux, macOS and Windows
   - Python `Wheels`_ for Linux, macOS and Windows
   - C++ and GLib `Linux packages`_ for multiple distributions
   - Java for Gandiva
@@ -230,9 +229,8 @@ see its help page:
   $ archery crossbow submit --help
 
 
-.. _conda-forge packages: conda-recipes
-.. _Wheels: python-wheels
-.. _Linux packages: linux-packages
+.. _Wheels: https://github.com/apache/arrow/tree/main/dev/tasks/python-wheels
+.. _Linux packages: https://github.com/apache/arrow/tree/main/dev/tasks/linux-packages
 .. _Create the queue repository: https://docs.github.com/en/repositories/creating-and-managing-repositories/creating-a-new-repository
 .. _GitHub Actions: https://docs.github.com/en/actions/quickstart
 .. _Travis CI: https://travis-ci.com/getting-started/

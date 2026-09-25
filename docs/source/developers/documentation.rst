@@ -23,8 +23,8 @@ Building the Documentation
 Prerequisites
 -------------
 
-The documentation build process uses `Doxygen <http://www.doxygen.nl/>`_ and
-`Sphinx <http://www.sphinx-doc.org/>`_ along with a few extensions.
+The documentation build process uses `Doxygen <https://www.doxygen.nl/>`_ and
+`Sphinx <https://www.sphinx-doc.org/>`_ along with a few extensions.
 
 If you're using Conda, the required software can be installed in a single line:
 
@@ -36,7 +36,7 @@ If you're using Conda, the required software can be installed in a single line:
 
    ``linuxdoc`` cannot be installed by Conda. It has to be installed via pip separately.
 
-Otherwise, you'll first need to install `Doxygen <http://www.doxygen.nl/>`_
+Otherwise, you'll first need to install `Doxygen <https://www.doxygen.nl/>`_
 yourself (for example from your distribution's official repositories, if
 using Linux).  Then you can install the Python-based requirements with the
 following command:

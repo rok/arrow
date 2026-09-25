@@ -36,7 +36,7 @@ docs_url = "https://arrow.apache.org/docs/c_glib/arrow-glib/"
 [related."Parquet-1.0"]
 name = "Apache Parquet GLib"
 description = "Apache Parquet GLib API"
-docs_url = "https://arrow.apache.org/docs/c_glib/arrow-parquet-glib/"
+docs_url = "https://arrow.apache.org/docs/c_glib/parquet-glib/"
 
 [related."GObject-2.0"]
 name = "GObject"

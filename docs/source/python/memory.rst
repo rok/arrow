@@ -117,7 +117,7 @@ the buffer is garbage-collected, all of the memory is freed:
    0
 
 Besides the default built-in memory pool, there may be additional memory pools
-to choose from (such as `jemalloc <http://jemalloc.net/>`_)
+to choose from (such as `jemalloc <https://jemalloc.net/>`_)
 depending on how Arrow was built.  One can get the backend name for a memory
 pool::
 

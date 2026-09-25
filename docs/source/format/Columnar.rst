@@ -1758,7 +1758,7 @@ never exposed. Before sending data to another system expecting Arrow
 data, these custom vectors should be converted to a type that exist in
 the Arrow spec.
 
-.. _Flatbuffers: http://github.com/google/flatbuffers
+.. _Flatbuffers: https://github.com/google/flatbuffers
 .. _Flatbuffers protocol definition files: https://github.com/apache/arrow/tree/main/format
 .. _Schema.fbs: https://github.com/apache/arrow/blob/main/format/Schema.fbs
 .. _Message.fbs: https://github.com/apache/arrow/blob/main/format/Message.fbs

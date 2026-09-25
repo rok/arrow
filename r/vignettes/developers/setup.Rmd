@@ -73,7 +73,7 @@ There are five major steps to the process.
 
 When building libarrow, by default, system dependencies will be used if suitable versions are found.  If system dependencies are not present, libarrow will build them during its own build process. The only dependencies that you need to install _outside_ of the build process are [cmake](https://cmake.org/) (for configuring the build), [openssl](https://www.openssl.org/) and [curl](https://curl.se/libcurl/) if you are building with S3 and GCS support, and [libxml2](https://gitlab.gnome.org/GNOME/libxml2/-/wikis/home) if you're building with Azure support.
 
-For a faster build, you may choose to pre-install more C++ library dependencies (such as [lz4](http://lz4.github.io/lz4/), [zstd](https://facebook.github.io/zstd/), etc.) on the system  so that they don't need to be built from source in the libarrow build.
+For a faster build, you may choose to pre-install more C++ library dependencies (such as [lz4](https://lz4.github.io/lz4/), [zstd](https://facebook.github.io/zstd/), etc.) on the system  so that they don't need to be built from source in the libarrow build.
 
 #### Ubuntu
 ```{bash, save=run & ubuntu}
@@ -311,7 +311,7 @@ Execution halted
 ERROR: loading failed
 ```
 
-To resolve this, try [rebuilding the Arrow library](#step-3-building-arrow).
+To resolve this, try [rebuilding the Arrow library](#step-3---building-libarrow).
 
 ## Multiple versions of libarrow
 

@@ -93,12 +93,12 @@ R_ORG=rhub R_IMAGE=ubuntu-release R_TAG=latest docker compose run r
 
 ### Example - Using Archery
 
-Alternatively, you may prefer to use the [Archery tool to run docker images](https://arrow.apache.org/docs/developers/docker.html).
+Alternatively, you may prefer to use the [Archery tool to run docker images](https://arrow.apache.org/docs/developers/continuous_integration/docker.html).
 This has the advantage of making it simpler to build some of the existing Arrow
 CI jobs which have hierarchical dependencies, and so for example, you could
 build the R package on a container which already has the C++ code pre-built.
 
-This is the same tool which our CI uses - via a tool called [Crossbow](https://arrow.apache.org/docs/developers/crossbow.html).
+This is the same tool which our CI uses - via a tool called [Crossbow](https://arrow.apache.org/docs/developers/continuous_integration/crossbow.html).
 
 If you want to run the `r` workflow discussed above, you could run:
 

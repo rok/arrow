@@ -83,7 +83,7 @@ designed to help produce and consume Arrow data.
 
    * - nanoarrow
      - `nanoarrow Docs <https://arrow.apache.org/nanoarrow>`_ :fa:`external-link-alt`
-     - `nanoarrow Source <http://github.com/apache/arrow-nanoarrow>`_
+     - `nanoarrow Source <https://github.com/apache/arrow-nanoarrow>`_
 
 Implementation Status
 =====================

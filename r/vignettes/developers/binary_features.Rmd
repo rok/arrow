@@ -10,7 +10,7 @@ package build configurations, and documents the decisions behind our default
 feature set. This is intended as internal developer documentation for understanding
 which features are enabled in which builds. It is not intended to be a guide for
 installing the Arrow R package; for that, see the
-[installation guide](../../install.html).
+[installation guide](../install.html).
 
 ## Overview
 
