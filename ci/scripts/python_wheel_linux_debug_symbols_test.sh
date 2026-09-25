@@ -43,6 +43,10 @@ mkdir -p "${site_packages}"
 python -m pip install --no-deps --target "${site_packages}" "${wheel}"
 python -c "import numpy"
 
+# GH-40749: preserve non-public frames, as in the GH-38770 backtrace.
+# That bug is fixed, so abort in a scalar UDF to exercise the compute executor
+# reliably on current wheels instead of relying on the old reproducer crashing.
+ulimit -c 0
 cat > "${work_dir}/backtrace_reproducer.py" <<'PYTHON'
 import os
 
@@ -69,15 +73,27 @@ PYTHON
 
 run_gdb() {
   local output=$1
-  PYTHONPATH="${site_packages}${PYTHONPATH:+:${PYTHONPATH}}" \
-    gdb --batch --quiet \
+  # Only use the supplied bundle, not system debug files or debuginfod.
+  if ! DEBUGINFOD_URLS= \
+    PYTHONPATH="${site_packages}${PYTHONPATH:+:${PYTHONPATH}}" \
+    gdb --nx --batch --quiet \
+      -ex "set debug-file-directory ${work_dir}/no-system-debug" \
       -ex run \
       -ex "thread apply all backtrace" \
       --args python "${work_dir}/backtrace_reproducer.py" \
-      > "${output}" 2>&1 || true
+      > "${output}" 2>&1; then
+    cat "${output}" >&2
+    return 1
+  fi
+  cat "${output}"
+  if ! grep -F "received signal SIGABRT" "${output}"; then
+    echo "The reproducer did not reach the expected abort" >&2
+    return 1
+  fi
 }
 
 # Verify that the main wheel is stripped of non-public function symbols.
+echo "=== Backtrace without the debug-symbol bundle ==="
 run_gdb "${work_dir}/stripped-backtrace.txt"
 if grep -F "ScalarExecutor::Execute" "${work_dir}/stripped-backtrace.txt"; then
   echo "The wheel still contains non-public function symbols" >&2
@@ -86,6 +102,7 @@ fi
 
 # GDB searches an adjacent .debug directory for GNU debuglink targets.
 tar -xzf "${debug_symbols}" -C "${site_packages}"
+echo "=== Backtrace with the debug-symbol bundle ==="
 run_gdb "${work_dir}/symbolized-backtrace.txt"
 
 for symbol in \
