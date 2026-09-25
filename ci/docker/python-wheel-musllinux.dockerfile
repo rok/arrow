@@ -38,6 +38,7 @@ RUN apk add --no-cache \
     sccache \
     unzip \
     wget \
+    xz \
     zip && \
     cert-sync /etc/ssl/certs/ca-certificates.crt
 
