@@ -399,7 +399,7 @@ improving it and finding the right generalizations to standardize on across tran
 
 Please chime in using the Arrow Developers Mailing list: https://arrow.apache.org/community/#mailing-lists
 
-.. _Flatbuffers: http://github.com/google/flatbuffers
+.. _Flatbuffers: https://github.com/google/flatbuffers
 .. _UCX: https://openucx.org/
 .. _libfabric: https://ofiwg.github.io/libfabric/
 .. _libcudf: https://docs.rapids.ai/api

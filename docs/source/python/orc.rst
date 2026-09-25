@@ -21,13 +21,13 @@
 Reading and Writing the Apache ORC Format
 =============================================
 
-The `Apache ORC <http://orc.apache.org/>`_ project provides a
+The `Apache ORC <https://orc.apache.org/>`_ project provides a
 standardized open-source columnar storage format for use in data analysis
 systems. It was created originally for use in `Apache Hadoop
-<http://hadoop.apache.org/>`_ with systems like `Apache Drill
-<http://drill.apache.org>`_, `Apache Hive <http://hive.apache.org>`_, `Apache
-Impala <http://impala.apache.org>`_, and `Apache Spark
-<http://spark.apache.org>`_ adopting it as a shared standard for high
+<https://hadoop.apache.org/>`_ with systems like `Apache Drill
+<https://drill.apache.org>`_, `Apache Hive <https://hive.apache.org>`_, `Apache
+Impala <https://impala.apache.org>`_, and `Apache Spark
+<https://spark.apache.org>`_ adopting it as a shared standard for high
 performance data IO.
 
 Apache Arrow is an ideal in-memory representation layer for data that is being read

@@ -414,7 +414,8 @@ html_css_files = ['theme_overrides.css']
 # .htaccess) here, relative to this directory. These files are copied
 # directly to the root of the documentation.
 #
-# html_extra_path = []
+# _redirects/ holds stub pages that redirect from moved or removed pages.
+html_extra_path = ['_redirects']
 
 # If not None, a 'Last updated on:' timestamp is inserted at every page
 # bottom, using the given strftime format.
@@ -614,6 +615,16 @@ def setup(app):
     app.add_config_value('cuda_enabled', cuda_enabled, 'env')
     app.add_config_value('flight_enabled', flight_enabled, 'env')
     app.add_directive('arrow-computefuncs', ComputeFunctionsTableDirective)
+    app.connect('html-page-context', _hide_edit_button_on_generated_pages)
+
+
+def _hide_edit_button_on_generated_pages(app, pagename, templatename,
+                                         context, doctree):
+    # autosummary stubs under */generated/ are created at build time and
+    # are not checked in, so an "Edit on GitHub" link would point to a
+    # non-existent file.
+    if '/generated/' in f'/{pagename}':
+        context['theme_use_edit_page_button'] = False
 
 
 class ComputeFunctionsTableDirective(Directive):

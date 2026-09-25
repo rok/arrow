@@ -183,4 +183,4 @@ sw |>
 
 - To learn more about multi-file datasets, see the [dataset article](./dataset.html).
 - To learn more about user-registered functions, see `help("register_scalar_function", package = "arrow")`.
-- To learn more about writing dplyr bindings as an arrow developer, see the [article on writing bindings](./developers/writing_bindings.html).
+- To learn more about writing dplyr bindings as an arrow developer, see the "Writing bindings" section of the `register_binding()` documentation in [`r/R/dplyr-funcs.R`](https://github.com/apache/arrow/blob/main/r/R/dplyr-funcs.R).

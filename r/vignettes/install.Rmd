@@ -8,7 +8,7 @@ output: rmarkdown::html_vignette
 
 In most cases, `install.packages("arrow")` should just work. There are things you can do to make the installation faster, documented in this article. If for some reason installation does not work, set the environment variable `ARROW_R_DEV=true`, retry, and share the logs with us.
 
-Note that CRAN builds of arrow have some optional features disabled, including Google Cloud Storage (GCS) support. If you need these features, see the information below on [building with a libarrow binary](#r-source-package-with-libarrow-binary), or the [cloud storage article](./fs.html#s3-and-gcs-support) for alternative installation options.
+Note that CRAN builds of arrow have some optional features disabled, including Google Cloud Storage (GCS) support. If you need these features, see the information below on [building with a libarrow binary](#r-source-package-with-libarrow-binary), or the [cloud storage article](./fs.html#s3-gcs-and-azure-support) for alternative installation options.
 
 ## Background
 

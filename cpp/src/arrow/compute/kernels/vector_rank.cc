@@ -297,7 +297,7 @@ const FunctionDoc rank_quantile_doc(
      "NaNs are considered greater than any other non-null value, but smaller\n"
      "than null values.\n"
      "The results are real values strictly between 0 and 1. They are\n"
-     "computed as in https://en.wikipedia.org/wiki/Quantile_rank\n"
+     "computed as in https://en.wikipedia.org/wiki/Percentile_rank\n"
      "but without multiplying by 100.\n"
      "\n"
      "The handling of nulls and NaNs can be changed in RankQuantileOptions."),
