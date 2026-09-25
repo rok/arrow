@@ -21,7 +21,7 @@ set -e
 set -o pipefail
 
 if [ "$#" -ne 2 ]; then
-  echo "Usage: $0 <pyarrow-wheel> <debug-symbols.tar.xz>" >&2
+  echo "Usage: $0 <pyarrow-wheel> <debug-symbols.tar.gz>" >&2
   exit 1
 fi
 
@@ -85,7 +85,7 @@ if grep -F "ScalarExecutor::Execute" "${work_dir}/stripped-backtrace.txt"; then
 fi
 
 # GDB searches an adjacent .debug directory for GNU debuglink targets.
-tar -xJf "${debug_symbols}" -C "${site_packages}"
+tar -xzf "${debug_symbols}" -C "${site_packages}"
 run_gdb "${work_dir}/symbolized-backtrace.txt"
 
 for symbol in \

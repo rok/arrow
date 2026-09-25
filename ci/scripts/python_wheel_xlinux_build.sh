@@ -227,12 +227,12 @@ For example:
 
   site_packages=$(python -c \
     'import sysconfig; print(sysconfig.get_paths()["purelib"])')
-  tar -xJf pyarrow-*-debug-symbols.tar.xz -C "${site_packages}"
+  tar -xzf pyarrow-*-debug-symbols.tar.gz -C "${site_packages}"
 EOF
 # Keep the debug files out of the wheel. They are published as a separate
 # optional artifact for post-mortem debugging and symbolizing core dumps.
 tar -C /tmp/pyarrow-debug-symbols \
-    -cJf ../../debug_symbols/pyarrow-debug-symbols.tar.xz \
+    -czf ../../debug_symbols/pyarrow-debug-symbols.tar.gz \
     README.txt pyarrow/.debug
 # Zip wheel again after stripping symbols
 zip -r "$wheel_name" .
@@ -251,6 +251,6 @@ if [ "${#repaired_wheels[@]}" -ne 1 ]; then
   exit 1
 fi
 repaired_wheel_name=$(basename "${repaired_wheels[0]}")
-mv debug_symbols/pyarrow-debug-symbols.tar.xz \
-   "debug_symbols/${repaired_wheel_name%.whl}-debug-symbols.tar.xz"
+mv debug_symbols/pyarrow-debug-symbols.tar.gz \
+   "debug_symbols/${repaired_wheel_name%.whl}-debug-symbols.tar.gz"
 popd
