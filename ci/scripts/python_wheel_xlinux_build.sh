@@ -51,6 +51,8 @@ rm -rf /tmp/arrow-build
 rm -rf /arrow/python/dist
 rm -rf /arrow/python/build
 rm -rf /arrow/python/repaired_wheels
+rm -rf /arrow/python/debug_symbols
+rm -rf /tmp/pyarrow-debug-symbols
 rm -rf /arrow/python/pyarrow/*.so
 rm -rf /arrow/python/pyarrow/*.so.*
 
@@ -193,8 +195,10 @@ if command -v sccache &> /dev/null; then
   sccache --show-stats
 fi
 
-echo "=== Strip symbols from wheel ==="
+echo "=== Extract debug symbols and strip wheel binaries ==="
 mkdir -p dist/temp-fix-wheel
+mkdir -p debug_symbols
+mkdir -p /tmp/pyarrow-debug-symbols/pyarrow/.debug
 mv dist/pyarrow-*.whl dist/temp-fix-wheel
 
 pushd dist/temp-fix-wheel
@@ -203,16 +207,50 @@ wheel_name=$(ls pyarrow-*.whl)
 unzip "$wheel_name"
 rm "$wheel_name"
 for filename in pyarrow/*.so pyarrow/*.so.*; do
-    echo "Stripping debug symbols from: $filename";
-    strip --strip-debug "$filename"
+    debug_file="/tmp/pyarrow-debug-symbols/pyarrow/.debug/$(basename "$filename").debug"
+    echo "Extracting debug symbols from: $filename"
+    objcopy --only-keep-debug "$filename" "$debug_file"
+    strip --strip-unneeded "$filename"
+    objcopy --add-gnu-debuglink="$debug_file" "$filename"
 done
+cat > /tmp/pyarrow-debug-symbols/README.txt <<'EOF'
+This archive contains GNU debug symbols for one specific PyArrow wheel.
+It must only be used with the wheel whose full platform-qualified name is
+included in this archive's filename.
+
+To make the symbols available to GDB, extract the archive into the Python
+environment's site-packages directory. The resulting layout must be:
+
+  site-packages/pyarrow/.debug/*.debug
+
+For example:
+
+  site_packages=$(python -c \
+    'import sysconfig; print(sysconfig.get_paths()["purelib"])')
+  tar -xzf pyarrow-*-debug-symbols.tar.gz -C "${site_packages}"
+EOF
+# Keep the debug files out of the wheel. They are published as a separate
+# optional artifact for post-mortem debugging and symbolizing core dumps.
+tar -C /tmp/pyarrow-debug-symbols \
+    -czf ../../debug_symbols/pyarrow-debug-symbols.tar.gz \
+    README.txt pyarrow/.debug
 # Zip wheel again after stripping symbols
 zip -r "$wheel_name" .
 mv "$wheel_name" ..
 popd
 
 rm -rf dist/temp-fix-wheel
+rm -rf /tmp/pyarrow-debug-symbols
 
 echo "=== (${PYTHON_VERSION}) Tag the wheel with ${LINUX_WHEEL_KIND}${LINUX_WHEEL_VERSION} ==="
 auditwheel repair dist/pyarrow-*.whl -w repaired_wheels
+
+repaired_wheels=(repaired_wheels/*.whl)
+if [ "${#repaired_wheels[@]}" -ne 1 ]; then
+  echo "Expected one repaired wheel, found ${#repaired_wheels[@]}" >&2
+  exit 1
+fi
+repaired_wheel_name=$(basename "${repaired_wheels[0]}")
+mv debug_symbols/pyarrow-debug-symbols.tar.gz \
+   "debug_symbols/${repaired_wheel_name%.whl}-debug-symbols.tar.gz"
 popd
