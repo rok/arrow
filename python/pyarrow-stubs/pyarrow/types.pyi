@@ -15,6 +15,10 @@
 # specific language governing permissions and limitations
 # under the License.
 
+from pyarrow.lib import DataType, Decimal128Type, Decimal256Type, Decimal32Type, Decimal64Type, DenseUnionType, DictionaryType, DurationType, FixedSizeBinaryType, FixedSizeListType, LargeListType, LargeListViewType, ListType, ListViewType, MapType, RunEndEncodedType, SparseUnionType, StructType, Time32Type, Time64Type, TimestampType, UuidType
+from pyarrow.tests.test_extension_type import PeriodType, PeriodTypeWithClass, PeriodTypeWithToPandasDtype
+from pyarrow.tests.test_pandas import DummyExtensionType, MyCustomIntegerType
+from typing import Union
 import os
 import re
 import pyarrow
@@ -34,163 +38,163 @@ _INTERVAL_TYPES: Incomplete
 _TEMPORAL_TYPES: Incomplete
 _UNION_TYPES: Incomplete
 
-def is_null(t: pyarrow.DataType):
+def is_null(t: pyarrow.DataType) -> bool:
     ...
 
-def is_boolean(t: pyarrow.DataType):
+def is_boolean(t: pyarrow.DataType) -> bool:
     ...
 
-def is_integer(t: pyarrow.DataType):
+def is_integer(t: pyarrow.DataType) -> bool:
     ...
 
-def is_signed_integer(t: pyarrow.DataType):
+def is_signed_integer(t: pyarrow.DataType) -> bool:
     ...
 
-def is_unsigned_integer(t: pyarrow.DataType):
+def is_unsigned_integer(t: pyarrow.DataType) -> bool:
     ...
 
-def is_int8(t: pyarrow.DataType):
+def is_int8(t: pyarrow.DataType) -> bool:
     ...
 
-def is_int16(t: pyarrow.DataType):
+def is_int16(t: pyarrow.DataType) -> bool:
     ...
 
-def is_int32(t: pyarrow.DataType):
+def is_int32(t: pyarrow.DataType) -> bool:
     ...
 
-def is_int64(t: pyarrow.DataType):
+def is_int64(t: pyarrow.DataType) -> bool:
     ...
 
-def is_uint8(t: pyarrow.DataType):
+def is_uint8(t: pyarrow.DataType) -> bool:
     ...
 
-def is_uint16(t: pyarrow.DataType):
+def is_uint16(t: pyarrow.DataType) -> bool:
     ...
 
-def is_uint32(t: pyarrow.DataType):
+def is_uint32(t: pyarrow.DataType) -> bool:
     ...
 
-def is_uint64(t: pyarrow.DataType):
+def is_uint64(t: pyarrow.DataType) -> bool:
     ...
 
-def is_floating(t: pyarrow.DataType):
+def is_floating(t: pyarrow.DataType) -> bool:
     ...
 
-def is_float16(t: pyarrow.DataType):
+def is_float16(t: pyarrow.DataType) -> bool:
     ...
 
-def is_float32(t: pyarrow.DataType):
+def is_float32(t: pyarrow.DataType) -> bool:
     ...
 
-def is_float64(t: pyarrow.DataType):
+def is_float64(t: pyarrow.DataType) -> bool:
     ...
 
-def is_list(t: pyarrow.DataType):
+def is_list(t: pyarrow.DataType) -> bool:
     ...
 
-def is_large_list(t: pyarrow.DataType):
+def is_large_list(t: pyarrow.DataType) -> bool:
     ...
 
-def is_fixed_size_list(t: pyarrow.DataType):
+def is_fixed_size_list(t: pyarrow.DataType) -> bool:
     ...
 
-def is_list_view(t: pyarrow.DataType):
+def is_list_view(t: pyarrow.DataType) -> bool:
     ...
 
-def is_large_list_view(t: pyarrow.DataType):
+def is_large_list_view(t: pyarrow.DataType) -> bool:
     ...
 
-def is_struct(t: pyarrow.DataType):
+def is_struct(t: pyarrow.DataType) -> bool:
     ...
 
-def is_union(t: pyarrow.DataType):
+def is_union(t: pyarrow.DataType) -> bool:
     ...
 
-def is_nested(t: pyarrow.DataType):
+def is_nested(t: pyarrow.DataType) -> bool:
     ...
 
-def is_run_end_encoded(t: pyarrow.DataType):
+def is_run_end_encoded(t: pyarrow.DataType) -> bool:
     ...
 
-def is_temporal(t: pyarrow.DataType):
+def is_temporal(t: pyarrow.DataType) -> bool:
     ...
 
-def is_timestamp(t: pyarrow.DataType):
+def is_timestamp(t: pyarrow.DataType) -> bool:
     ...
 
-def is_duration(t: pyarrow.DataType):
+def is_duration(t: pyarrow.DataType) -> bool:
     ...
 
-def is_time(t: pyarrow.DataType):
+def is_time(t: pyarrow.DataType) -> bool:
     ...
 
-def is_time32(t: pyarrow.DataType):
+def is_time32(t: pyarrow.DataType) -> bool:
     ...
 
-def is_time64(t: pyarrow.DataType):
+def is_time64(t: pyarrow.DataType) -> bool:
     ...
 
-def is_binary(t: pyarrow.DataType):
+def is_binary(t: pyarrow.DataType) -> bool:
     ...
 
-def is_large_binary(t: pyarrow.DataType):
+def is_large_binary(t: pyarrow.DataType) -> bool:
     ...
 
-def is_unicode(t: pyarrow.DataType):
+def is_unicode(t: pyarrow.DataType) -> bool:
     ...
 
-def is_string(t: pyarrow.DataType):
+def is_string(t: pyarrow.DataType) -> bool:
     ...
 
 def is_large_unicode(t: pyarrow.DataType):
     ...
 
-def is_large_string(t: pyarrow.DataType):
+def is_large_string(t: pyarrow.DataType) -> bool:
     ...
 
-def is_fixed_size_binary(t: pyarrow.DataType):
+def is_fixed_size_binary(t: pyarrow.DataType) -> bool:
     ...
 
-def is_binary_view(t: pyarrow.DataType):
+def is_binary_view(t: pyarrow.DataType) -> bool:
     ...
 
-def is_string_view(t: pyarrow.DataType):
+def is_string_view(t: pyarrow.DataType) -> bool:
     ...
 
-def is_date(t: pyarrow.DataType):
+def is_date(t: pyarrow.DataType) -> bool:
     ...
 
-def is_date32(t: pyarrow.DataType):
+def is_date32(t: pyarrow.DataType) -> bool:
     ...
 
-def is_date64(t: pyarrow.DataType):
+def is_date64(t: pyarrow.DataType) -> bool:
     ...
 
-def is_map(t: pyarrow.DataType):
+def is_map(t: pyarrow.DataType) -> bool:
     ...
 
-def is_decimal(t: pyarrow.DataType):
+def is_decimal(t: pyarrow.DataType) -> bool:
     ...
 
-def is_decimal32(t: pyarrow.DataType):
+def is_decimal32(t: pyarrow.DataType) -> bool:
     ...
 
-def is_decimal64(t: pyarrow.DataType):
+def is_decimal64(t: pyarrow.DataType) -> bool:
     ...
 
-def is_decimal128(t: pyarrow.DataType):
+def is_decimal128(t: pyarrow.DataType) -> bool:
     ...
 
-def is_decimal256(t: pyarrow.DataType):
+def is_decimal256(t: pyarrow.DataType) -> bool:
     ...
 
-def is_dictionary(t: pyarrow.DataType):
+def is_dictionary(t: pyarrow.DataType) -> bool:
     ...
 
-def is_interval(t: pyarrow.DataType):
+def is_interval(t: pyarrow.DataType) -> bool:
     ...
 
-def is_primitive(t: pyarrow.DataType):
+def is_primitive(t: pyarrow.DataType) -> bool:
     ...
 
 class TypesEnum(IntEnum):

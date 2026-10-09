@@ -15,6 +15,12 @@
 # specific language governing permissions and limitations
 # under the License.
 
+from io import BufferedReader, BufferedWriter, BytesIO, StringIO
+from pathlib import Path
+from pyarrow._dataset import FileSystemDataset, FileSystemDatasetFactory, InMemoryDataset, Scanner
+from pyarrow.lib import Buffer, BufferOutputStream, BufferReader, BufferedInputStream, BufferedOutputStream, CompressedInputStream, CompressedOutputStream, MockOutputStream, NativeFile, OSFile, PythonFile, RecordBatch, RecordBatchReader, Table
+from pyarrow.tests.util import FSProtocolClass
+from typing import List, Optional, Tuple, Type, Union
 import os
 import re
 import pyarrow
@@ -22,22 +28,22 @@ from typing import Any, Callable, IO, Iterable, Iterator, Literal, Mapping, Name
 from _typeshed import Incomplete
 _DEPR_MSG: str
 
-def doc(*docstrings, **params):
+def doc(*docstrings, **params) -> Callable:
     ...
 
-def _deprecate_api(old_name, new_name, api, next_version, type=...):
+def _deprecate_api(old_name: str, new_name: str, api: Callable, next_version: str, type=...) -> Callable:
     ...
 
 def _deprecate_class(old_name, new_class, next_version, instancecheck: bool=True):
     ...
 
-def _is_iterable(obj):
+def _is_iterable(obj: FileSystemDataset | Iterator[Any] | InMemoryDataset | Scanner):
     ...
 
-def _is_path_like(path):
+def _is_path_like(path) -> bool:
     ...
 
-def _stringify_path(path):
+def _stringify_path(path) -> str:
     ...
 
 def product(seq):
@@ -46,10 +52,10 @@ def product(seq):
 def get_contiguous_span(shape: tuple, strides: tuple, itemsize: int) -> int:
     ...
 
-def find_free_port():
+def find_free_port() -> int:
     ...
 
-def guid():
+def guid() -> str:
     ...
 
 def _break_traceback_cycle_from_frame(frame) -> None:

@@ -15,6 +15,11 @@
 # specific language governing permissions and limitations
 # under the License.
 
+from io import BufferedReader, BufferedWriter, BytesIO
+from pathlib import Path
+from pyarrow.lib import Buffer, BufferOutputStream, BufferReader, NativeFile, OSFile
+from pyarrow.tests.util import FSProtocolClass
+from typing import Optional, Tuple, Union
 import os
 import re
 import pyarrow
@@ -29,13 +34,13 @@ from pyarrow.util import _is_path_like as _is_path_like, _stringify_path as _str
 FileStats = FileInfo
 _not_imported: Incomplete
 
-def __getattr__(name) -> None:
+def __getattr__(name: str) -> None:
     ...
 
-def _ensure_filesystem(filesystem, *, use_mmap: bool=False):
+def _ensure_filesystem(filesystem: PyFileSystem | _MockFileSystem | str | SubTreeFileSystem | LocalFileSystem, *, use_mmap: bool=False) -> PyFileSystem | SubTreeFileSystem | _MockFileSystem | LocalFileSystem:
     ...
 
-def _resolve_filesystem_and_path(path, filesystem=None, *, memory_map: bool=False):
+def _resolve_filesystem_and_path(path, filesystem: _MockFileSystem | PyFileSystem | str | SubTreeFileSystem | LocalFileSystem | None=None, *, memory_map: bool=False) -> tuple[PyFileSystem, str] | tuple[None, BufferedReader] | tuple[None, NativeFile] | tuple[None, BufferOutputStream] | tuple[LocalFileSystem, str] | tuple[_MockFileSystem, str] | tuple[None, None] | tuple[None, BytesIO] | tuple[None, OSFile] | tuple[SubTreeFileSystem, str] | tuple[None, Buffer] | tuple[None, BufferedWriter] | tuple[None, BufferReader]:
     ...
 
 def copy_files(source: str, destination: str, source_filesystem: FileSystem | None=None, destination_filesystem: FileSystem | None=None, *, chunk_size: int=..., use_threads: bool=True) -> None:

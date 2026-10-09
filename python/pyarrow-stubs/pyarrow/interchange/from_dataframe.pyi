@@ -15,6 +15,8 @@
 # specific language governing permissions and limitations
 # under the License.
 
+from pyarrow.lib import DataType, Table, TimestampType
+from typing import Tuple, Union
 import os
 import re
 import pyarrow
@@ -46,10 +48,10 @@ def bool_column_to_array(col: ColumnObject, allow_copy: bool=True) -> pa.Array:
 def categorical_column_to_dictionary(col: ColumnObject, allow_copy: bool=True) -> pa.DictionaryArray:
     ...
 
-def parse_datetime_format_str(format_str):
+def parse_datetime_format_str(format_str: str) -> tuple[str, str]:
     ...
 
-def map_date_type(data_type):
+def map_date_type(data_type: tuple[DtypeKind, int, str, str] | tuple[DtypeKind, int, str, str]) -> DataType | TimestampType:
     ...
 
 def buffers_to_array(buffers: ColumnBuffers, data_type: tuple[DtypeKind, int, str, str], length: int, describe_null: ColumnNullType, offset: int=0, allow_copy: bool=True) -> pa.Array:

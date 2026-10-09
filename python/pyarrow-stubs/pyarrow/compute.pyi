@@ -15,6 +15,10 @@
 # specific language governing permissions and limitations
 # under the License.
 
+from pyarrow._compute import MetaFunction
+from pyarrow.lib import BinaryArray, BinaryScalar, BinaryViewArray, Bool8Array, Bool8Type, BooleanArray, ChunkedArray, DataType, Date32Array, Date32Scalar, Date64Array, Date64Scalar, Decimal128Array, Decimal128Scalar, Decimal128Type, Decimal256Array, Decimal256Scalar, Decimal256Type, Decimal32Scalar, Decimal32Type, Decimal64Scalar, Decimal64Type, DenseUnionType, DictionaryArray, DictionaryType, DoubleArray, DoubleScalar, DurationArray, DurationType, ExtensionArray, FixedShapeTensorArray, FixedShapeTensorType, FixedSizeBinaryArray, FixedSizeBinaryType, FixedSizeListArray, FixedSizeListType, FloatArray, FloatScalar, HalfFloatArray, Int16Array, Int16Scalar, Int32Array, Int64Array, Int64Scalar, Int8Array, Int8Scalar, JsonArray, JsonType, LargeBinaryArray, LargeListArray, LargeListType, LargeStringArray, LargeStringScalar, ListArray, ListType, MapArray, MapType, MonthDayNanoIntervalArray, NullArray, NullScalar, OpaqueArray, OpaqueType, RecordBatch, SparseUnionType, StringArray, StringScalar, StringViewArray, StructArray, StructType, Table, Time32Array, Time64Array, TimestampArray, TimestampScalar, TimestampType, UInt16Array, UInt16Scalar, UInt32Array, UInt32Scalar, UInt64Array, UInt64Scalar, UInt8Array, UInt8Scalar
+from pyarrow.tests.test_extension_type import ExampleUuidType, ExampleUuidType2, IntegerEmbeddedType, IntegerType, MyFixedListType, MyListType, PeriodType, PeriodTypeWithClass, PeriodTypeWithToPandasDtype, TinyIntType
+from typing import Dict, List, Optional, Tuple, Type, Union
 import os
 import re
 from typing import Any, Callable, IO, Iterable, Iterator, Literal, Mapping, NamedTuple, Self, Sequence
@@ -209,7 +213,7 @@ def bit_wise_xor(x, y, *, memory_pool: Incomplete | None=...):
 def case_when(cond, *cases, memory_pool: Incomplete | None=...):
     ...
 
-def cast(arr, target_type: Incomplete | None=..., safe: Incomplete | None=..., options: Incomplete | None=..., memory_pool: Incomplete | None=...) -> pyarrow.Array:
+def cast(arr: Table | Int16Array | StringViewArray | UInt64Array | Date32Array | JsonArray | DurationArray | UInt16Array | HalfFloatArray | Date64Array | Int64Scalar | ChunkedArray | StringScalar | FloatScalar | FixedShapeTensorArray | DoubleScalar | Int32Array | DictionaryArray | FloatArray | TimestampArray | Decimal128Array | LargeStringArray | ListArray | NullArray | StringArray | OpaqueArray | BinaryScalar | Int8Array | UInt32Array | MapArray | DoubleArray | Time32Array | LargeListArray | BooleanArray | ExtensionArray | BinaryArray | TimestampScalar | Bool8Array | UInt8Array | Int64Array | FixedSizeBinaryArray | Time64Array | StructArray | FixedSizeListArray | Int8Scalar, target_type: Incomplete | None=..., safe: Incomplete | None=..., options: Incomplete | None=..., memory_pool: Incomplete | None=...) -> pyarrow.Array:
     ...
 
 def ceil(x, *, memory_pool: Incomplete | None=...):
@@ -359,7 +363,7 @@ def hypot(x, y, *, memory_pool: Incomplete | None=...):
 def if_else(cond, left, right, *, memory_pool: Incomplete | None=...):
     ...
 
-def index(data, value, start: Incomplete | None=..., end: Incomplete | None=..., *, memory_pool: Incomplete | None=...) -> int:
+def index(data: ChunkedArray | Int64Array, value: Int64Scalar | int | Int8Scalar | None, start: Incomplete | None=..., end: Incomplete | None=..., *, memory_pool: Incomplete | None=...) -> int:
     ...
 
 def index_in(values, value_set: pyarrow.Array, *, skip_nulls: bool=..., options: Incomplete | None=..., memory_pool: Incomplete | None=...):
@@ -599,7 +603,7 @@ def quarter(values, *, memory_pool: Incomplete | None=...):
 def quarters_between(start, end, *, memory_pool: Incomplete | None=...):
     ...
 
-def random(n: int, *, initializer: str=..., options: Incomplete | None=..., memory_pool: Incomplete | None=...):
+def random(n: int, *, initializer: str=..., options: Incomplete | None=..., memory_pool: Incomplete | None=...) -> DoubleArray:
     ...
 
 def rank(input, sort_keys: str=..., *, null_placement: Incomplete | None=..., tiebreaker: str=..., options: Incomplete | None=..., memory_pool: Incomplete | None=...):
@@ -731,7 +735,7 @@ def subtract_checked(x, y, *, memory_pool: Incomplete | None=...):
 def sum(array, *, skip_nulls: bool=..., min_count: int=..., options: Incomplete | None=..., memory_pool: Incomplete | None=...):
     ...
 
-def take(data: pyarrow.Array | pyarrow.ChunkedArray | pyarrow.RecordBatch | pyarrow.Table, indices: pyarrow.Array | pyarrow.ChunkedArray, *, boundscheck: bool=..., memory_pool: Incomplete | None=...):
+def take(data: pyarrow.Array | pyarrow.ChunkedArray | pyarrow.RecordBatch | pyarrow.Table, indices: pyarrow.Array | pyarrow.ChunkedArray, *, boundscheck: bool=..., memory_pool: Incomplete | None=...) -> Table | Int16Array | UInt64Array | UInt16Array | ChunkedArray | Int32Array | DictionaryArray | FloatArray | ListArray | NullArray | StringArray | Int8Array | UInt32Array | DoubleArray | LargeBinaryArray | LargeListArray | BooleanArray | ExtensionArray | BinaryArray | UInt8Array | Int64Array | FixedSizeBinaryArray | RecordBatch | StructArray:
     ...
 
 def tan(x, *, memory_pool: Incomplete | None=...):
@@ -884,13 +888,13 @@ def years_between(start, end, *, memory_pool: Incomplete | None=...):
 def utf8_zfill(strings, width: int, padding: str=..., *, options: Incomplete | None=..., memory_pool: Incomplete | None=...):
     ...
 
-def fill_null(values, fill_value):
+def fill_null(values: ChunkedArray | Int16Array | UInt64Array | StringArray | NullArray | UInt8Array | Int64Array | Int8Array | DoubleArray | Int32Array | FloatArray | LargeBinaryArray | UInt16Array | BooleanArray, fill_value: Int64Scalar | NullScalar | FloatScalar | bool | str | Int8Array | UInt16Scalar | UInt8Scalar | UInt64Scalar | DoubleScalar | Int16Scalar | int | Int8Scalar | None) -> ChunkedArray | Int16Array | UInt64Array | StringArray | NullArray | UInt8Array | Int64Array | Int8Array | DoubleArray | Int32Array | FloatArray | LargeBinaryArray | UInt16Array | BooleanArray:
     ...
 
 def top_k_unstable(values: pyarrow.Array | pyarrow.ChunkedArray | pyarrow.RecordBatch | pyarrow.Table, k: int, sort_keys: Incomplete | None=..., null_placements: Incomplete | None=..., *, memory_pool: Incomplete | None=...) -> pyarrow.Array:
     ...
 
-def bottom_k_unstable(values: pyarrow.Array | pyarrow.ChunkedArray | pyarrow.RecordBatch | pyarrow.Table, k: int, sort_keys: Incomplete | None=..., null_placements: Incomplete | None=..., *, memory_pool: Incomplete | None=...):
+def bottom_k_unstable(values: pyarrow.Array | pyarrow.ChunkedArray | pyarrow.RecordBatch | pyarrow.Table, k: int, sort_keys: Incomplete | None=..., null_placements: Incomplete | None=..., *, memory_pool: Incomplete | None=...) -> UInt64Array:
     ...
 
 def field(*name_or_index) -> Expression:

@@ -81,32 +81,6 @@ __cuda_loaded: Incomplete
 ordered_dict = dict
 ArrowIOError = IOError
 have_signal_refcycle: bool
-
-class VersionInfo(NamedTuple):
-    major: Incomplete
-    minor: Incomplete
-    patch: Incomplete
-
-class RuntimeInfo(NamedTuple):
-    simd_level: Incomplete
-    detected_simd_level: Incomplete
-
-class BuildInfo(NamedTuple):
-    build_type: Incomplete
-    cpp_build_info: Incomplete
-
-class CppBuildInfo(NamedTuple):
-    version: Incomplete
-    version_info: Incomplete
-    so_version: Incomplete
-    full_so_version: Incomplete
-    compiler_id: Incomplete
-    compiler_version: Incomplete
-    compiler_flags: Incomplete
-    git_id: Incomplete
-    git_description: Incomplete
-    package_kind: Incomplete
-    build_type: Incomplete
 build_info: BuildInfo
 cpp_build_info: CppBuildInfo
 cpp_version: str
@@ -115,24 +89,6 @@ _pandas_api: Incomplete
 _python_extension_types_registry: list[Incomplete]
 _registry_nanny: _ExtensionRegistryNanny
 DEFAULT_BUFFER_SIZE: int
-
-class _WriteStats(NamedTuple):
-    num_messages: Incomplete
-    num_record_batches: Incomplete
-    num_dictionary_batches: Incomplete
-    num_dictionary_deltas: Incomplete
-    num_replaced_dictionaries: Incomplete
-
-class _ReadStats(NamedTuple):
-    num_messages: Incomplete
-    num_record_batches: Incomplete
-    num_dictionary_batches: Incomplete
-    num_dictionary_deltas: Incomplete
-    num_replaced_dictionaries: Incomplete
-
-class _RecordBatchWithMetadata(NamedTuple):
-    batch: Incomplete
-    custom_metadata: Incomplete
 
 def cpu_count():
     ...
@@ -561,6 +517,50 @@ def benchmark_PandasObjectIsNull(obj: list[Any]) -> None:
     ...
 _NULL: NullScalar
 NA: NullScalar
+
+class VersionInfo(NamedTuple):
+    major: Incomplete
+    minor: Incomplete
+    patch: Incomplete
+
+class RuntimeInfo(NamedTuple):
+    simd_level: Incomplete
+    detected_simd_level: Incomplete
+
+class BuildInfo(NamedTuple):
+    build_type: Incomplete
+    cpp_build_info: Incomplete
+
+class CppBuildInfo(NamedTuple):
+    version: Incomplete
+    version_info: Incomplete
+    so_version: Incomplete
+    full_so_version: Incomplete
+    compiler_id: Incomplete
+    compiler_version: Incomplete
+    compiler_flags: Incomplete
+    git_id: Incomplete
+    git_description: Incomplete
+    package_kind: Incomplete
+    build_type: Incomplete
+
+class _WriteStats(NamedTuple):
+    num_messages: Incomplete
+    num_record_batches: Incomplete
+    num_dictionary_batches: Incomplete
+    num_dictionary_deltas: Incomplete
+    num_replaced_dictionaries: Incomplete
+
+class _ReadStats(NamedTuple):
+    num_messages: Incomplete
+    num_record_batches: Incomplete
+    num_dictionary_batches: Incomplete
+    num_dictionary_deltas: Incomplete
+    num_replaced_dictionaries: Incomplete
+
+class _RecordBatchWithMetadata(NamedTuple):
+    batch: Incomplete
+    custom_metadata: Incomplete
 
 class DeviceAllocationType(IntEnum):
     CPU = ...

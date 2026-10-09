@@ -31,6 +31,12 @@ from pyarrow.lib import *
 from pyarrow.lib import ArrowCancelled as ArrowCancelled, ArrowException as ArrowException, ArrowInvalid as ArrowInvalid
 _FLIGHT_SERVER_ERROR_REGEX: re.Pattern[str]
 
+def _munge_grpc_python_error(message):
+    ...
+
+def connect(location: str | tuple | Location, **kwargs) -> FlightClient:
+    ...
+
 class _CertKeyPair(NamedTuple):
     cert: Incomplete
     key: Incomplete
@@ -41,12 +47,6 @@ class _ActionType(NamedTuple):
 
 class _CallInfo(NamedTuple):
     method: Incomplete
-
-def _munge_grpc_python_error(message):
-    ...
-
-def connect(location: str | tuple | Location, **kwargs) -> FlightClient:
-    ...
 
 class FlightCallOptions(_Weakrefable):
 

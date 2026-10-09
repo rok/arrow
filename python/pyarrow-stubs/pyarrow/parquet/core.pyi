@@ -15,6 +15,14 @@
 # specific language governing permissions and limitations
 # under the License.
 
+from io import BufferedReader, BufferedWriter, BytesIO
+from datetime import datetime
+from pathlib import Path
+from pyarrow._compute import Expression
+from pyarrow._fs import LocalFileSystem as LocalFileSystem, SubTreeFileSystem
+from pyarrow.lib import Buffer, BufferOutputStream, BufferReader, NativeFile, OSFile, PythonFile, RecordBatch, Schema, Table
+from pyarrow.tests.util import FSProtocolClass
+from typing import DefaultDict, Dict, List, Optional, Set, Tuple, Union
 import os
 import re
 import pyarrow
@@ -41,7 +49,7 @@ def read_pandas(source: str | list[str] | pyarrow.NativeFile | IO[Any], columns:
 def write_table(table: pyarrow.Table, where: str | pyarrow.NativeFile, row_group_size: int | None=None, version: str='2.6', use_dictionary: bool=True, compression: str='snappy', write_statistics: bool=True, use_deprecated_int96_timestamps: bool | None=None, coerce_timestamps: str | None=None, allow_truncated_timestamps: bool=False, data_page_size: int | None=None, flavor: Literal['spark'] | None=None, filesystem: pyarrow.fs.FileSystem | None=None, compression_level: int | dict | None=None, use_byte_stream_split: bool=False, column_encoding: str | dict | None=None, data_page_version: str='1.0', use_compliant_nested_type: bool=True, encryption_properties: FileEncryptionProperties | None=None, write_batch_size: int | None=None, dictionary_pagesize_limit: int | None=None, store_schema: bool=True, write_page_index: bool=False, write_page_checksum: bool=False, sorting_columns: Sequence[SortingColumn] | None=None, store_decimal_as_integer: bool=False, write_time_adjusted_to_utc: bool=False, max_rows_per_page: int | None=None, bloom_filter_options: dict | None=None, use_content_defined_chunking: bool=False, **kwargs) -> None:
     ...
 
-def write_to_dataset(table: pyarrow.Table, root_path, partition_cols: list | None=None, filesystem: pyarrow.fs.FileSystem | None=None, schema: pyarrow.Schema | None=None, partitioning: pyarrow.dataset.Partitioning | list[str] | None=None, basename_template: str | None=None, use_threads: bool | None=None, file_visitor: Callable[..., Any] | None=None, existing_data_behavior: Literal['overwrite_or_ignore'] | Literal['error'] | Literal['delete_matching'] | None=None, **kwargs) -> None:
+def write_to_dataset(table: pyarrow.Table, root_path: Path | str, partition_cols: list | None=None, filesystem: pyarrow.fs.FileSystem | None=None, schema: pyarrow.Schema | None=None, partitioning: pyarrow.dataset.Partitioning | list[str] | None=None, basename_template: str | None=None, use_threads: bool | None=None, file_visitor: Callable[..., Any] | None=None, existing_data_behavior: Literal['overwrite_or_ignore'] | Literal['error'] | Literal['delete_matching'] | None=None, **kwargs) -> None:
     ...
 
 def write_metadata(schema: pyarrow.Schema, where: str | pyarrow.NativeFile, metadata_collector: list | None=None, filesystem: pyarrow.fs.FileSystem | None=None, **kwargs) -> None:
@@ -69,23 +77,23 @@ class ParquetFile:
     def __exit__(self, *args, **kwargs) -> None:
         ...
 
-    def _build_nested_paths(self):
+    def _build_nested_paths(self) -> DefaultDict[str, list[int]] | DefaultDict[Any, Any]:
         ...
 
     @property
-    def metadata(self):
+    def metadata(self) -> FileMetaData:
         ...
 
     @property
-    def schema(self):
+    def schema(self) -> ParquetSchema:
         ...
 
     @property
-    def schema_arrow(self):
+    def schema_arrow(self) -> Schema:
         ...
 
     @property
-    def num_row_groups(self):
+    def num_row_groups(self) -> int:
         ...
 
     def close(self, force: bool=False):
@@ -95,22 +103,22 @@ class ParquetFile:
     def closed(self) -> bool:
         ...
 
-    def read_row_group(self, i: int, columns: list | None=None, use_threads: bool=True, use_pandas_metadata: bool=False):
+    def read_row_group(self, i: int, columns: list | None=None, use_threads: bool=True, use_pandas_metadata: bool=False) -> Table:
         ...
 
-    def read_row_groups(self, row_groups: list, columns: list | None=None, use_threads: bool=True, use_pandas_metadata: bool=False):
+    def read_row_groups(self, row_groups: list, columns: list | None=None, use_threads: bool=True, use_pandas_metadata: bool=False) -> Table:
         ...
 
     def iter_batches(self, batch_size: int=65536, row_groups: list | None=None, columns: list | None=None, use_threads: bool=True, use_pandas_metadata: bool=False):
         ...
 
-    def read(self, columns: list | None=None, use_threads: bool=True, use_pandas_metadata: bool=False):
+    def read(self, columns: list | None=None, use_threads: bool=True, use_pandas_metadata: bool=False) -> Table:
         ...
 
     def scan_contents(self, columns: list[int] | None=None, batch_size: int=65536) -> int:
         ...
 
-    def _get_column_indices(self, column_names, use_pandas_metadata: bool=False):
+    def _get_column_indices(self, column_names, use_pandas_metadata: bool=False) -> list[int]:
         ...
 
 class ParquetWriter:
@@ -124,7 +132,7 @@ class ParquetWriter:
     writer: Incomplete
     is_open: bool
 
-    def __init__(self, where, schema, filesystem=None, flavor=None, version: str='2.6', use_dictionary: bool=True, compression: str='snappy', write_statistics: bool=True, use_deprecated_int96_timestamps=None, compression_level=None, use_byte_stream_split: bool=False, column_encoding=None, writer_engine_version=None, data_page_version: str='1.0', use_compliant_nested_type: bool=True, encryption_properties=None, write_batch_size=None, dictionary_pagesize_limit=None, store_schema: bool=True, write_page_index: bool=False, write_page_checksum: bool=False, sorting_columns=None, store_decimal_as_integer: bool=False, write_time_adjusted_to_utc: bool=False, max_rows_per_page=None, bloom_filter_options=None, use_content_defined_chunking: bool=False, **options) -> None:
+    def __init__(self, where, schema: Schema | None, filesystem: LocalFileSystem | None=None, flavor: str | None=None, version: str='2.6', use_dictionary: bool=True, compression: str='snappy', write_statistics: bool=True, use_deprecated_int96_timestamps: bool | None=None, compression_level: int | dict[str, int] | None=None, use_byte_stream_split: bool=False, column_encoding: dict[str, str] | bool | str | None=None, writer_engine_version=None, data_page_version: str='1.0', use_compliant_nested_type: bool=True, encryption_properties: FileEncryptionProperties | None=None, write_batch_size: int | None=None, dictionary_pagesize_limit: int | str | None=None, store_schema: bool=True, write_page_index: bool=False, write_page_checksum: bool=False, sorting_columns: tuple[SortingColumn, SortingColumn] | None=None, store_decimal_as_integer: bool=False, write_time_adjusted_to_utc: bool=False, max_rows_per_page: int | None=None, bloom_filter_options: bool | dict[str, dict[str, str | int]] | dict[str, dict[Any, Any]] | dict[str, dict[str, float]] | dict[str, dict[str, str | float]] | dict[str, dict[str, int]] | dict[str, bool] | dict[str, dict[str, int | float]] | None=None, use_content_defined_chunking: bool=False, **options) -> None:
         ...
 
     def __del__(self) -> None:
@@ -136,7 +144,7 @@ class ParquetWriter:
     def __exit__(self, *args, **kwargs):
         ...
 
-    def write(self, table_or_batch, row_group_size: int | None=None) -> None:
+    def write(self, table_or_batch: Table | RecordBatch, row_group_size: int | None=None) -> None:
         ...
 
     def write_batch(self, batch: pyarrow.RecordBatch, row_group_size: int | None=None) -> None:
@@ -157,26 +165,26 @@ class ParquetDataset:
     _base_dir: Incomplete
     _dataset: Incomplete
 
-    def __init__(self, path_or_paths, filesystem=None, schema=None, *, filters=None, read_dictionary=None, binary_type=None, list_type=None, memory_map: bool=False, buffer_size=None, partitioning: str='hive', ignore_prefixes=None, pre_buffer: bool=True, coerce_int96_timestamp_unit=None, decryption_properties=None, thrift_string_size_limit=None, thrift_container_size_limit=None, schema_depth_limit=None, page_checksum_verification: bool=False, arrow_extensions_enabled: bool=True) -> None:
+    def __init__(self, path_or_paths, filesystem: SubTreeFileSystem | LocalFileSystem | str | None=None, schema: Schema | None=None, *, filters=None, read_dictionary=None, binary_type=None, list_type=None, memory_map: bool=False, buffer_size=None, partitioning: str='hive', ignore_prefixes=None, pre_buffer: bool=True, coerce_int96_timestamp_unit=None, decryption_properties=None, thrift_string_size_limit=None, thrift_container_size_limit=None, schema_depth_limit=None, page_checksum_verification: bool=False, arrow_extensions_enabled: bool=True) -> None:
         ...
 
-    def equals(self, other):
+    def equals(self, other) -> bool:
         ...
 
-    def __eq__(self, other):
+    def __eq__(self, other) -> bool:
         ...
 
     @property
-    def schema(self):
+    def schema(self) -> Schema:
         ...
 
     def read(self, columns: list[str] | None=None, use_threads: bool=True, use_pandas_metadata: bool=False) -> pyarrow.Table:
         ...
 
-    def _get_common_pandas_metadata(self):
+    def _get_common_pandas_metadata(self) -> dict[bytes, bytes]:
         ...
 
-    def read_pandas(self, **kwargs):
+    def read_pandas(self, **kwargs) -> Table:
         ...
 
     @property
@@ -184,11 +192,11 @@ class ParquetDataset:
         ...
 
     @property
-    def files(self):
+    def files(self) -> list[str]:
         ...
 
     @property
-    def filesystem(self):
+    def filesystem(self) -> LocalFileSystem:
         ...
 
     @property

@@ -30,13 +30,6 @@ from typing_extensions import TypeAlias
 __pas: Incomplete
 _substrait_msg: str
 SUPPORTED_INPUT_ARR_TYPES: tuple[Incomplete, ...]
-
-class FunctionDoc(NamedTuple):
-    summary: Incomplete
-    description: Incomplete
-    arg_names: Incomplete
-    options_class: Incomplete
-    options_required: Incomplete
 _deserialize: Incomplete
 
 def _pas():
@@ -86,6 +79,13 @@ def _register_user_defined_function(register_func, func: Callable[..., Any], fun
 
 def call_tabular_function(function_name: str, args: Iterable[Any] | None=None, func_registry: FunctionRegistry | None=None) -> pyarrow.RecordBatchReader:
     ...
+
+class FunctionDoc(NamedTuple):
+    summary: Incomplete
+    description: Incomplete
+    arg_names: Incomplete
+    options_class: Incomplete
+    options_required: Incomplete
 
 class Kernel(_Weakrefable):
 

@@ -15,6 +15,9 @@
 # specific language governing permissions and limitations
 # under the License.
 
+from pyarrow._compute import CountOptions, PivotWiderOptions
+from pyarrow._dataset import FileSystemDataset, InMemoryDataset, UnionDataset
+from typing import List, Optional, Tuple, Type, Union
 import os
 import re
 import pyarrow
@@ -28,22 +31,22 @@ from pyarrow.compute import Expression as Expression, field as field
 from pyarrow.lib import RecordBatch as RecordBatch, Table as Table, array as array
 ds: Incomplete
 
-def _dataset_to_decl(dataset, use_threads: bool=True, implicit_ordering: bool=False):
+def _dataset_to_decl(dataset: FileSystemDataset | UnionDataset | InMemoryDataset, use_threads: bool=True, implicit_ordering: bool=False) -> Declaration:
     ...
 
 def _perform_join(join_type: str, left_operand: Table | pyarrow.dataset.Dataset, left_keys: str | list[str], right_operand: Table | pyarrow.dataset.Dataset, right_keys: str | list[str], left_suffix: str | None=None, right_suffix: str | None=None, use_threads: bool=True, coalesce_keys: bool=False, output_type=..., filter_expression: pyarrow.compute.Expression | None=None) -> Table | pyarrow.dataset.InMemoryDataset:
     ...
 
-def _perform_join_asof(left_operand: Table | pyarrow.dataset.Dataset, left_on: str, left_by, right_operand: Table | pyarrow.dataset.Dataset, right_on: str | list[str], right_by, tolerance: int, use_threads: bool=True, output_type=...) -> Table | pyarrow.dataset.InMemoryDataset:
+def _perform_join_asof(left_operand: Table | pyarrow.dataset.Dataset, left_on: str, left_by: list[Any] | str | list[str], right_operand: Table | pyarrow.dataset.Dataset, right_on: str | list[str], right_by: list[Any] | str | list[str], tolerance: int, use_threads: bool=True, output_type=...) -> Table | pyarrow.dataset.InMemoryDataset:
     ...
 
 def _filter_table(table: Table | RecordBatch, expression: Expression) -> Table | RecordBatch:
     ...
 
-def _sort_source(table_or_dataset, sort_keys, output_type=..., **kwargs):
+def _sort_source(table_or_dataset: FileSystemDataset | InMemoryDataset, sort_keys: list[tuple[str, str, str]], output_type=..., **kwargs) -> InMemoryDataset:
     ...
 
-def _group_by(table, aggregates, keys, use_threads: bool=True):
+def _group_by(table: Table, aggregates: list[tuple[tuple[str, str], str, None, str] | tuple[list[Any], str, None, str] | tuple[list[str], str, CountOptions, str] | Any | tuple[list[str], str, None, str] | tuple[tuple[str, str], str, PivotWiderOptions, str]], keys: list[str], use_threads: bool=True) -> Table:
     ...
 
 class DatasetModuleStub:

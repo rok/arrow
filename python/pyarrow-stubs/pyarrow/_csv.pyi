@@ -25,12 +25,6 @@ from pyarrow.lib import __name__ as __name__
 from _typeshed import Incomplete
 from collections import namedtuple
 from pyarrow.lib import MemoryPool, RecordBatchReader, Schema, _CRecordBatchWriter, _Weakrefable
-
-class _InvalidRow(NamedTuple):
-    expected_columns: Incomplete
-    actual_columns: Incomplete
-    number: Incomplete
-    text: Incomplete
 ISO8601: _ISO8601
 
 def read_csv(input_file, read_options: pyarrow.csv.ReadOptions | None=None, parse_options: pyarrow.csv.ParseOptions | None=None, convert_options: pyarrow.csv.ConvertOptions | None=None, memory_pool: MemoryPool | None=None) -> pyarrow.Table:
@@ -44,6 +38,12 @@ def _raise_invalid_function_option(value, description, *, exception_class=ValueE
 
 def write_csv(data: pyarrow.RecordBatch | pyarrow.Table, output_file, write_options: pyarrow.csv.WriteOptions | None=None, memory_pool: MemoryPool | None=None) -> None:
     ...
+
+class _InvalidRow(NamedTuple):
+    expected_columns: Incomplete
+    actual_columns: Incomplete
+    number: Incomplete
+    text: Incomplete
 
 class InvalidRow(_InvalidRow):
     __slots__ = ()

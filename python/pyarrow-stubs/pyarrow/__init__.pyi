@@ -37,13 +37,13 @@ def _module_is_available(module):
 def _filesystem_is_available(fs):
     ...
 
-def have_libhdfs():
+def have_libhdfs() -> bool:
     ...
 
 def show_info() -> None:
     ...
 
-def get_include():
+def get_include() -> str:
     ...
 
 def _get_pkg_config_executable():

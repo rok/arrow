@@ -15,6 +15,11 @@
 # specific language governing permissions and limitations
 # under the License.
 
+from io import BytesIO
+from pathlib import Path
+from pyarrow._fs import LocalFileSystem
+from pyarrow.lib import BufferOutputStream, BufferReader, NativeFile, RecordBatch, Schema
+from typing import List, Optional, Union
 import os
 import re
 import pyarrow
@@ -27,7 +32,7 @@ from pyarrow.fs import _resolve_filesystem_and_path as _resolve_filesystem_and_p
 from pyarrow.lib import Table as Table
 _orc_writer_args_docs: str
 
-def read_table(source: str | pyarrow.NativeFile | IO[Any], columns: list | None=None, filesystem: pyarrow.fs.FileSystem | None=None):
+def read_table(source: str | pyarrow.NativeFile | IO[Any], columns: list | None=None, filesystem: pyarrow.fs.FileSystem | None=None) -> Table:
     ...
 
 def write_table(table: Table, where, *, file_version: str='0.12', batch_size: int=1024, stripe_size: int=..., compression: str='uncompressed', compression_block_size: int=65536, compression_strategy: str='speed', row_index_stride: int=10000, padding_tolerance: float=0.0, dictionary_key_size_threshold: float=0.0, bloom_filter_columns=None, bloom_filter_fpp: float=0.05) -> None:
@@ -36,7 +41,7 @@ def write_table(table: Table, where, *, file_version: str='0.12', batch_size: in
 class ORCFile:
     reader: Incomplete
 
-    def __init__(self, source) -> None:
+    def __init__(self, source: Path | BufferReader | str | BytesIO | NativeFile) -> None:
         ...
 
     @property
@@ -44,19 +49,19 @@ class ORCFile:
         ...
 
     @property
-    def schema(self):
+    def schema(self) -> Schema:
         ...
 
     @property
-    def nrows(self):
+    def nrows(self) -> int:
         ...
 
     @property
-    def nstripes(self):
+    def nstripes(self) -> int:
         ...
 
     @property
-    def file_version(self):
+    def file_version(self) -> str:
         ...
 
     @property
@@ -64,11 +69,11 @@ class ORCFile:
         ...
 
     @property
-    def compression(self):
+    def compression(self) -> str:
         ...
 
     @property
-    def compression_size(self):
+    def compression_size(self) -> int:
         ...
 
     @property
@@ -80,7 +85,7 @@ class ORCFile:
         ...
 
     @property
-    def row_index_stride(self):
+    def row_index_stride(self) -> int:
         ...
 
     @property
@@ -107,7 +112,7 @@ class ORCFile:
     def file_length(self):
         ...
 
-    def _select_names(self, columns=None):
+    def _select_names(self, columns: list[int] | list[str] | None=None) -> list[str]:
         ...
 
     def read_stripe(self, n: int, columns: list | None=None) -> pyarrow.RecordBatch:

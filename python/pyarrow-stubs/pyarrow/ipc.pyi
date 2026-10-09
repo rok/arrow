@@ -15,6 +15,10 @@
 # specific language governing permissions and limitations
 # under the License.
 
+from io import BufferedWriter, BytesIO
+from pathlib import Path
+from pyarrow.lib import Buffer, BufferOutputStream, BufferReader, CompressedInputStream, CompressedOutputStream, MockOutputStream, NativeFile, OSFile, Schema
+from typing import Optional, Union
 import os
 import re
 import pyarrow
@@ -27,48 +31,48 @@ from pyarrow.lib import Alignment as Alignment, IpcReadOptions as IpcReadOptions
 _ipc_writer_class_doc: str
 _ipc_file_writer_class_doc: Incomplete
 
-def _get_legacy_format_default(options):
+def _get_legacy_format_default(options: IpcWriteOptions | None) -> IpcWriteOptions:
     ...
 
-def _ensure_default_ipc_read_options(options):
+def _ensure_default_ipc_read_options(options: IpcReadOptions | bool | None) -> IpcReadOptions:
     ...
 
 def new_stream(sink: str | pyarrow.NativeFile | IO[Any], schema: pyarrow.Schema, *, options: pyarrow.ipc.IpcWriteOptions | None=None) -> RecordBatchStreamWriter:
     ...
 
-def open_stream(source, *, options: pyarrow.ipc.IpcReadOptions | None=None, memory_pool: pyarrow.MemoryPool | None=None) -> RecordBatchStreamReader:
+def open_stream(source: BytesIO | bytes | BufferReader | Buffer, *, options: pyarrow.ipc.IpcReadOptions | None=None, memory_pool: pyarrow.MemoryPool | None=None) -> RecordBatchStreamReader:
     ...
 
 def new_file(sink: str | pyarrow.NativeFile | IO[Any], schema: pyarrow.Schema, *, options: pyarrow.ipc.IpcWriteOptions | None=None, metadata: dict | pyarrow.KeyValueMetadata | None=None) -> RecordBatchFileWriter:
     ...
 
-def open_file(source, footer_offset: int | None=None, *, options: pyarrow.ipc.IpcReadOptions | None=None, memory_pool: pyarrow.MemoryPool | None=None) -> RecordBatchFileReader:
+def open_file(source: Path | BufferReader | Buffer | BytesIO | OSFile | bytes, footer_offset: int | None=None, *, options: pyarrow.ipc.IpcReadOptions | None=None, memory_pool: pyarrow.MemoryPool | None=None) -> RecordBatchFileReader:
     ...
 
-def serialize_pandas(df, *, nthreads: int | None=None, preserve_index: bool | None=None):
+def serialize_pandas(df, *, nthreads: int | None=None, preserve_index: bool | None=None) -> Buffer:
     ...
 
-def deserialize_pandas(buf, *, use_threads: bool=True):
+def deserialize_pandas(buf: Buffer, *, use_threads: bool=True):
     ...
 
 class RecordBatchStreamReader(lib._RecordBatchStreamReader):
 
-    def __init__(self, source, *, options=None, memory_pool=None) -> None:
+    def __init__(self, source: BufferReader | CompressedInputStream | Buffer | BytesIO | bytes, *, options=None, memory_pool=None) -> None:
         ...
 
 class RecordBatchStreamWriter(lib._RecordBatchStreamWriter):
     __doc__: Incomplete
 
-    def __init__(self, sink, schema, *, options=None) -> None:
+    def __init__(self, sink: BufferOutputStream | BufferedWriter | MockOutputStream | CompressedOutputStream | BytesIO, schema: Schema, *, options=None) -> None:
         ...
 
 class RecordBatchFileReader(lib._RecordBatchFileReader):
 
-    def __init__(self, source, footer_offset=None, *, options=None, memory_pool=None) -> None:
+    def __init__(self, source: Path | BufferReader | Buffer | BytesIO | OSFile | bytes, footer_offset=None, *, options=None, memory_pool=None) -> None:
         ...
 
 class RecordBatchFileWriter(lib._RecordBatchFileWriter):
     __doc__: Incomplete
 
-    def __init__(self, sink, schema, *, options=None, metadata=None) -> None:
+    def __init__(self, sink: BufferOutputStream | MockOutputStream | str | BytesIO | NativeFile | OSFile, schema: Schema, *, options=None, metadata=None) -> None:
         ...

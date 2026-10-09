@@ -15,6 +15,11 @@
 # specific language governing permissions and limitations
 # under the License.
 
+from pathlib import Path
+from pyarrow._fs import FileSelector, LocalFileSystem, PyFileSystem, SubTreeFileSystem, _MockFileSystem
+from pyarrow.lib import RecordBatch, RecordBatchReader, Schema, Table
+from pyarrow.tests.util import FSProtocolClass
+from typing import List, Optional, Tuple, Union
 import os
 import re
 import pyarrow
@@ -33,41 +38,41 @@ _orc_msg: str
 _parquet_available: bool
 _parquet_msg: str
 
-def __getattr__(name) -> None:
+def __getattr__(name: str) -> None:
     ...
 
-def partitioning(schema: pyarrow.Schema | None=None, field_names: list[str] | None=None, flavor: str | None=None, dictionaries=None) -> Partitioning | PartitioningFactory:
+def partitioning(schema: pyarrow.Schema | None=None, field_names: list[str] | None=None, flavor: str | None=None, dictionaries: str | None=None) -> Partitioning | PartitioningFactory:
     ...
 
-def _ensure_partitioning(scheme):
+def _ensure_partitioning(scheme: str | list[str] | PartitioningFactory | FilenamePartitioning | DirectoryPartitioning | int | HivePartitioning | None) -> FilenamePartitioning | PartitioningFactory | HivePartitioning | DirectoryPartitioning | None:
     ...
 
-def _ensure_format(obj):
+def _ensure_format(obj: str | OrcFileFormat | JsonFileFormat | IpcFileFormat | CsvFileFormat | ParquetFileFormat) -> OrcFileFormat | JsonFileFormat | IpcFileFormat | CsvFileFormat | FeatherFileFormat | ParquetFileFormat:
     ...
 
-def _ensure_multiple_sources(paths: list[os.PathLike[str]], filesystem: pyarrow.fs.FileSystem | str | None=None):
+def _ensure_multiple_sources(paths: list[os.PathLike[str]], filesystem: pyarrow.fs.FileSystem | str | None=None) -> tuple[_MockFileSystem, list[str]] | tuple[LocalFileSystem, list[Any]] | tuple[LocalFileSystem, list[str]] | tuple[SubTreeFileSystem, list[str]]:
     ...
 
-def _ensure_single_source(path: os.PathLike[str], filesystem: pyarrow.fs.FileSystem | str | None=None):
+def _ensure_single_source(path: os.PathLike[str], filesystem: pyarrow.fs.FileSystem | str | None=None) -> tuple[PyFileSystem, FileSelector] | tuple[_MockFileSystem, FileSelector] | tuple[LocalFileSystem, list[str]] | tuple[LocalFileSystem, FileSelector] | tuple[SubTreeFileSystem, FileSelector] | tuple[SubTreeFileSystem, list[str]]:
     ...
 
-def _filesystem_dataset(source, schema=None, filesystem=None, partitioning=None, format=None, partition_base_dir=None, exclude_invalid_files=None, selector_ignore_prefixes=None) -> FileSystemDataset:
+def _filesystem_dataset(source, schema: Schema | None=None, filesystem: _MockFileSystem | PyFileSystem | str | SubTreeFileSystem | LocalFileSystem | None=None, partitioning: FilenamePartitioning | str | list[str] | PartitioningFactory | HivePartitioning | DirectoryPartitioning | int | None=None, format: str | OrcFileFormat | JsonFileFormat | IpcFileFormat | CsvFileFormat | ParquetFileFormat | None=None, partition_base_dir=None, exclude_invalid_files=None, selector_ignore_prefixes: list[str] | None=None) -> FileSystemDataset:
     ...
 
-def _in_memory_dataset(source, schema=None, **kwargs):
+def _in_memory_dataset(source: Table | list[RecordBatch] | RecordBatch | list[Table] | RecordBatchReader, schema=None, **kwargs) -> InMemoryDataset:
     ...
 
-def _union_dataset(children, schema=None, **kwargs):
+def _union_dataset(children: list[FileSystemDataset] | tuple[InMemoryDataset, InMemoryDataset] | tuple[FileSystemDataset, FileSystemDataset], schema: Schema | None=None, **kwargs) -> UnionDataset:
     ...
 
-def parquet_dataset(metadata_path, schema: pyarrow.Schema | None=None, filesystem=None, format: ParquetFileFormat | None=None, partitioning: Partitioning | PartitioningFactory | str | list[str] | None=None, partition_base_dir: str | None=None) -> FileSystemDataset:
+def parquet_dataset(metadata_path: str, schema: pyarrow.Schema | None=None, filesystem=None, format: ParquetFileFormat | None=None, partitioning: Partitioning | PartitioningFactory | str | list[str] | None=None, partition_base_dir: str | None=None) -> FileSystemDataset:
     ...
 
-def dataset(source, schema: pyarrow.Schema | None=None, format: FileFormat | str | None=None, filesystem=None, partitioning: Partitioning | PartitioningFactory | str | list[str] | None=None, partition_base_dir: str | None=None, exclude_invalid_files: bool | None=None, ignore_prefixes: list | None=None) -> Dataset:
+def dataset(source, schema: pyarrow.Schema | None=None, format: FileFormat | str | None=None, filesystem: _MockFileSystem | PyFileSystem | str | SubTreeFileSystem | LocalFileSystem | None=None, partitioning: Partitioning | PartitioningFactory | str | list[str] | None=None, partition_base_dir: str | None=None, exclude_invalid_files: bool | None=None, ignore_prefixes: list | None=None) -> Dataset:
     ...
 
-def _ensure_write_partitioning(part, schema, flavor):
+def _ensure_write_partitioning(part: list[str] | FilenamePartitioning | DirectoryPartitioning | HivePartitioning | None, schema: Schema, flavor: str | None) -> DirectoryPartitioning | HivePartitioning | FilenamePartitioning:
     ...
 
-def write_dataset(data, base_dir: str, *, basename_template: str | None=None, format: FileFormat | str | None=None, partitioning: Partitioning | list[str] | None=None, partitioning_flavor: str | None=None, schema: pyarrow.Schema | None=None, filesystem: pyarrow.fs.FileSystem | None=None, file_options: pyarrow.dataset.FileWriteOptions | None=None, use_threads: bool=True, preserve_order: bool=False, max_partitions: int | None=None, max_open_files: int | None=None, max_rows_per_file: int | None=None, min_rows_per_group: int | None=None, max_rows_per_group: int | None=None, file_visitor: Callable[..., Any] | None=None, existing_data_behavior: str='error', create_dir: bool=True) -> None:
+def write_dataset(data: Table | FileSystemDataset | Scanner | list[Table] | InMemoryDataset, base_dir: str, *, basename_template: str | None=None, format: FileFormat | str | None=None, partitioning: Partitioning | list[str] | None=None, partitioning_flavor: str | None=None, schema: pyarrow.Schema | None=None, filesystem: pyarrow.fs.FileSystem | None=None, file_options: pyarrow.dataset.FileWriteOptions | None=None, use_threads: bool=True, preserve_order: bool=False, max_partitions: int | None=None, max_open_files: int | None=None, max_rows_per_file: int | None=None, min_rows_per_group: int | None=None, max_rows_per_group: int | None=None, file_visitor: Callable[..., Any] | None=None, existing_data_behavior: str='error', create_dir: bool=True) -> None:
     ...
