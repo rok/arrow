@@ -15,50 +15,57 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from pyarrow.lib import DataType, Table, TimestampType
-from typing import Tuple, Union
-import os
-import re
+from pyarrow.lib import DataType, TimestampType
 import pyarrow
-from typing import Callable, IO, Iterable, Iterator, Literal, Mapping, NamedTuple, Self, Sequence
-from _typeshed import Incomplete
 import pyarrow as pa
-from pyarrow.interchange.column import ColumnBuffers as ColumnBuffers, ColumnNullType as ColumnNullType, Dtype as Dtype, DtypeKind as DtypeKind
-from typing import Any
-DataFrameObject = Any
-ColumnObject = Any
-BufferObject = Any
+from pyarrow.interchange.column import (
+    ColumnBuffers as ColumnBuffers,
+    ColumnNullType as ColumnNullType,
+    Dtype as Dtype,
+    DtypeKind as DtypeKind,
+)
+from typing import Any, TypeAlias
+
+DataFrameObject: TypeAlias = Any
+ColumnObject: TypeAlias = Any
+BufferObject: TypeAlias = Any
 _PYARROW_DTYPES: dict[DtypeKind, dict[int, Any]]
 
-def from_dataframe(df: DataFrameObject, allow_copy: bool=True) -> pa.Table:
-    ...
-
-def _from_dataframe(df: DataFrameObject, allow_copy: bool=True) -> pyarrow.Table:
-    ...
-
-def protocol_df_chunk_to_pyarrow(df: DataFrameObject, allow_copy: bool=True) -> pa.RecordBatch:
-    ...
-
-def column_to_array(col: ColumnObject, allow_copy: bool=True) -> pa.Array:
-    ...
-
-def bool_column_to_array(col: ColumnObject, allow_copy: bool=True) -> pa.Array:
-    ...
-
-def categorical_column_to_dictionary(col: ColumnObject, allow_copy: bool=True) -> pa.DictionaryArray:
-    ...
-
-def parse_datetime_format_str(format_str: str) -> tuple[str, str]:
-    ...
-
-def map_date_type(data_type: tuple[DtypeKind, int, str, str] | tuple[DtypeKind, int, str, str]) -> DataType | TimestampType:
-    ...
-
-def buffers_to_array(buffers: ColumnBuffers, data_type: tuple[DtypeKind, int, str, str], length: int, describe_null: ColumnNullType, offset: int=0, allow_copy: bool=True) -> pa.Array:
-    ...
-
-def validity_buffer_from_mask(validity_buff: BufferObject, validity_dtype: Dtype, describe_null: ColumnNullType, length: int, offset: int=0, allow_copy: bool=True) -> pa.Buffer:
-    ...
-
-def validity_buffer_nan_sentinel(data_pa_buffer: BufferObject, data_type: Dtype, describe_null: ColumnNullType, length: int, offset: int=0, allow_copy: bool=True) -> pa.Buffer:
-    ...
+def from_dataframe(df: DataFrameObject, allow_copy: bool = True) -> pa.Table: ...
+def _from_dataframe(df: DataFrameObject, allow_copy: bool = True) -> pyarrow.Table: ...
+def protocol_df_chunk_to_pyarrow(
+    df: DataFrameObject, allow_copy: bool = True
+) -> pa.RecordBatch: ...
+def column_to_array(col: ColumnObject, allow_copy: bool = True) -> pa.Array: ...
+def bool_column_to_array(col: ColumnObject, allow_copy: bool = True) -> pa.Array: ...
+def categorical_column_to_dictionary(
+    col: ColumnObject, allow_copy: bool = True
+) -> pa.DictionaryArray: ...
+def parse_datetime_format_str(format_str: str) -> tuple[str, str]: ...
+def map_date_type(
+    data_type: tuple[DtypeKind, int, str, str],
+) -> DataType | TimestampType: ...
+def buffers_to_array(
+    buffers: ColumnBuffers,
+    data_type: tuple[DtypeKind, int, str, str],
+    length: int,
+    describe_null: ColumnNullType,
+    offset: int = 0,
+    allow_copy: bool = True,
+) -> pa.Array: ...
+def validity_buffer_from_mask(
+    validity_buff: BufferObject,
+    validity_dtype: Dtype,
+    describe_null: ColumnNullType,
+    length: int,
+    offset: int = 0,
+    allow_copy: bool = True,
+) -> pa.Buffer: ...
+def validity_buffer_nan_sentinel(
+    data_pa_buffer: BufferObject,
+    data_type: Dtype,
+    describe_null: ColumnNullType,
+    length: int,
+    offset: int = 0,
+    allow_copy: bool = True,
+) -> pa.Buffer: ...

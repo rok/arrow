@@ -17,129 +17,110 @@
 
 from io import BytesIO
 from pathlib import Path
-from pyarrow._fs import LocalFileSystem
-from pyarrow.lib import BufferOutputStream, BufferReader, NativeFile, RecordBatch, Schema
-from typing import List, Optional, Union
-import os
-import re
+from pyarrow.lib import BufferReader, NativeFile, Schema
 import pyarrow
-from typing import Any, Callable, IO, Iterable, Iterator, Literal, Mapping, NamedTuple, Self, Sequence
+from typing import Any, IO
 import pyarrow.fs
 from pyarrow.lib import __doc__ as __doc__
-import types
 from _typeshed import Incomplete
 from pyarrow.fs import _resolve_filesystem_and_path as _resolve_filesystem_and_path
 from pyarrow.lib import Table as Table
+
 _orc_writer_args_docs: str
 
-def read_table(source: str | pyarrow.NativeFile | IO[Any], columns: list | None=None, filesystem: pyarrow.fs.FileSystem | None=None) -> Table:
-    ...
-
-def write_table(table: Table, where, *, file_version: str='0.12', batch_size: int=1024, stripe_size: int=..., compression: str='uncompressed', compression_block_size: int=65536, compression_strategy: str='speed', row_index_stride: int=10000, padding_tolerance: float=0.0, dictionary_key_size_threshold: float=0.0, bloom_filter_columns=None, bloom_filter_fpp: float=0.05) -> None:
-    ...
+def read_table(
+    source: str | pyarrow.NativeFile | IO[Any],
+    columns: list | None = None,
+    filesystem: pyarrow.fs.FileSystem | None = None,
+) -> Table: ...
+def write_table(
+    table: Table,
+    where,
+    *,
+    file_version: str = "0.12",
+    batch_size: int = 1024,
+    stripe_size: int = ...,
+    compression: str = "uncompressed",
+    compression_block_size: int = 65536,
+    compression_strategy: str = "speed",
+    row_index_stride: int = 10000,
+    padding_tolerance: float = 0.0,
+    dictionary_key_size_threshold: float = 0.0,
+    bloom_filter_columns=None,
+    bloom_filter_fpp: float = 0.05,
+) -> None: ...
 
 class ORCFile:
     reader: Incomplete
 
-    def __init__(self, source: Path | BufferReader | str | BytesIO | NativeFile) -> None:
-        ...
-
+    def __init__(
+        self, source: Path | BufferReader | str | BytesIO | NativeFile
+    ) -> None: ...
     @property
-    def metadata(self):
-        ...
-
+    def metadata(self): ...
     @property
-    def schema(self) -> Schema:
-        ...
-
+    def schema(self) -> Schema: ...
     @property
-    def nrows(self) -> int:
-        ...
-
+    def nrows(self) -> int: ...
     @property
-    def nstripes(self) -> int:
-        ...
-
+    def nstripes(self) -> int: ...
     @property
-    def file_version(self) -> str:
-        ...
-
+    def file_version(self) -> str: ...
     @property
-    def software_version(self):
-        ...
-
+    def software_version(self): ...
     @property
-    def compression(self) -> str:
-        ...
-
+    def compression(self) -> str: ...
     @property
-    def compression_size(self) -> int:
-        ...
-
+    def compression_size(self) -> int: ...
     @property
-    def writer(self):
-        ...
-
+    def writer(self): ...
     @property
-    def writer_version(self):
-        ...
-
+    def writer_version(self): ...
     @property
-    def row_index_stride(self) -> int:
-        ...
-
+    def row_index_stride(self) -> int: ...
     @property
-    def nstripe_statistics(self):
-        ...
-
+    def nstripe_statistics(self): ...
     @property
-    def content_length(self):
-        ...
-
+    def content_length(self): ...
     @property
-    def stripe_statistics_length(self):
-        ...
-
+    def stripe_statistics_length(self): ...
     @property
-    def file_footer_length(self):
-        ...
-
+    def file_footer_length(self): ...
     @property
-    def file_postscript_length(self):
-        ...
-
+    def file_postscript_length(self): ...
     @property
-    def file_length(self):
-        ...
-
-    def _select_names(self, columns: list[int] | list[str] | None=None) -> list[str]:
-        ...
-
-    def read_stripe(self, n: int, columns: list | None=None) -> pyarrow.RecordBatch:
-        ...
-
-    def read(self, columns: list | None=None) -> Table:
-        ...
+    def file_length(self): ...
+    def _select_names(
+        self, columns: list[int] | list[str] | None = None
+    ) -> list[str]: ...
+    def read_stripe(
+        self, n: int, columns: list | None = None
+    ) -> pyarrow.RecordBatch: ...
+    def read(self, columns: list | None = None) -> Table: ...
 
 class ORCWriter:
     __doc__: Incomplete
     is_open: bool
     writer: Incomplete
 
-    def __init__(self, where, *, file_version: str='0.12', batch_size: int=1024, stripe_size=..., compression: str='uncompressed', compression_block_size: int=65536, compression_strategy: str='speed', row_index_stride: int=10000, padding_tolerance: float=0.0, dictionary_key_size_threshold: float=0.0, bloom_filter_columns=None, bloom_filter_fpp: float=0.05) -> None:
-        ...
-
-    def __del__(self) -> None:
-        ...
-
-    def __enter__(self):
-        ...
-
-    def __exit__(self, *args, **kwargs) -> None:
-        ...
-
-    def write(self, table: Table) -> None:
-        ...
-
-    def close(self) -> None:
-        ...
+    def __init__(
+        self,
+        where,
+        *,
+        file_version: str = "0.12",
+        batch_size: int = 1024,
+        stripe_size=...,
+        compression: str = "uncompressed",
+        compression_block_size: int = 65536,
+        compression_strategy: str = "speed",
+        row_index_stride: int = 10000,
+        padding_tolerance: float = 0.0,
+        dictionary_key_size_threshold: float = 0.0,
+        bloom_filter_columns=None,
+        bloom_filter_fpp: float = 0.05,
+    ) -> None: ...
+    def __del__(self) -> None: ...
+    def __enter__(self): ...
+    def __exit__(self, *args, **kwargs) -> None: ...
+    def write(self, table: Table) -> None: ...
+    def close(self) -> None: ...

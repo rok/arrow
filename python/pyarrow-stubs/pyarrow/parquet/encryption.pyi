@@ -15,9 +15,12 @@
 # specific language governing permissions and limitations
 # under the License.
 
-import os
-import re
-import pyarrow
-from typing import Any, Callable, IO, Iterable, Iterator, Literal, Mapping, NamedTuple, Self, Sequence
-from _typeshed import Incomplete
-from pyarrow._parquet_encryption import CryptoFactory as CryptoFactory, DecryptionConfiguration as DecryptionConfiguration, EncryptionConfiguration as EncryptionConfiguration, KmsClient as KmsClient, KmsConnectionConfig as KmsConnectionConfig, create_decryption_properties as create_decryption_properties, create_encryption_properties as create_encryption_properties
+from pyarrow._parquet_encryption import (
+    CryptoFactory as CryptoFactory,
+    DecryptionConfiguration as DecryptionConfiguration,
+    EncryptionConfiguration as EncryptionConfiguration,
+    KmsClient as KmsClient,
+    KmsConnectionConfig as KmsConnectionConfig,
+    create_decryption_properties as create_decryption_properties,
+    create_encryption_properties as create_encryption_properties,
+)

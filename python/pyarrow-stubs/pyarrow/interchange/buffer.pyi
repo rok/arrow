@@ -15,10 +15,6 @@
 # specific language governing permissions and limitations
 # under the License.
 
-import os
-import re
-import pyarrow
-from typing import Any, Callable, IO, Iterable, Iterator, Literal, Mapping, NamedTuple, Self, Sequence
 import enum
 import pyarrow as pa
 from _typeshed import Incomplete
@@ -36,22 +32,10 @@ class DlpackDeviceType(enum.IntEnum):
 class _PyArrowBuffer:
     _x: Incomplete
 
-    def __init__(self, x: pa.Buffer, allow_copy: bool=True) -> None:
-        ...
-
+    def __init__(self, x: pa.Buffer, allow_copy: bool = True) -> None: ...
     @property
-    def bufsize(self) -> int:
-        ...
-
+    def bufsize(self) -> int: ...
     @property
-    def ptr(self) -> int:
-        ...
-
-    def __dlpack__(self) -> None:
-        ...
-
-    def __dlpack_device__(self) -> tuple[DlpackDeviceType, int | None]:
-        ...
-
-    def __repr__(self) -> str:
-        ...
+    def ptr(self) -> int: ...
+    def __dlpack__(self) -> None: ...
+    def __dlpack_device__(self) -> tuple[DlpackDeviceType, int | None]: ...
