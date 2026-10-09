@@ -1,3 +1,20 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
 import pyarrow.lib
 from _typeshed import Incomplete
 from pyarrow._compute import ArraySortOptions as ArraySortOptions, AssumeTimezoneOptions as AssumeTimezoneOptions, CastOptions as CastOptions, CountOptions as CountOptions, CumulativeOptions as CumulativeOptions, CumulativeSumOptions as CumulativeSumOptions, DayOfWeekOptions as DayOfWeekOptions, DictionaryEncodeOptions as DictionaryEncodeOptions, ElementWiseAggregateOptions as ElementWiseAggregateOptions, Expression as Expression, ExtractRegexOptions as ExtractRegexOptions, ExtractRegexSpanOptions as ExtractRegexSpanOptions, FilterOptions as FilterOptions, Function as Function, FunctionOptions as FunctionOptions, FunctionRegistry as FunctionRegistry, HashAggregateFunction as HashAggregateFunction, HashAggregateKernel as HashAggregateKernel, IndexOptions as IndexOptions, InversePermutationOptions as InversePermutationOptions, JoinOptions as JoinOptions, Kernel as Kernel, ListFlattenOptions as ListFlattenOptions, ListSliceOptions as ListSliceOptions, MakeStructOptions as MakeStructOptions, MapLookupOptions as MapLookupOptions, MatchSubstringOptions as MatchSubstringOptions, ModeOptions as ModeOptions, NullOptions as NullOptions, PadOptions as PadOptions, PairwiseOptions as PairwiseOptions, PartitionNthOptions as PartitionNthOptions, PivotWiderOptions as PivotWiderOptions, QuantileOptions as QuantileOptions, RandomOptions as RandomOptions, RankOptions as RankOptions, RankQuantileOptions as RankQuantileOptions, ReplaceSliceOptions as ReplaceSliceOptions, ReplaceSubstringOptions as ReplaceSubstringOptions, RoundBinaryOptions as RoundBinaryOptions, RoundOptions as RoundOptions, RoundTemporalOptions as RoundTemporalOptions, RoundToMultipleOptions as RoundToMultipleOptions, RunEndEncodeOptions as RunEndEncodeOptions, ScalarAggregateFunction as ScalarAggregateFunction, ScalarAggregateKernel as ScalarAggregateKernel, ScalarAggregateOptions as ScalarAggregateOptions, ScalarFunction as ScalarFunction, ScalarKernel as ScalarKernel, ScatterOptions as ScatterOptions, SearchSortedOptions as SearchSortedOptions, SelectKOptions as SelectKOptions, SetLookupOptions as SetLookupOptions, SkewOptions as SkewOptions, SliceOptions as SliceOptions, SortOptions as SortOptions, SplitOptions as SplitOptions, SplitPatternOptions as SplitPatternOptions, StrftimeOptions as StrftimeOptions, StrptimeOptions as StrptimeOptions, StructFieldOptions as StructFieldOptions, TDigestOptions as TDigestOptions, TakeOptions as TakeOptions, TrimOptions as TrimOptions, UdfContext as UdfContext, Utf8NormalizeOptions as Utf8NormalizeOptions, VarianceOptions as VarianceOptions, VectorFunction as VectorFunction, VectorKernel as VectorKernel, WeekOptions as WeekOptions, WinsorizeOptions as WinsorizeOptions, ZeroFillOptions as ZeroFillOptions, call_function as call_function, call_tabular_function as call_tabular_function, function_registry as function_registry, get_function as get_function, list_functions as list_functions, register_aggregate_function as register_aggregate_function, register_scalar_function as register_scalar_function, register_tabular_function as register_tabular_function, register_vector_function as register_vector_function

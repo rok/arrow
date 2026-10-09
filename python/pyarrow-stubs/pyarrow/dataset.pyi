@@ -1,3 +1,20 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
 from pyarrow._dataset import CsvFileFormat as CsvFileFormat, CsvFragmentScanOptions as CsvFragmentScanOptions, Dataset as Dataset, DatasetFactory as DatasetFactory, DirectoryPartitioning as DirectoryPartitioning, FeatherFileFormat as FeatherFileFormat, FileFormat as FileFormat, FileFragment as FileFragment, FileSystemDataset as FileSystemDataset, FileSystemDatasetFactory as FileSystemDatasetFactory, FileSystemFactoryOptions as FileSystemFactoryOptions, FileWriteOptions as FileWriteOptions, FilenamePartitioning as FilenamePartitioning, Fragment as Fragment, FragmentScanOptions as FragmentScanOptions, HivePartitioning as HivePartitioning, InMemoryDataset as InMemoryDataset, IpcFileFormat as IpcFileFormat, IpcFileWriteOptions as IpcFileWriteOptions, JsonFileFormat as JsonFileFormat, JsonFragmentScanOptions as JsonFragmentScanOptions, Partitioning as Partitioning, PartitioningFactory as PartitioningFactory, Scanner as Scanner, TaggedRecordBatch as TaggedRecordBatch, UnionDataset as UnionDataset, UnionDatasetFactory as UnionDatasetFactory, WrittenFile as WrittenFile, _filesystemdataset_write as _filesystemdataset_write, get_partition_keys as get_partition_keys
 from pyarrow._dataset_orc import OrcFileFormat as OrcFileFormat
 from pyarrow._dataset_parquet import ParquetDatasetFactory as ParquetDatasetFactory, ParquetFactoryOptions as ParquetFactoryOptions, ParquetFileFormat as ParquetFileFormat, ParquetFileFragment as ParquetFileFragment, ParquetFileWriteOptions as ParquetFileWriteOptions, ParquetFragmentScanOptions as ParquetFragmentScanOptions, ParquetReadOptions as ParquetReadOptions, RowGroupInfo as RowGroupInfo
