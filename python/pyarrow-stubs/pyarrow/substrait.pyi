@@ -15,4 +15,9 @@
 # specific language governing permissions and limitations
 # under the License.
 
+import os
+import re
+import pyarrow
+from typing import Any, Callable, IO, Iterable, Iterator, Literal, Mapping, NamedTuple, Self, Sequence
+from _typeshed import Incomplete
 from pyarrow._substrait import BoundExpressions as BoundExpressions, SubstraitSchema as SubstraitSchema, deserialize_expressions as deserialize_expressions, deserialize_schema as deserialize_schema, get_supported_functions as get_supported_functions, run_query as run_query, serialize_expressions as serialize_expressions, serialize_schema as serialize_schema
