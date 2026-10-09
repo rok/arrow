@@ -112,23 +112,24 @@ git_describe_command = 'git describe --dirty --tags --long --match "apache-arrow
 fallback_version = '26.0.0a0'
 
 # TODO: Enable type checking once stubs are merged
+# The test suite is checked against the stubs: it calls the API with real
+# values, so it validates the annotations. Test bodies are unannotated, hence
+# check_untyped_defs. The library sources themselves are not checked yet.
 [tool.mypy]
-files = ["pyarrow-stubs"]
+files = ["pyarrow-stubs", "pyarrow/tests"]
 mypy_path = "$MYPY_CONFIG_FILE_DIR/pyarrow-stubs"
+check_untyped_defs = true
 exclude = [
-    "^pyarrow/",
     "^benchmarks/",
     "^examples/",
     "^scripts/",
 ]
 
-# TODO: Enable type checking once stubs are merged
 [tool.pyright]
 pythonPlatform = "All"
 pythonVersion = "3.11"
-include = ["pyarrow-stubs"]
+include = ["pyarrow-stubs", "pyarrow/tests"]
 exclude = [
-    "pyarrow",
     "benchmarks",
     "examples",
     "scripts",
@@ -136,16 +137,30 @@ exclude = [
 ]
 stubPath = "pyarrow-stubs"
 typeCheckingMode = "basic"
+# The tests import optional dependencies as `x = None` on failure and then
+# use them unguarded; every report of that idiom would be noise here.
+reportOptionalMemberAccess = false
 
-# TODO: Enable type checking once stubs are merged
 [tool.ty.environment]
 extra-paths = ["pyarrow-stubs"]
 
 [tool.ty.src]
-include = ["pyarrow-stubs"]
+include = ["pyarrow-stubs", "pyarrow/tests"]
 exclude = [
-    "pyarrow",
     "benchmarks",
     "examples",
     "scripts",
 ]
+
+# ruff formats and lints the generated stubs only; the pre-commit hooks and
+# scripts/add_types_to_stubs.py run it. The stubs follow the typeshed
+# conventions its flake8-pyi rules describe.
+[tool.ruff]
+include = ["pyarrow-stubs/**/*.pyi"]
+line-length = 88
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "PYI", "UP006", "UP007", "UP035", "UP037", "UP045"]
+# Star imports mirror the sources; in a stub they re-export.
+ignore = ["F403", "F405"]
