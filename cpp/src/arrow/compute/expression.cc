@@ -30,6 +30,7 @@
 #include "arrow/compute/exec_internal.h"
 #include "arrow/compute/expression_internal.h"
 #include "arrow/compute/function_internal.h"
+#include "arrow/compute/kernels/scalar_set_lookup_internal.h"
 #include "arrow/compute/util.h"
 #include "arrow/io/memory.h"
 #ifdef ARROW_IPC
@@ -1270,12 +1271,10 @@ struct Inequality {
 
     auto options = checked_pointer_cast<SetLookupOptions>(is_in_call->options);
 
-    // The maximum number of values in the is_in expression set of values
-    // in order to use the simplification.
-    // If the set is large there are performance implications, see:
-    // https://github.com/apache/arrow/issues/46777
-    constexpr int16_t kIsInSimplificationMaxValueSet = 50;
-    if (options->value_set.length() > kIsInSimplificationMaxValueSet) {
+    // Filtering a large value set and rebinding the call for every guarantee is
+    // expensive (https://github.com/apache/arrow/issues/46777). Large value sets
+    // are handled by SimplifyIsInWithInequalities instead.
+    if (options->value_set.length() > internal::kIsInSimplificationMaxValueSet) {
       return std::nullopt;
     }
 
@@ -1412,6 +1411,158 @@ struct Inequality {
   }
 };
 
+/// \brief Whether an `is_in` call can be simplified to `false` once we know that
+///   none of its (non-null) value set members can occur in the data.
+///
+/// \param nullable whether the data matched against the value set may be null
+bool IsInWithoutMatchesIsFalse(const SetLookupOptions& options, bool value_set_has_null,
+                               bool nullable) {
+  switch (options.null_matching_behavior) {
+    case SetLookupOptions::MATCH:
+      // A null in the value set matches nulls in the data.
+      return !(nullable && value_set_has_null);
+    case SetLookupOptions::SKIP:
+      // Nulls in the data produce false.
+      return true;
+    case SetLookupOptions::EMIT_NULL:
+      // Nulls in the data produce null.
+      return !nullable;
+    case SetLookupOptions::INCONCLUSIVE:
+      // Nulls in the data produce null and so does any non-match if the value
+      // set contains a null.
+      return !nullable && !value_set_has_null;
+  }
+  return false;
+}
+
+/// \brief Simplify an `is_in` call with a large value set against all inequality
+///   guarantees on its argument at once.
+///
+/// Rather than filtering the value set (see Inequality::SimplifyIsIn), this binary
+/// searches the sorted copy of the value set kept in the kernel state for the
+/// range of values admitted by the inequalities. If that range is empty the call
+/// is simplified to `false`; otherwise it is left unchanged. This is exact for any
+/// number of values and costs O(log N) per guarantee, with no rebinding.
+///
+/// Applying all inequalities on a field together matters: a row group's
+/// statistics yield `x >= min and x <= max`, and neither bound on its own can
+/// rule out a value set whose hull spans the row group.
+Result<Expression> SimplifyIsInWithInequalities(
+    const std::vector<Inequality>& inequalities, Expression expr) {
+  auto call = expr.call();
+  if (!call || call->function_name != "is_in") return expr;
+  if (!call->kernel_state) return expr;
+
+  auto options = checked_pointer_cast<SetLookupOptions>(call->options);
+  if (options->value_set.length() <= internal::kIsInSimplificationMaxValueSet) {
+    // Handled by Inequality::SimplifyIsIn
+    return expr;
+  }
+
+  const auto& lhs = Comparison::StripOrderPreservingCasts(call->arguments[0]);
+  if (!lhs.field_ref()) return expr;
+  const FieldRef& target = *lhs.field_ref();
+  // The casts stripped above are nondecreasing but, when the argument is floating
+  // point, not necessarily injective (e.g. float64 to float32 or int64 to float64),
+  // so `x > b` only implies `cast(x) >= cast(b)`: strict bounds have to be
+  // weakened to inclusive ones below. Integer widenings are injective.
+  const bool lhs_was_cast = &lhs != &call->arguments[0];
+  const bool weaken_strict_bounds =
+      lhs_was_cast && is_floating(call->arguments[0].type()->id());
+
+  std::vector<const Inequality*> applicable;
+  for (const Inequality& inequality : inequalities) {
+    if (inequality.target != target) continue;
+    if (inequality.cmp == Comparison::NA || inequality.cmp == Comparison::NOT_EQUAL) {
+      continue;
+    }
+    applicable.push_back(&inequality);
+  }
+  // Only materialize the (lazily sorted) value set once we know it can be used.
+  if (applicable.empty()) return expr;
+
+  const auto& state =
+      checked_cast<const internal::SetLookupStateBase&>(*call->kernel_state);
+  std::shared_ptr<Array> sorted = state.GetSortedValueSet();
+  if (!sorted) return expr;
+  // If the value set could not be cast to the argument type when the call was
+  // bound, the kernel casts the argument instead and the argument's order (which
+  // the guarantee refers to) need not be the value set's order.
+  if (!sorted->type()->Equals(*call->arguments[0].type())) return expr;
+
+  // Indices into `sorted` delimiting the values admitted by the inequalities.
+  int64_t begin = 0;
+  int64_t end = sorted->length();
+  // The guarantee holds for every row, and an inequality which does not admit
+  // nulls can only hold for non-null data.
+  bool nullable = true;
+
+  ExecContext exec_context;
+  for (const Inequality* inequality : applicable) {
+    nullable = nullable && inequality->nullable;
+
+    std::shared_ptr<Scalar> bound = inequality->bound.scalar();
+    if (!bound->type->Equals(*sorted->type())) {
+      // The sorted value set has the type of the (cast) argument. A bound which
+      // cannot be cast to it exactly is ignored, which only loses precision:
+      // "safe" casts between floating point types or to decimals may still
+      // round, so require the cast to round trip.
+      auto maybe_cast =
+          Cast(inequality->bound, sorted->type(), CastOptions::Safe(), &exec_context);
+      if (!maybe_cast.ok()) continue;
+      auto maybe_round_trip =
+          Cast(*maybe_cast, bound->type, CastOptions::Safe(), &exec_context);
+      if (!maybe_round_trip.ok() || !maybe_round_trip->scalar()->Equals(*bound)) {
+        continue;
+      }
+      bound = maybe_cast->scalar();
+    }
+    // A comparison against null or NaN cannot be guaranteed true, but be defensive.
+    if (!bound->is_valid || internal::IsNaNScalar(*bound)) continue;
+
+    Comparison::type cmp = inequality->cmp;
+    if (weaken_strict_bounds) {
+      if (cmp == Comparison::GREATER) cmp = Comparison::GREATER_EQUAL;
+      if (cmp == Comparison::LESS) cmp = Comparison::LESS_EQUAL;
+    }
+
+    ARROW_ASSIGN_OR_RAISE(
+        int64_t lower, internal::SearchSortedValueSet(*sorted, *bound, /*upper=*/false));
+    ARROW_ASSIGN_OR_RAISE(
+        int64_t upper, internal::SearchSortedValueSet(*sorted, *bound, /*upper=*/true));
+    switch (cmp) {
+      case Comparison::GREATER_EQUAL:
+        begin = std::max(begin, lower);
+        break;
+      case Comparison::GREATER:
+        begin = std::max(begin, upper);
+        break;
+      case Comparison::LESS_EQUAL:
+        end = std::min(end, upper);
+        break;
+      case Comparison::LESS:
+        end = std::min(end, lower);
+        break;
+      case Comparison::EQUAL:
+        begin = std::max(begin, lower);
+        end = std::min(end, upper);
+        break;
+      case Comparison::NA:
+      case Comparison::NOT_EQUAL:
+        break;
+    }
+  }
+
+  // Some value set member may occur in the data: leave the call unchanged rather
+  // than rebinding it against a narrowed value set.
+  if (begin < end) return expr;
+
+  if (!IsInWithoutMatchesIsFalse(*options, state.value_set_has_null, nullable)) {
+    return expr;
+  }
+  return literal(false);
+}
+
 /// \brief Simplify an expression given a guarantee, if the guarantee
 ///   is is_valid().
 Result<Expression> SimplifyIsValidGuarantee(Expression expr,
@@ -1454,6 +1605,28 @@ Result<Expression> SimplifyWithGuarantee(Expression expr,
     return Status::OK();
   };
   RETURN_NOT_OK(CanonicalizeAndFoldConstants());
+
+  // `is_in` calls with large value sets are simplified against all inequalities
+  // on their argument at once, see SimplifyIsInWithInequalities.
+  std::vector<Inequality> inequalities;
+  for (const auto& guarantee : conjunction_members) {
+    if (auto inequality = Inequality::ExtractOne(guarantee)) {
+      inequalities.push_back(*inequality);
+    }
+  }
+  if (!inequalities.empty()) {
+    Expression before = expr;
+    ARROW_ASSIGN_OR_RAISE(expr, ModifyExpression(
+                                    std::move(expr), [](Expression expr) { return expr; },
+                                    [&](Expression expr, ...) -> Result<Expression> {
+                                      return SimplifyIsInWithInequalities(
+                                          inequalities, std::move(expr));
+                                    }));
+
+    if (!Expression::Identical(expr, before)) {
+      RETURN_NOT_OK(CanonicalizeAndFoldConstants());
+    }
+  }
 
   for (const auto& guarantee : conjunction_members) {
     if (!guarantee.call()) continue;
