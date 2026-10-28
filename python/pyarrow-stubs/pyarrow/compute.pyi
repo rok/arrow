@@ -1,0 +1,1379 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
+from pyarrow.lib import (
+    BinaryArray,
+    BinaryScalar,
+    Bool8Array,
+    BooleanArray,
+    ChunkedArray,
+    Date32Array,
+    Date64Array,
+    Decimal128Array,
+    DictionaryArray,
+    DoubleArray,
+    DoubleScalar,
+    DurationArray,
+    ExtensionArray,
+    FixedShapeTensorArray,
+    FixedSizeBinaryArray,
+    FixedSizeListArray,
+    FloatArray,
+    FloatScalar,
+    HalfFloatArray,
+    Int16Array,
+    Int16Scalar,
+    Int32Array,
+    Int64Array,
+    Int64Scalar,
+    Int8Array,
+    Int8Scalar,
+    JsonArray,
+    LargeBinaryArray,
+    LargeListArray,
+    LargeStringArray,
+    ListArray,
+    MapArray,
+    NullArray,
+    NullScalar,
+    OpaqueArray,
+    RecordBatch,
+    StringArray,
+    StringScalar,
+    StringViewArray,
+    StructArray,
+    Table,
+    Time32Array,
+    Time64Array,
+    TimestampArray,
+    TimestampScalar,
+    UInt16Array,
+    UInt16Scalar,
+    UInt32Array,
+    UInt64Array,
+    UInt64Scalar,
+    UInt8Array,
+    UInt8Scalar,
+)
+from collections.abc import Sequence
+import pyarrow.lib
+from _typeshed import Incomplete
+from pyarrow._compute import (
+    ArraySortOptions as ArraySortOptions,
+    AssumeTimezoneOptions as AssumeTimezoneOptions,
+    CastOptions as CastOptions,
+    CountOptions as CountOptions,
+    CumulativeOptions as CumulativeOptions,
+    CumulativeSumOptions as CumulativeSumOptions,
+    DayOfWeekOptions as DayOfWeekOptions,
+    DictionaryEncodeOptions as DictionaryEncodeOptions,
+    ElementWiseAggregateOptions as ElementWiseAggregateOptions,
+    Expression as Expression,
+    ExtractRegexOptions as ExtractRegexOptions,
+    ExtractRegexSpanOptions as ExtractRegexSpanOptions,
+    FilterOptions as FilterOptions,
+    Function as Function,
+    FunctionOptions as FunctionOptions,
+    FunctionRegistry as FunctionRegistry,
+    HashAggregateFunction as HashAggregateFunction,
+    HashAggregateKernel as HashAggregateKernel,
+    IndexOptions as IndexOptions,
+    InversePermutationOptions as InversePermutationOptions,
+    JoinOptions as JoinOptions,
+    Kernel as Kernel,
+    ListFlattenOptions as ListFlattenOptions,
+    ListSliceOptions as ListSliceOptions,
+    MakeStructOptions as MakeStructOptions,
+    MapLookupOptions as MapLookupOptions,
+    MatchSubstringOptions as MatchSubstringOptions,
+    ModeOptions as ModeOptions,
+    NullOptions as NullOptions,
+    PadOptions as PadOptions,
+    PairwiseOptions as PairwiseOptions,
+    PartitionNthOptions as PartitionNthOptions,
+    PivotWiderOptions as PivotWiderOptions,
+    QuantileOptions as QuantileOptions,
+    RandomOptions as RandomOptions,
+    RankOptions as RankOptions,
+    RankQuantileOptions as RankQuantileOptions,
+    ReplaceSliceOptions as ReplaceSliceOptions,
+    ReplaceSubstringOptions as ReplaceSubstringOptions,
+    RoundBinaryOptions as RoundBinaryOptions,
+    RoundOptions as RoundOptions,
+    RoundTemporalOptions as RoundTemporalOptions,
+    RoundToMultipleOptions as RoundToMultipleOptions,
+    RunEndEncodeOptions as RunEndEncodeOptions,
+    ScalarAggregateFunction as ScalarAggregateFunction,
+    ScalarAggregateKernel as ScalarAggregateKernel,
+    ScalarAggregateOptions as ScalarAggregateOptions,
+    ScalarFunction as ScalarFunction,
+    ScalarKernel as ScalarKernel,
+    ScatterOptions as ScatterOptions,
+    SearchSortedOptions as SearchSortedOptions,
+    SelectKOptions as SelectKOptions,
+    SetLookupOptions as SetLookupOptions,
+    SkewOptions as SkewOptions,
+    SliceOptions as SliceOptions,
+    SortOptions as SortOptions,
+    SplitOptions as SplitOptions,
+    SplitPatternOptions as SplitPatternOptions,
+    StrftimeOptions as StrftimeOptions,
+    StrptimeOptions as StrptimeOptions,
+    StructFieldOptions as StructFieldOptions,
+    TDigestOptions as TDigestOptions,
+    TakeOptions as TakeOptions,
+    TrimOptions as TrimOptions,
+    UdfContext as UdfContext,
+    Utf8NormalizeOptions as Utf8NormalizeOptions,
+    VarianceOptions as VarianceOptions,
+    VectorFunction as VectorFunction,
+    VectorKernel as VectorKernel,
+    WeekOptions as WeekOptions,
+    WinsorizeOptions as WinsorizeOptions,
+    ZeroFillOptions as ZeroFillOptions,
+    call_function as call_function,
+    call_tabular_function as call_tabular_function,
+    function_registry as function_registry,
+    get_function as get_function,
+    list_functions as list_functions,
+    register_aggregate_function as register_aggregate_function,
+    register_scalar_function as register_scalar_function,
+    register_tabular_function as register_tabular_function,
+    register_vector_function as register_vector_function,
+)
+from typing import ClassVar
+
+def abs(x, *, memory_pool: Incomplete | None = ...): ...
+def abs_checked(x, *, memory_pool: Incomplete | None = ...): ...
+def acos(x, *, memory_pool: Incomplete | None = ...): ...
+def acos_checked(x, *, memory_pool: Incomplete | None = ...): ...
+def acosh(x, *, memory_pool: Incomplete | None = ...): ...
+def acosh_checked(x, *, memory_pool: Incomplete | None = ...): ...
+def add(x, y, *, memory_pool: Incomplete | None = ...): ...
+def add_checked(x, y, *, memory_pool: Incomplete | None = ...): ...
+def all(
+    array,
+    *,
+    skip_nulls: bool = ...,
+    min_count: int = ...,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+): ...
+def and_(x, y, *, memory_pool: Incomplete | None = ...): ...
+def and_kleene(x, y, *, memory_pool: Incomplete | None = ...): ...
+def and_not(x, y, *, memory_pool: Incomplete | None = ...): ...
+def and_not_kleene(x, y, *, memory_pool: Incomplete | None = ...): ...
+def any(
+    array,
+    *,
+    skip_nulls: bool = ...,
+    min_count: int = ...,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+): ...
+def approximate_median(
+    array,
+    *,
+    skip_nulls: bool = ...,
+    min_count: int = ...,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+): ...
+def array_filter(
+    array,
+    selection_filter,
+    null_selection_behavior: str = ...,
+    *,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+): ...
+def array_sort_indices(
+    array,
+    order: str = ...,
+    *,
+    null_placement: str = ...,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+): ...
+def array_take(
+    array,
+    indices,
+    *,
+    boundscheck: bool = ...,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+): ...
+def ascii_capitalize(strings, *, memory_pool: Incomplete | None = ...): ...
+def ascii_center(
+    strings,
+    width: int,
+    padding: str = ...,
+    lean_left_on_odd_padding: bool = ...,
+    *,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+): ...
+def ascii_is_alnum(strings, *, memory_pool: Incomplete | None = ...): ...
+def ascii_is_alpha(strings, *, memory_pool: Incomplete | None = ...): ...
+def ascii_is_decimal(strings, *, memory_pool: Incomplete | None = ...): ...
+def ascii_is_lower(strings, *, memory_pool: Incomplete | None = ...): ...
+def ascii_is_printable(strings, *, memory_pool: Incomplete | None = ...): ...
+def ascii_is_space(strings, *, memory_pool: Incomplete | None = ...): ...
+def ascii_is_title(strings, *, memory_pool: Incomplete | None = ...): ...
+def ascii_is_upper(strings, *, memory_pool: Incomplete | None = ...): ...
+def ascii_lower(strings, *, memory_pool: Incomplete | None = ...): ...
+def ascii_lpad(
+    strings,
+    width: int,
+    padding: str = ...,
+    lean_left_on_odd_padding: bool = ...,
+    *,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+): ...
+def ascii_ltrim(
+    strings,
+    characters: str,
+    *,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+): ...
+def ascii_ltrim_whitespace(strings, *, memory_pool: Incomplete | None = ...): ...
+def ascii_reverse(strings, *, memory_pool: Incomplete | None = ...): ...
+def ascii_rpad(
+    strings,
+    width: int,
+    padding: str = ...,
+    lean_left_on_odd_padding: bool = ...,
+    *,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+): ...
+def ascii_rtrim(
+    strings,
+    characters: str,
+    *,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+): ...
+def ascii_rtrim_whitespace(strings, *, memory_pool: Incomplete | None = ...): ...
+def ascii_split_whitespace(
+    strings,
+    *,
+    max_splits: Incomplete | None = ...,
+    reverse: bool = ...,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+): ...
+def ascii_swapcase(strings, *, memory_pool: Incomplete | None = ...): ...
+def ascii_title(strings, *, memory_pool: Incomplete | None = ...): ...
+def ascii_trim(
+    strings,
+    characters: str,
+    *,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+): ...
+def ascii_trim_whitespace(strings, *, memory_pool: Incomplete | None = ...): ...
+def ascii_upper(strings, *, memory_pool: Incomplete | None = ...): ...
+def asin(x, *, memory_pool: Incomplete | None = ...): ...
+def asin_checked(x, *, memory_pool: Incomplete | None = ...): ...
+def asinh(x, *, memory_pool: Incomplete | None = ...): ...
+def assume_timezone(
+    timestamps,
+    timezone: str,
+    *,
+    ambiguous: str = ...,
+    nonexistent: str = ...,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+): ...
+def atan(x, *, memory_pool: Incomplete | None = ...): ...
+def atan2(y, x, *, memory_pool: Incomplete | None = ...): ...
+def atanh(x, *, memory_pool: Incomplete | None = ...): ...
+def atanh_checked(x, *, memory_pool: Incomplete | None = ...): ...
+def binary_join(strings, separator, *, memory_pool: Incomplete | None = ...): ...
+def binary_join_element_wise(
+    *strings,
+    null_handling: str = ...,
+    null_replacement: str = ...,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+): ...
+def binary_length(strings, *, memory_pool: Incomplete | None = ...): ...
+def binary_repeat(strings, num_repeats, *, memory_pool: Incomplete | None = ...): ...
+def binary_replace_slice(
+    strings,
+    start: int,
+    stop: int,
+    replacement: str,
+    *,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+): ...
+def binary_reverse(strings, *, memory_pool: Incomplete | None = ...): ...
+def binary_slice(
+    strings,
+    start: int,
+    stop: Incomplete | None = ...,
+    step: int = ...,
+    *,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+): ...
+def bit_wise_and(x, y, *, memory_pool: Incomplete | None = ...): ...
+def bit_wise_not(x, *, memory_pool: Incomplete | None = ...): ...
+def bit_wise_or(x, y, *, memory_pool: Incomplete | None = ...): ...
+def bit_wise_xor(x, y, *, memory_pool: Incomplete | None = ...): ...
+def case_when(cond, *cases, memory_pool: Incomplete | None = ...): ...
+def cast(
+    arr: Table
+    | Int16Array
+    | StringViewArray
+    | UInt64Array
+    | Date32Array
+    | JsonArray
+    | DurationArray
+    | UInt16Array
+    | HalfFloatArray
+    | Date64Array
+    | Int64Scalar
+    | ChunkedArray
+    | StringScalar
+    | FloatScalar
+    | FixedShapeTensorArray
+    | DoubleScalar
+    | Int32Array
+    | DictionaryArray
+    | FloatArray
+    | TimestampArray
+    | Decimal128Array
+    | LargeStringArray
+    | ListArray
+    | NullArray
+    | StringArray
+    | OpaqueArray
+    | BinaryScalar
+    | Int8Array
+    | UInt32Array
+    | MapArray
+    | DoubleArray
+    | Time32Array
+    | LargeListArray
+    | BooleanArray
+    | ExtensionArray
+    | BinaryArray
+    | TimestampScalar
+    | Bool8Array
+    | UInt8Array
+    | Int64Array
+    | FixedSizeBinaryArray
+    | Time64Array
+    | StructArray
+    | FixedSizeListArray
+    | Int8Scalar,
+    target_type: Incomplete | None = ...,
+    safe: Incomplete | None = ...,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+) -> pyarrow.Array: ...
+def ceil(x, *, memory_pool: Incomplete | None = ...): ...
+def ceil_temporal(
+    timestamps,
+    multiple: int = ...,
+    unit: str = ...,
+    *,
+    week_starts_monday: bool = ...,
+    ceil_is_strictly_greater: bool = ...,
+    calendar_based_origin: bool = ...,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+): ...
+def choose(indices, *values, memory_pool: Incomplete | None = ...): ...
+def coalesce(*values, memory_pool: Incomplete | None = ...): ...
+def cos(x, *, memory_pool: Incomplete | None = ...): ...
+def cos_checked(x, *, memory_pool: Incomplete | None = ...): ...
+def cosh(x, *, memory_pool: Incomplete | None = ...): ...
+def count(
+    array,
+    mode: str = ...,
+    *,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+): ...
+def count_distinct(
+    array,
+    mode: str = ...,
+    *,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+): ...
+def count_substring(
+    strings,
+    pattern: str,
+    *,
+    ignore_case: bool = ...,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+): ...
+def count_substring_regex(
+    strings,
+    pattern: str,
+    *,
+    ignore_case: bool = ...,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+): ...
+def cumulative_max(
+    values,
+    start: Incomplete | None = ...,
+    *,
+    skip_nulls: bool = ...,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+): ...
+def cumulative_mean(
+    values,
+    start: Incomplete | None = ...,
+    *,
+    skip_nulls: bool = ...,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+): ...
+def cumulative_min(
+    values,
+    start: Incomplete | None = ...,
+    *,
+    skip_nulls: bool = ...,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+): ...
+def cumulative_prod(
+    values,
+    start: Incomplete | None = ...,
+    *,
+    skip_nulls: bool = ...,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+): ...
+def cumulative_prod_checked(
+    values,
+    start: Incomplete | None = ...,
+    *,
+    skip_nulls: bool = ...,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+): ...
+def cumulative_sum(
+    values,
+    start: Incomplete | None = ...,
+    *,
+    skip_nulls: bool = ...,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+): ...
+def cumulative_sum_checked(
+    values,
+    start: Incomplete | None = ...,
+    *,
+    skip_nulls: bool = ...,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+): ...
+def day(values, *, memory_pool: Incomplete | None = ...): ...
+def day_of_week(
+    values,
+    *,
+    count_from_zero: bool = ...,
+    week_start: int = ...,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+): ...
+def day_of_year(values, *, memory_pool: Incomplete | None = ...): ...
+def day_time_interval_between(start, end, *, memory_pool: Incomplete | None = ...): ...
+def days_between(start, end, *, memory_pool: Incomplete | None = ...): ...
+def dictionary_decode(dictionary_array, *, memory_pool: Incomplete | None = ...): ...
+def dictionary_encode(
+    array,
+    null_encoding: str = ...,
+    *,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+): ...
+def divide(dividend, divisor, *, memory_pool: Incomplete | None = ...): ...
+def divide_checked(dividend, divisor, *, memory_pool: Incomplete | None = ...): ...
+def drop_null(input, *, memory_pool: Incomplete | None = ...): ...
+def ends_with(
+    strings,
+    pattern: str,
+    *,
+    ignore_case: bool = ...,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+): ...
+def equal(x, y, *, memory_pool: Incomplete | None = ...): ...
+def exp(exponent, *, memory_pool: Incomplete | None = ...): ...
+def expm1(exponent, *, memory_pool: Incomplete | None = ...): ...
+def extract_regex(
+    strings,
+    pattern: str,
+    *,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+): ...
+def extract_regex_span(
+    strings,
+    pattern: str,
+    *,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+): ...
+def fill_null_backward(values, *, memory_pool: Incomplete | None = ...): ...
+def fill_null_forward(values, *, memory_pool: Incomplete | None = ...): ...
+def filter(
+    input,
+    selection_filter,
+    null_selection_behavior: str = ...,
+    *,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+): ...
+def find_substring(
+    strings,
+    pattern: str,
+    *,
+    ignore_case: bool = ...,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+): ...
+def find_substring_regex(
+    strings,
+    pattern: str,
+    *,
+    ignore_case: bool = ...,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+): ...
+def first(
+    array,
+    *,
+    skip_nulls: bool = ...,
+    min_count: int = ...,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+): ...
+def first_last(
+    array,
+    *,
+    skip_nulls: bool = ...,
+    min_count: int = ...,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+): ...
+def floor(x, *, memory_pool: Incomplete | None = ...): ...
+def floor_temporal(
+    timestamps,
+    multiple: int = ...,
+    unit: str = ...,
+    *,
+    week_starts_monday: bool = ...,
+    ceil_is_strictly_greater: bool = ...,
+    calendar_based_origin: bool = ...,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+): ...
+def greater(x, y, *, memory_pool: Incomplete | None = ...): ...
+def greater_equal(x, y, *, memory_pool: Incomplete | None = ...): ...
+def hour(values, *, memory_pool: Incomplete | None = ...): ...
+def hours_between(start, end, *, memory_pool: Incomplete | None = ...): ...
+def hypot(x, y, *, memory_pool: Incomplete | None = ...): ...
+def if_else(cond, left, right, *, memory_pool: Incomplete | None = ...): ...
+def index(
+    data: ChunkedArray | Int64Array,
+    value: Int64Scalar | int | Int8Scalar | None,
+    start: Incomplete | None = ...,
+    end: Incomplete | None = ...,
+    *,
+    memory_pool: Incomplete | None = ...,
+) -> int: ...
+def index_in(
+    values,
+    value_set: pyarrow.Array,
+    *,
+    skip_nulls: bool = ...,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+): ...
+def index_in_meta_binary(
+    values, value_set, *, memory_pool: Incomplete | None = ...
+): ...
+def indices_nonzero(values, *, memory_pool: Incomplete | None = ...): ...
+def inverse_permutation(
+    indices,
+    max_index: int = ...,
+    output_type: Incomplete | None = ...,
+    *,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+): ...
+def invert(values, *, memory_pool: Incomplete | None = ...): ...
+def is_dst(values, *, memory_pool: Incomplete | None = ...): ...
+def is_finite(values, *, memory_pool: Incomplete | None = ...): ...
+def is_in(
+    values,
+    value_set: pyarrow.Array,
+    *,
+    skip_nulls: bool = ...,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+): ...
+def is_in_meta_binary(values, value_set, *, memory_pool: Incomplete | None = ...): ...
+def is_inf(values, *, memory_pool: Incomplete | None = ...): ...
+def is_leap_year(values, *, memory_pool: Incomplete | None = ...): ...
+def is_nan(values, *, memory_pool: Incomplete | None = ...): ...
+def is_null(
+    values,
+    *,
+    nan_is_null: bool = ...,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+): ...
+def is_valid(values, *, memory_pool: Incomplete | None = ...): ...
+def iso_calendar(values, *, memory_pool: Incomplete | None = ...): ...
+def iso_week(values, *, memory_pool: Incomplete | None = ...): ...
+def iso_year(values, *, memory_pool: Incomplete | None = ...): ...
+def kurtosis(
+    array,
+    *,
+    skip_nulls: bool = ...,
+    biased: bool = ...,
+    min_count: int = ...,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+): ...
+def last(
+    array,
+    *,
+    skip_nulls: bool = ...,
+    min_count: int = ...,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+): ...
+def less(x, y, *, memory_pool: Incomplete | None = ...): ...
+def less_equal(x, y, *, memory_pool: Incomplete | None = ...): ...
+def list_element(lists, index, *, memory_pool: Incomplete | None = ...): ...
+def list_flatten(
+    lists,
+    recursive: bool = ...,
+    *,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+): ...
+def list_parent_indices(lists, *, memory_pool: Incomplete | None = ...): ...
+def list_slice(
+    lists,
+    start: int,
+    stop: Incomplete | None = ...,
+    step: int = ...,
+    return_fixed_size_list: Incomplete | None = ...,
+    *,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+): ...
+def list_value_length(lists, *, memory_pool: Incomplete | None = ...): ...
+def ln(x, *, memory_pool: Incomplete | None = ...): ...
+def ln_checked(x, *, memory_pool: Incomplete | None = ...): ...
+def local_timestamp(values, *, memory_pool: Incomplete | None = ...): ...
+def log10(x, *, memory_pool: Incomplete | None = ...): ...
+def log10_checked(x, *, memory_pool: Incomplete | None = ...): ...
+def log1p(x, *, memory_pool: Incomplete | None = ...): ...
+def log1p_checked(x, *, memory_pool: Incomplete | None = ...): ...
+def log2(x, *, memory_pool: Incomplete | None = ...): ...
+def log2_checked(x, *, memory_pool: Incomplete | None = ...): ...
+def logb(x, b, *, memory_pool: Incomplete | None = ...): ...
+def logb_checked(x, b, *, memory_pool: Incomplete | None = ...): ...
+def make_struct(
+    *args,
+    field_names: tuple = ...,
+    field_nullability: Incomplete | None = ...,
+    field_metadata: Incomplete | None = ...,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+): ...
+def map_lookup(
+    container,
+    query_key,
+    occurrence: str,
+    *,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+): ...
+def match_like(
+    strings,
+    pattern: str,
+    *,
+    ignore_case: bool = ...,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+): ...
+def match_substring(
+    strings,
+    pattern: str,
+    *,
+    ignore_case: bool = ...,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+): ...
+def match_substring_regex(
+    strings,
+    pattern: str,
+    *,
+    ignore_case: bool = ...,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+): ...
+def max(
+    array,
+    *,
+    skip_nulls: bool = ...,
+    min_count: int = ...,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+): ...
+def max_element_wise(
+    *args,
+    skip_nulls: bool = ...,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+): ...
+def mean(
+    array,
+    *,
+    skip_nulls: bool = ...,
+    min_count: int = ...,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+): ...
+def microsecond(values, *, memory_pool: Incomplete | None = ...): ...
+def microseconds_between(start, end, *, memory_pool: Incomplete | None = ...): ...
+def millisecond(values, *, memory_pool: Incomplete | None = ...): ...
+def milliseconds_between(start, end, *, memory_pool: Incomplete | None = ...): ...
+def min(
+    array,
+    *,
+    skip_nulls: bool = ...,
+    min_count: int = ...,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+): ...
+def min_element_wise(
+    *args,
+    skip_nulls: bool = ...,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+): ...
+def min_max(
+    array,
+    *,
+    skip_nulls: bool = ...,
+    min_count: int = ...,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+): ...
+def minute(values, *, memory_pool: Incomplete | None = ...): ...
+def minutes_between(start, end, *, memory_pool: Incomplete | None = ...): ...
+def mode(
+    array,
+    n: int = ...,
+    *,
+    skip_nulls: bool = ...,
+    min_count: int = ...,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+): ...
+def modulo(dividend, divisor, *, memory_pool: Incomplete | None = ...): ...
+def modulo_checked(dividend, divisor, *, memory_pool: Incomplete | None = ...): ...
+def month(values, *, memory_pool: Incomplete | None = ...): ...
+def month_day_nano_interval_between(
+    start, end, *, memory_pool: Incomplete | None = ...
+): ...
+def month_interval_between(start, end, *, memory_pool: Incomplete | None = ...): ...
+def multiply(x, y, *, memory_pool: Incomplete | None = ...): ...
+def multiply_checked(x, y, *, memory_pool: Incomplete | None = ...): ...
+def nanosecond(values, *, memory_pool: Incomplete | None = ...): ...
+def nanoseconds_between(start, end, *, memory_pool: Incomplete | None = ...): ...
+def negate(x, *, memory_pool: Incomplete | None = ...): ...
+def negate_checked(x, *, memory_pool: Incomplete | None = ...): ...
+def not_equal(x, y, *, memory_pool: Incomplete | None = ...): ...
+def or_(x, y, *, memory_pool: Incomplete | None = ...): ...
+def or_kleene(x, y, *, memory_pool: Incomplete | None = ...): ...
+def pairwise_diff(
+    input,
+    period: int = ...,
+    *,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+): ...
+def pairwise_diff_checked(
+    input,
+    period: int = ...,
+    *,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+): ...
+def partition_nth_indices(
+    array,
+    pivot: int,
+    *,
+    null_placement: str = ...,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+): ...
+def pivot_wider(
+    pivot_keys,
+    pivot_values,
+    key_names: Sequence[str],
+    *,
+    unexpected_key_behavior: str = ...,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+): ...
+def power(base, exponent, *, memory_pool: Incomplete | None = ...): ...
+def power_checked(base, exponent, *, memory_pool: Incomplete | None = ...): ...
+def product(
+    array,
+    *,
+    skip_nulls: bool = ...,
+    min_count: int = ...,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+): ...
+def quantile(
+    array,
+    q: float = ...,
+    *,
+    interpolation: str = ...,
+    skip_nulls: bool = ...,
+    min_count: int = ...,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+): ...
+def quarter(values, *, memory_pool: Incomplete | None = ...): ...
+def quarters_between(start, end, *, memory_pool: Incomplete | None = ...): ...
+def random(
+    n: int,
+    *,
+    initializer: str = ...,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+) -> DoubleArray: ...
+def rank(
+    input,
+    sort_keys: str = ...,
+    *,
+    null_placement: Incomplete | None = ...,
+    tiebreaker: str = ...,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+): ...
+def rank_normal(
+    input,
+    sort_keys: str = ...,
+    *,
+    null_placement: Incomplete | None = ...,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+): ...
+def rank_quantile(
+    input,
+    sort_keys: str = ...,
+    *,
+    null_placement: Incomplete | None = ...,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+): ...
+def remainder(dividend, divisor, *, memory_pool: Incomplete | None = ...): ...
+def remainder_checked(dividend, divisor, *, memory_pool: Incomplete | None = ...): ...
+def replace_substring(
+    strings,
+    pattern: str,
+    replacement: str,
+    *,
+    max_replacements: Incomplete | None = ...,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+): ...
+def replace_substring_regex(
+    strings,
+    pattern: str,
+    replacement: str,
+    *,
+    max_replacements: Incomplete | None = ...,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+): ...
+def replace_with_mask(
+    values, mask, replacements, *, memory_pool: Incomplete | None = ...
+): ...
+def round(
+    x,
+    ndigits: int = ...,
+    round_mode: str = ...,
+    *,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+): ...
+def round_binary(
+    x,
+    s,
+    round_mode: str = ...,
+    *,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+): ...
+def round_temporal(
+    timestamps,
+    multiple: int = ...,
+    unit: str = ...,
+    *,
+    week_starts_monday: bool = ...,
+    ceil_is_strictly_greater: bool = ...,
+    calendar_based_origin: bool = ...,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+): ...
+def round_to_multiple(
+    x,
+    multiple: float = ...,
+    round_mode: str = ...,
+    *,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+): ...
+def run_end_decode(array, *, memory_pool: Incomplete | None = ...): ...
+def run_end_encode(
+    array,
+    run_end_type: pyarrow.lib.DataType = ...,
+    *,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+): ...
+def scatter(
+    values,
+    indices,
+    max_index: int = ...,
+    *,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+): ...
+def search_sorted(
+    values,
+    needles,
+    side: str = ...,
+    *,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+): ...
+def second(values, *, memory_pool: Incomplete | None = ...): ...
+def seconds_between(start, end, *, memory_pool: Incomplete | None = ...): ...
+def select_k_unstable(
+    input,
+    k: int,
+    sort_keys,
+    *,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+): ...
+def shift_left(x, y, *, memory_pool: Incomplete | None = ...): ...
+def shift_left_checked(x, y, *, memory_pool: Incomplete | None = ...): ...
+def shift_right(x, y, *, memory_pool: Incomplete | None = ...): ...
+def shift_right_checked(x, y, *, memory_pool: Incomplete | None = ...): ...
+def sign(x, *, memory_pool: Incomplete | None = ...): ...
+def sin(x, *, memory_pool: Incomplete | None = ...): ...
+def sin_checked(x, *, memory_pool: Incomplete | None = ...): ...
+def sinh(x, *, memory_pool: Incomplete | None = ...): ...
+def skew(
+    array,
+    *,
+    skip_nulls: bool = ...,
+    biased: bool = ...,
+    min_count: int = ...,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+): ...
+def sort_indices(
+    input,
+    sort_keys: tuple = ...,
+    *,
+    null_placement: Incomplete | None = ...,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+): ...
+def split_pattern(
+    strings,
+    pattern: str,
+    *,
+    max_splits: Incomplete | None = ...,
+    reverse: bool = ...,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+): ...
+def split_pattern_regex(
+    strings,
+    pattern: str,
+    *,
+    max_splits: Incomplete | None = ...,
+    reverse: bool = ...,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+): ...
+def sqrt(x, *, memory_pool: Incomplete | None = ...): ...
+def sqrt_checked(x, *, memory_pool: Incomplete | None = ...): ...
+def starts_with(
+    strings,
+    pattern: str,
+    *,
+    ignore_case: bool = ...,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+): ...
+def stddev(
+    array,
+    *,
+    ddof: int = ...,
+    skip_nulls: bool = ...,
+    min_count: int = ...,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+): ...
+def strftime(
+    timestamps,
+    format: str = ...,
+    locale: str = ...,
+    *,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+): ...
+def string_is_ascii(strings, *, memory_pool: Incomplete | None = ...): ...
+def strptime(
+    strings,
+    format: str,
+    unit: str,
+    error_is_null: bool = ...,
+    *,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+): ...
+def struct_field(
+    values,
+    indices: list[str] | list[bytes] | list[int] | Expression | bytes | str | int,
+    *,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+): ...
+def subsecond(values, *, memory_pool: Incomplete | None = ...): ...
+def subtract(x, y, *, memory_pool: Incomplete | None = ...): ...
+def subtract_checked(x, y, *, memory_pool: Incomplete | None = ...): ...
+def sum(
+    array,
+    *,
+    skip_nulls: bool = ...,
+    min_count: int = ...,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+): ...
+def take(
+    data: pyarrow.Array | pyarrow.ChunkedArray | pyarrow.RecordBatch | pyarrow.Table,
+    indices: pyarrow.Array | pyarrow.ChunkedArray,
+    *,
+    boundscheck: bool = ...,
+    memory_pool: Incomplete | None = ...,
+) -> (
+    Table
+    | Int16Array
+    | UInt64Array
+    | UInt16Array
+    | ChunkedArray
+    | Int32Array
+    | DictionaryArray
+    | FloatArray
+    | ListArray
+    | NullArray
+    | StringArray
+    | Int8Array
+    | UInt32Array
+    | DoubleArray
+    | LargeBinaryArray
+    | LargeListArray
+    | BooleanArray
+    | ExtensionArray
+    | BinaryArray
+    | UInt8Array
+    | Int64Array
+    | FixedSizeBinaryArray
+    | RecordBatch
+    | StructArray
+): ...
+def tan(x, *, memory_pool: Incomplete | None = ...): ...
+def tan_checked(x, *, memory_pool: Incomplete | None = ...): ...
+def tanh(x, *, memory_pool: Incomplete | None = ...): ...
+def tdigest(
+    array,
+    q: float = ...,
+    *,
+    delta: int = ...,
+    buffer_size: int = ...,
+    skip_nulls: bool = ...,
+    min_count: int = ...,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+): ...
+def true_unless_null(values, *, memory_pool: Incomplete | None = ...): ...
+def trunc(x, *, memory_pool: Incomplete | None = ...): ...
+def unique(array, *, memory_pool: Incomplete | None = ...): ...
+def us_week(values, *, memory_pool: Incomplete | None = ...): ...
+def us_year(values, *, memory_pool: Incomplete | None = ...): ...
+def utf8_capitalize(strings, *, memory_pool: Incomplete | None = ...): ...
+def utf8_center(
+    strings,
+    width: int,
+    padding: str = ...,
+    lean_left_on_odd_padding: bool = ...,
+    *,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+): ...
+def utf8_is_alnum(strings, *, memory_pool: Incomplete | None = ...): ...
+def utf8_is_alpha(strings, *, memory_pool: Incomplete | None = ...): ...
+def utf8_is_decimal(strings, *, memory_pool: Incomplete | None = ...): ...
+def utf8_is_digit(strings, *, memory_pool: Incomplete | None = ...): ...
+def utf8_is_lower(strings, *, memory_pool: Incomplete | None = ...): ...
+def utf8_is_numeric(strings, *, memory_pool: Incomplete | None = ...): ...
+def utf8_is_printable(strings, *, memory_pool: Incomplete | None = ...): ...
+def utf8_is_space(strings, *, memory_pool: Incomplete | None = ...): ...
+def utf8_is_title(strings, *, memory_pool: Incomplete | None = ...): ...
+def utf8_is_upper(strings, *, memory_pool: Incomplete | None = ...): ...
+def utf8_length(strings, *, memory_pool: Incomplete | None = ...): ...
+def utf8_lower(strings, *, memory_pool: Incomplete | None = ...): ...
+def utf8_lpad(
+    strings,
+    width: int,
+    padding: str = ...,
+    lean_left_on_odd_padding: bool = ...,
+    *,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+): ...
+def utf8_ltrim(
+    strings,
+    characters: str,
+    *,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+): ...
+def utf8_ltrim_whitespace(strings, *, memory_pool: Incomplete | None = ...): ...
+def utf8_normalize(
+    strings,
+    form: str,
+    *,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+): ...
+def utf8_replace_slice(
+    strings,
+    start: int,
+    stop: int,
+    replacement: str,
+    *,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+): ...
+def utf8_reverse(strings, *, memory_pool: Incomplete | None = ...): ...
+def utf8_rpad(
+    strings,
+    width: int,
+    padding: str = ...,
+    lean_left_on_odd_padding: bool = ...,
+    *,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+): ...
+def utf8_rtrim(
+    strings,
+    characters: str,
+    *,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+): ...
+def utf8_rtrim_whitespace(strings, *, memory_pool: Incomplete | None = ...): ...
+def utf8_slice_codeunits(
+    strings,
+    start: int,
+    stop: Incomplete | None = ...,
+    step: int = ...,
+    *,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+): ...
+def utf8_split_whitespace(
+    strings,
+    *,
+    max_splits: Incomplete | None = ...,
+    reverse: bool = ...,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+): ...
+def utf8_swapcase(strings, *, memory_pool: Incomplete | None = ...): ...
+def utf8_title(strings, *, memory_pool: Incomplete | None = ...): ...
+def utf8_trim(
+    strings,
+    characters: str,
+    *,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+): ...
+def utf8_trim_whitespace(strings, *, memory_pool: Incomplete | None = ...): ...
+def utf8_upper(strings, *, memory_pool: Incomplete | None = ...): ...
+def utf8_zero_fill(
+    strings,
+    width: int,
+    padding: str = ...,
+    *,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+): ...
+def value_counts(array, *, memory_pool: Incomplete | None = ...): ...
+def variance(
+    array,
+    *,
+    ddof: int = ...,
+    skip_nulls: bool = ...,
+    min_count: int = ...,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+): ...
+def week(
+    values,
+    *,
+    week_starts_monday: bool = ...,
+    count_from_zero: bool = ...,
+    first_week_is_fully_in_year: bool = ...,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+): ...
+def weeks_between(
+    start,
+    end,
+    *,
+    count_from_zero: bool = ...,
+    week_start: int = ...,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+): ...
+def winsorize(
+    array,
+    lower_limit,
+    upper_limit,
+    *,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+): ...
+def xor(x, y, *, memory_pool: Incomplete | None = ...): ...
+def year(values, *, memory_pool: Incomplete | None = ...): ...
+def year_month_day(values, *, memory_pool: Incomplete | None = ...): ...
+def years_between(start, end, *, memory_pool: Incomplete | None = ...): ...
+def utf8_zfill(
+    strings,
+    width: int,
+    padding: str = ...,
+    *,
+    options: Incomplete | None = ...,
+    memory_pool: Incomplete | None = ...,
+): ...
+def fill_null(
+    values: ChunkedArray
+    | Int16Array
+    | UInt64Array
+    | StringArray
+    | NullArray
+    | UInt8Array
+    | Int64Array
+    | Int8Array
+    | DoubleArray
+    | Int32Array
+    | FloatArray
+    | LargeBinaryArray
+    | UInt16Array
+    | BooleanArray,
+    fill_value: Int64Scalar
+    | NullScalar
+    | FloatScalar
+    | bool
+    | str
+    | Int8Array
+    | UInt16Scalar
+    | UInt8Scalar
+    | UInt64Scalar
+    | DoubleScalar
+    | Int16Scalar
+    | int
+    | Int8Scalar
+    | None,
+) -> (
+    ChunkedArray
+    | Int16Array
+    | UInt64Array
+    | StringArray
+    | NullArray
+    | UInt8Array
+    | Int64Array
+    | Int8Array
+    | DoubleArray
+    | Int32Array
+    | FloatArray
+    | LargeBinaryArray
+    | UInt16Array
+    | BooleanArray
+): ...
+def top_k_unstable(
+    values: pyarrow.Array | pyarrow.ChunkedArray | pyarrow.RecordBatch | pyarrow.Table,
+    k: int,
+    sort_keys: Incomplete | None = ...,
+    null_placements: Incomplete | None = ...,
+    *,
+    memory_pool: Incomplete | None = ...,
+) -> pyarrow.Array: ...
+def bottom_k_unstable(
+    values: pyarrow.Array | pyarrow.ChunkedArray | pyarrow.RecordBatch | pyarrow.Table,
+    k: int,
+    sort_keys: Incomplete | None = ...,
+    null_placements: Incomplete | None = ...,
+    *,
+    memory_pool: Incomplete | None = ...,
+) -> UInt64Array: ...
+def field(*name_or_index) -> Expression: ...
+def scalar(value: bool | float | str) -> Expression: ...
+
+class _OptionsClassDoc(tuple):
+    _fields: ClassVar[tuple] = ...
+    _field_defaults: ClassVar[dict] = ...
+    __match_args__: ClassVar[tuple] = ...
+    params: Incomplete
+
+    def __init__(self, _cls, params) -> None: ...
+    def __replace__(self, **kwds): ...
+    def __getnewargs__(self): ...
