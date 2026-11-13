@@ -584,9 +584,11 @@ def top_k_unstable(
         The number of `k` elements to keep.
     sort_keys : List-like
         Column key names to order by when input is table-like data.
-    null_placements : A list of "at_start" or "at_end"
-        Whether nulls and NaNs are placed at the start or at the end.
-        Accepted values are "at_end", "at_start".
+    null_placements : List-like of str, optional
+        Whether nulls and NaNs are placed at the start or at the end, one
+        entry per sort key when input is table-like data.
+        Accepted values are "at_end", "at_start". Defaults to "at_end"
+        for every sort key.
     memory_pool : MemoryPool, optional
         If not passed, will allocate memory from the default memory pool.
 
@@ -613,8 +615,11 @@ def top_k_unstable(
     if isinstance(values, (pa.Array, pa.ChunkedArray)):
         sort_keys.append(("dummy", "descending", "at_end"))
     else:
+        if null_placements is None:
+            null_placements = ["at_end"] * len(sort_keys)
         sort_keys = [(sort_key, "descending", null_placement)
-                     for sort_key, null_placement in zip(sort_keys, null_placements)]
+                     for sort_key, null_placement
+                     in zip(sort_keys, null_placements, strict=True)]
     options = SelectKOptions(k, sort_keys)
     return call_function("select_k_unstable", [values], options, memory_pool)
 
@@ -636,9 +641,11 @@ def bottom_k_unstable(
         The number of `k` elements to keep.
     sort_keys : List-like
         Column key names to order by when input is table-like data.
-    null_placements : A list of "at_start" or "at_end"
-        Whether nulls and NaNs are placed at the start or at the end.
-        Accepted values are "at_end", "at_start".
+    null_placements : List-like of str, optional
+        Whether nulls and NaNs are placed at the start or at the end, one
+        entry per sort key when input is table-like data.
+        Accepted values are "at_end", "at_start". Defaults to "at_end"
+        for every sort key.
     memory_pool : MemoryPool, optional
         If not passed, will allocate memory from the default memory pool.
 
@@ -665,8 +672,11 @@ def bottom_k_unstable(
     if isinstance(values, (pa.Array, pa.ChunkedArray)):
         sort_keys.append(("dummy", "ascending", "at_end"))
     else:
+        if null_placements is None:
+            null_placements = ["at_end"] * len(sort_keys)
         sort_keys = [(sort_key, "ascending", null_placement)
-                     for sort_key, null_placement in zip(sort_keys, null_placements)]
+                     for sort_key, null_placement
+                     in zip(sort_keys, null_placements, strict=True)]
 
     options = SelectKOptions(k, sort_keys)
     return call_function("select_k_unstable", [values], options, memory_pool)

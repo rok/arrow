@@ -3251,6 +3251,29 @@ def test_select_k_table():
         pc.select_k_unstable(table, k=k, sort_keys=[("unknown", "ascending", "at_end")])
 
 
+@pytest.mark.parametrize("make_data", [pa.table, pa.record_batch])
+def test_top_bottom_k_unstable_default_null_placements(make_data):
+    # null_placements should default to "at_end" for every sort key
+    data = make_data({"a": [3, None, 1, 2], "b": [0, 1, 0, 1]})
+
+    result = pc.top_k_unstable(data, 2, ["a"])
+    assert result == pc.top_k_unstable(data, 2, ["a"], ["at_end"])
+    assert pc.take(data, result)["a"].to_pylist() == [3, 2]
+
+    result = pc.bottom_k_unstable(data, 2, ["a"])
+    assert result == pc.bottom_k_unstable(data, 2, ["a"], ["at_end"])
+    assert pc.take(data, result)["a"].to_pylist() == [1, 2]
+
+    # Nulls end up last with the default placement
+    result = pc.bottom_k_unstable(data, 4, ["a", "b"])
+    assert pc.take(data, result)["a"].to_pylist() == [1, 2, 3, None]
+
+    with pytest.raises(ValueError, match="zip"):
+        pc.top_k_unstable(data, 2, ["a", "b"], ["at_end"])
+    with pytest.raises(ValueError, match="zip"):
+        pc.bottom_k_unstable(data, 2, ["a"], ["at_end", "at_start"])
+
+
 def test_array_sort_indices():
     arr = pa.array([1, 2, None, 0])
     result = pc.array_sort_indices(arr)
