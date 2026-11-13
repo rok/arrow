@@ -15,7 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from collections.abc import Callable, Hashable, Sequence
+from collections.abc import Callable, Hashable, Iterable, Sequence
 from typing import Any, Literal, ParamSpec, TypeAlias, TypeVar
 
 # Placeholders (Any) until scalar.pyi is annotated; mypy rejects them as
@@ -628,7 +628,7 @@ def ceil(
 floor = _clone_signature(ceil)
 
 def round(
-    x: _NumericScalar | _ArrayOrChunkedArray | Expression | float,
+    x: _NumericScalar | _ArrayOrChunkedArray | list[Any] | Expression | float,
     /,
     ndigits: int = 0,
     round_mode: _RoundMode = "half_to_even",
@@ -637,7 +637,7 @@ def round(
     memory_pool: MemoryPool | None = None,
 ) -> _NumericScalar | _NumericArray | Expression: ...
 def round_to_multiple(
-    x: _NumericScalar | _ArrayOrChunkedArray | Expression | float,
+    x: _NumericScalar | _ArrayOrChunkedArray | list[Any] | Expression | float,
     /,
     multiple: float | _NumericScalar = 1.0,
     round_mode: _RoundMode = "half_to_even",
@@ -646,7 +646,7 @@ def round_to_multiple(
     memory_pool: MemoryPool | None = None,
 ) -> _NumericScalar | _NumericArray | Expression: ...
 def round_binary(
-    x: _NumericScalar | _ArrayOrChunkedArray | float | Expression,
+    x: _NumericScalar | _ArrayOrChunkedArray | list[Any] | float | Expression,
     s: _SignedIntegerScalar | _ArrayOrChunkedArray | int | Expression,
     /,
     round_mode: _RoundMode = "half_to_even",
@@ -988,7 +988,12 @@ def binary_join(
     memory_pool: MemoryPool | None = None,
 ) -> _StringOrBinaryScalar | _StringOrBinaryArray | Expression: ...
 def binary_join_element_wise(
-    *strings: str | bytes | _StringOrBinaryScalar | _ArrayOrChunkedArray | Expression,
+    *strings: str
+    | bytes
+    | _StringOrBinaryScalar
+    | _ArrayOrChunkedArray
+    | list[Any]
+    | Expression,
     null_handling: Literal["emit_null", "skip", "replace"] = "emit_null",
     null_replacement: str = "",
     options: JoinOptions | None = None,
@@ -1495,7 +1500,7 @@ def array_sort_indices(
     memory_pool: MemoryPool | None = None,
 ) -> UInt64Array | Expression: ...
 def partition_nth_indices(
-    array: _ArrayOrChunkedArray | Expression,
+    array: _ArrayOrChunkedArray | Iterable[Any] | Expression,
     /,
     pivot: int,
     *,

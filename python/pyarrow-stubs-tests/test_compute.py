@@ -131,6 +131,13 @@ def test_array_functions() -> None:
                       _Filtered),
           pc.Expression)
 
+    # Python lists are accepted where the stubs list them.
+    check(assert_type(pc.partition_nth_indices([3, 1, 2], pivot=1),
+                      pa.UInt64Array | pc.Expression),
+          pa.UInt64Array)
+    check(pc.round([1.5, 2.5]), pa.Array)
+    check(pc.binary_join_element_wise(["a", "b"], ["c", "d"], "-"), pa.Array)
+
     # Python literals are accepted next to arrays.
     check(pc.power(arr, 2), pa.Array)
     check(pc.divide(arr, 2.0), pa.Array)

@@ -492,6 +492,8 @@ class UdfContext:
     @property
     def memory_pool(self) -> MemoryPool: ...
 
+def _get_udf_context(memory_pool: MemoryPool, batch_length: int) -> UdfContext: ...
+
 # ==================== Expression ====================
 
 class Expression(_Weakrefable):
