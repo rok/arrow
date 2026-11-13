@@ -1,0 +1,123 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
+from types import EllipsisType
+from typing import TYPE_CHECKING
+
+import pyarrow as pa
+import pyarrow.compute as pc
+from pyarrow.lib import Buffer
+from pyarrow._acero import Declaration, TableSourceNodeOptions
+
+from _check import assert_type, check
+
+
+def test_expression() -> None:
+    field = pc.field("a")
+    check(assert_type(field, pc.Expression), pc.Expression)
+    check(assert_type(pc.field("a", "b"), pc.Expression), pc.Expression)
+    check(assert_type(pc.field(("a", 0)), pc.Expression), pc.Expression)
+    check(assert_type(pc.scalar(1), pc.Expression), pc.Expression)
+
+    check(assert_type(field > 1, pc.Expression), pc.Expression)
+    check(assert_type(field == 1, pc.Expression), pc.Expression)
+    check(assert_type(field != 1, pc.Expression), pc.Expression)
+    check(assert_type((field > 1) & (field < 3), pc.Expression), pc.Expression)
+    check(assert_type(~(field > 1), pc.Expression), pc.Expression)
+    check(assert_type(field + 1, pc.Expression), pc.Expression)
+    check(assert_type(field / 2, pc.Expression), pc.Expression)
+    check(assert_type(field.isin([1, 2]), pc.Expression), pc.Expression)
+    check(assert_type(field.is_null(nan_is_null=True), pc.Expression),
+          pc.Expression)
+    check(assert_type(field.cast(pa.int64()), pc.Expression), pc.Expression)
+    check(assert_type(field.cast("int64", safe=False), pc.Expression),
+          pc.Expression)
+    check(assert_type(field.equals(pc.field("a")), bool), bool)
+
+    if TYPE_CHECKING:
+        field.cast(1)  # type: ignore[arg-type]
+        pc.field(1.0)  # type: ignore[arg-type]
+
+
+def test_functions() -> None:
+    func = pc.get_function("sum")
+    check(assert_type(func, pc.Function), pc.Function)
+    check(assert_type(func.name, str), str)
+    check(assert_type(func.arity, int | EllipsisType), int)
+    check(assert_type(func.num_kernels, int), int)
+    check(assert_type(pc.list_functions(), list[str]), list)
+    check(assert_type(pc.function_registry(), pc.FunctionRegistry),
+          pc.FunctionRegistry)
+
+
+def test_options() -> None:
+    check(assert_type(pc.CastOptions.safe(pa.int64()), pc.CastOptions),
+          pc.CastOptions)
+    check(assert_type(pc.CastOptions.safe().is_safe(), bool), bool)
+    check(assert_type(pc.ScalarAggregateOptions(skip_nulls=False),
+                      pc.ScalarAggregateOptions),
+          pc.ScalarAggregateOptions)
+    check(assert_type(pc.SortOptions([("a", "ascending", "at_start")]),
+                      pc.SortOptions),
+          pc.SortOptions)
+    check(assert_type(pc.SearchSortedOptions(side="right"),
+                      pc.SearchSortedOptions),
+          pc.SearchSortedOptions)
+    options = pc.RoundOptions(2, round_mode="half_up")
+    check(assert_type(options.serialize(), Buffer), Buffer)
+
+    if TYPE_CHECKING:
+        pc.RoundOptions(2, round_mode="nearest")  # type: ignore[arg-type]
+        pc.SearchSortedOptions(side="middle")  # type: ignore[arg-type]
+
+
+def test_array_functions() -> None:
+    arr = pa.array([3, 1, 2])
+    table = pa.table({"a": [3, 1, 2]})
+
+    check(assert_type(pc.array_sort_indices(arr), pa.UInt64Array | pc.Expression),
+          pa.UInt64Array)
+    check(assert_type(pc.sort_indices(table, [("a", "descending")]),
+                      pa.UInt64Array | pc.Expression),
+          pa.UInt64Array)
+    check(assert_type(pc.top_k_unstable(arr, 2), pa.UInt64Array), pa.UInt64Array)
+    check(assert_type(pc.bottom_k_unstable(table, 2, ["a"], ["at_end"]),
+                      pa.UInt64Array),
+          pa.UInt64Array)
+    check(assert_type(pc.indices_nonzero(arr), pa.UInt64Array | pc.Expression),
+          pa.UInt64Array)
+    check(assert_type(pc.quantile(arr, q=[0.25, 0.75]), pa.DoubleArray),
+          pa.DoubleArray)
+    check(assert_type(pc.mode(arr, n=2), pa.StructArray), pa.StructArray)
+    check(assert_type(pc.value_counts(arr), pa.StructArray | pc.Expression),
+          pa.StructArray)
+    check(assert_type(pc.random(3), pa.DoubleArray), pa.DoubleArray)
+
+    taken = pc.take(arr, [0, 2])
+    check(assert_type(taken, pa.Array | pa.ChunkedArray | pa.RecordBatch | pa.Table),
+          pa.Array)
+
+    if TYPE_CHECKING:
+        pc.top_k_unstable(arr, "2")  # type: ignore[arg-type]
+        pc.sort_indices(table, [("a", "up")])  # type: ignore[list-item]
+
+
+def test_acero_declaration() -> None:
+    table = pa.table({"a": [1, 2]})
+    decl = Declaration("table_source", TableSourceNodeOptions(table))
+    check(assert_type(decl, Declaration), Declaration)
+    check(assert_type(decl.to_table(), pa.Table), pa.Table)
