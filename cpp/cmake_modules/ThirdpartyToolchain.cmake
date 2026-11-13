@@ -371,7 +371,7 @@ endmacro()
 # ----------------------------------------------------------------------
 # Thirdparty versions, environment variables, source URLs
 
-set(THIRDPARTY_DIR "${arrow_SOURCE_DIR}/thirdparty")
+set(THIRDPARTY_DIR "${ARROW_SOURCE_DIR}/thirdparty")
 
 add_library(arrow::flatbuffers INTERFACE IMPORTED)
 target_include_directories(arrow::flatbuffers
@@ -1552,36 +1552,19 @@ macro(build_brotli)
   set(BROTLI_PREFIX "${CMAKE_CURRENT_BINARY_DIR}/brotli_ep/src/brotli_ep-install")
   set(BROTLI_INCLUDE_DIR "${BROTLI_PREFIX}/include")
   set(BROTLI_LIB_DIR "${BROTLI_PREFIX}/lib")
+  # Brotli >= 1.1.0 names its static libraries without a "-static"
+  # suffix when BUILD_SHARED_LIBS=OFF.
   set(BROTLI_STATIC_LIBRARY_ENC
-      "${BROTLI_PREFIX}/lib/${CMAKE_STATIC_LIBRARY_PREFIX}brotlienc-static${CMAKE_STATIC_LIBRARY_SUFFIX}"
+      "${BROTLI_LIB_DIR}/${CMAKE_STATIC_LIBRARY_PREFIX}brotlienc${CMAKE_STATIC_LIBRARY_SUFFIX}"
   )
   set(BROTLI_STATIC_LIBRARY_DEC
-      "${BROTLI_PREFIX}/lib/${CMAKE_STATIC_LIBRARY_PREFIX}brotlidec-static${CMAKE_STATIC_LIBRARY_SUFFIX}"
+      "${BROTLI_LIB_DIR}/${CMAKE_STATIC_LIBRARY_PREFIX}brotlidec${CMAKE_STATIC_LIBRARY_SUFFIX}"
   )
   set(BROTLI_STATIC_LIBRARY_COMMON
-      "${BROTLI_PREFIX}/lib/${CMAKE_STATIC_LIBRARY_PREFIX}brotlicommon-static${CMAKE_STATIC_LIBRARY_SUFFIX}"
+      "${BROTLI_LIB_DIR}/${CMAKE_STATIC_LIBRARY_PREFIX}brotlicommon${CMAKE_STATIC_LIBRARY_SUFFIX}"
   )
-  set(BROTLI_CMAKE_ARGS ${EP_COMMON_CMAKE_ARGS} "-DCMAKE_INSTALL_PREFIX=${BROTLI_PREFIX}")
-
-  set(BROTLI_EP_OPTIONS)
-  if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
-    # "cmake install" is disabled for Brotli on Emscripten, so the
-    # default INSTALL_COMMAND fails. We need to disable the default
-    # INSTALL_COMMAND.
-    list(APPEND
-         BROTLI_EP_OPTIONS
-         INSTALL_COMMAND
-         ${CMAKE_COMMAND}
-         -E
-         true)
-
-    set(BROTLI_BUILD_DIR ${CMAKE_CURRENT_BINARY_DIR}/brotli_ep-prefix/src/brotli_ep-build)
-    set(BROTLI_BUILD_LIBS
-        "${BROTLI_BUILD_DIR}/${CMAKE_STATIC_LIBRARY_PREFIX}brotlienc-static${CMAKE_STATIC_LIBRARY_SUFFIX}"
-        "${BROTLI_BUILD_DIR}/${CMAKE_STATIC_LIBRARY_PREFIX}brotlidec-static${CMAKE_STATIC_LIBRARY_SUFFIX}"
-        "${BROTLI_BUILD_DIR}/${CMAKE_STATIC_LIBRARY_PREFIX}brotlicommon-static${CMAKE_STATIC_LIBRARY_SUFFIX}"
-    )
-  endif()
+  set(BROTLI_CMAKE_ARGS ${EP_COMMON_CMAKE_ARGS} "-DCMAKE_INSTALL_PREFIX=${BROTLI_PREFIX}"
+                        -DBROTLI_BUILD_TOOLS=OFF -DBROTLI_DISABLE_TESTS=ON)
 
   externalproject_add(brotli_ep
                       ${EP_COMMON_OPTIONS}
@@ -1590,22 +1573,8 @@ macro(build_brotli)
                       BUILD_BYPRODUCTS "${BROTLI_STATIC_LIBRARY_ENC}"
                                        "${BROTLI_STATIC_LIBRARY_DEC}"
                                        "${BROTLI_STATIC_LIBRARY_COMMON}"
-                                       ${BROTLI_BUILD_BYPRODUCTS}
                       CMAKE_ARGS ${BROTLI_CMAKE_ARGS}
-                      STEP_TARGETS headers_copy ${BROTLI_EP_OPTIONS})
-
-  if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
-    # Copy the libraries to our install directory manually.
-    set(BROTLI_BUILD_INCLUDE_DIR
-        ${CMAKE_CURRENT_BINARY_DIR}/brotli_ep-prefix/src/brotli_ep/c/include/brotli)
-    add_custom_command(TARGET brotli_ep
-                       POST_BUILD
-                       COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                               ${BROTLI_BUILD_DIR}/${CMAKE_STATIC_LIBRARY_PREFIX}*${CMAKE_STATIC_LIBRARY_SUFFIX}
-                               ${BROTLI_LIB_DIR}
-                       COMMAND ${CMAKE_COMMAND} -E copy_directory
-                               ${BROTLI_BUILD_INCLUDE_DIR} ${BROTLI_INCLUDE_DIR}/brotli)
-  endif()
+                      STEP_TARGETS headers_copy)
 
   file(MAKE_DIRECTORY "${BROTLI_INCLUDE_DIR}")
 
@@ -2091,25 +2060,8 @@ function(build_protobuf)
       "${PROTOBUF_INCLUDE_DIR}"
       PARENT_SCOPE)
 
-  set(PROTOBUF_PATCH_COMMAND)
-  if(EMSCRIPTEN)
-    find_program(PATCH patch)
-    if(PATCH)
-      set(PROTOBUF_PATCH_COMMAND ${PATCH} -p1 -i)
-    else()
-      find_program(GIT git)
-      if(GIT)
-        set(PROTOBUF_PATCH_COMMAND ${GIT} apply)
-      endif()
-    endif()
-    if(PROTOBUF_PATCH_COMMAND)
-      list(APPEND PROTOBUF_PATCH_COMMAND
-           ${CMAKE_CURRENT_LIST_DIR}/protobuf-emscripten.patch)
-    endif()
-  endif()
   fetchcontent_declare(protobuf
                        ${FC_DECLARE_COMMON_OPTIONS} OVERRIDE_FIND_PACKAGE
-                       PATCH_COMMAND ${PROTOBUF_PATCH_COMMAND}
                        URL ${PROTOBUF_SOURCE_URL}
                        URL_HASH "SHA256=${ARROW_PROTOBUF_BUILD_SHA256_CHECKSUM}")
 
