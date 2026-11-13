@@ -318,7 +318,7 @@ class BaseListArray(Array):
 class ListArray(BaseListArray):
     @staticmethod
     def from_arrays(
-        offsets: Int32Array | Iterable[int | None] | np.ndarray,
+        offsets: Array | Iterable[int | None] | np.ndarray,
         values: Iterable[Any],
         type: DataType | None = None,
         pool: MemoryPool | None = None,
@@ -333,7 +333,7 @@ class ListArray(BaseListArray):
 class LargeListArray(BaseListArray):
     @staticmethod
     def from_arrays(
-        offsets: Int64Array | Iterable[int | None] | np.ndarray,
+        offsets: Array | Iterable[int | None] | np.ndarray,
         values: Iterable[Any],
         type: DataType | None = None,
         pool: MemoryPool | None = None,
@@ -348,8 +348,8 @@ class LargeListArray(BaseListArray):
 class ListViewArray(BaseListArray):
     @staticmethod
     def from_arrays(
-        offsets: Int32Array | Iterable[int | None] | np.ndarray,
-        sizes: Int32Array | Iterable[int | None] | np.ndarray,
+        offsets: Array | Iterable[int | None] | np.ndarray,
+        sizes: Array | Iterable[int | None] | np.ndarray,
         values: Iterable[Any],
         type: DataType | None = None,
         pool: MemoryPool | None = None,
@@ -366,8 +366,8 @@ class ListViewArray(BaseListArray):
 class LargeListViewArray(BaseListArray):
     @staticmethod
     def from_arrays(
-        offsets: Int64Array | Iterable[int | None] | np.ndarray,
-        sizes: Int64Array | Iterable[int | None] | np.ndarray,
+        offsets: Array | Iterable[int | None] | np.ndarray,
+        sizes: Array | Iterable[int | None] | np.ndarray,
         values: Iterable[Any],
         type: DataType | None = None,
         pool: MemoryPool | None = None,
@@ -396,7 +396,7 @@ class FixedSizeListArray(BaseListArray):
 class MapArray(ListArray):
     @staticmethod
     def from_arrays(  # type: ignore[override]
-        offsets: Int32Array | Iterable[int | None] | np.ndarray,
+        offsets: Array | Iterable[int | None] | np.ndarray,
         keys: Iterable[Any],
         items: Iterable[Any],
         type: DataType | None = None,
@@ -416,15 +416,15 @@ class UnionArray(Array):
     def offsets(self) -> Int32Array: ...
     @staticmethod
     def from_dense(
-        types: Int8Array,
-        value_offsets: Int32Array,
+        types: Array,
+        value_offsets: Array,
         children: list[Array],
         field_names: list[str] | None = None,
         type_codes: list[int] | None = None,
     ) -> UnionArray: ...
     @staticmethod
     def from_sparse(
-        types: Int8Array,
+        types: Array,
         children: list[Array],
         field_names: list[str] | None = None,
         type_codes: list[int] | None = None,
@@ -484,7 +484,7 @@ class DictionaryArray(Array):
     def from_arrays(
         indices: Indices,
         dictionary: Array | np.ndarray | pd.Series | list[Any],
-        mask: np.ndarray | pd.Series | BooleanArray | None = None,
+        mask: np.ndarray | pd.Series | None = None,
         ordered: bool = False,
         from_pandas: bool = False,
         safe: bool = True,
@@ -499,7 +499,7 @@ class StructArray(Array):
         arrays: Iterable[Array | np.ndarray | list],
         names: Sequence[str] | list[Field] | None = None,
         fields: list[Field] | None = None,
-        mask: BooleanArray | None = None,
+        mask: Array | None = None,
         memory_pool: MemoryPool | None = None,
         type: StructType | None = None,
     ) -> StructArray: ...
@@ -514,7 +514,7 @@ class StructArray(Array):
 class RunEndEncodedArray(Array):
     @staticmethod
     def from_arrays(
-        run_ends: Int16Array | Int32Array | Int64Array | list[int],
+        run_ends: Array | Sequence[int] | np.ndarray,
         values: Array | list[Any],
         type: DataType | None = None,
     ) -> RunEndEncodedArray: ...
@@ -557,7 +557,7 @@ class Bool8Array(ExtensionArray):
         self, zero_copy_only: bool = ..., writable: bool = ...
     ) -> np.ndarray: ...
     @staticmethod
-    def from_storage(storage: Int8Array) -> Bool8Array: ...  # type: ignore[override]
+    def from_storage(storage: Array) -> Bool8Array: ...  # type: ignore[override]
     @staticmethod
     def from_numpy(obj: np.ndarray) -> Bool8Array: ...
 
