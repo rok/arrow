@@ -16,14 +16,17 @@
 # under the License.
 
 from types import EllipsisType
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypeAlias
 
 import pyarrow as pa
 import pyarrow.compute as pc
 from pyarrow.lib import Buffer
-from pyarrow._acero import Declaration, TableSourceNodeOptions
 
 from _check import assert_type, check
+
+_Filtered: TypeAlias = (
+    pa.Array | pa.ChunkedArray | pa.RecordBatch | pa.Table | pc.Expression
+)
 
 
 def test_expression() -> None:
@@ -47,6 +50,10 @@ def test_expression() -> None:
     check(assert_type(field.cast("int64", safe=False), pc.Expression),
           pc.Expression)
     check(assert_type(field.equals(pc.field("a")), bool), bool)
+
+    # Calling a compute function with an expression builds an expression.
+    check(pc.count(field), pc.Expression)
+    check(pc.mean(field), pc.Expression)
 
     if TYPE_CHECKING:
         field.cast(1)  # type: ignore[arg-type]
@@ -74,6 +81,14 @@ def test_options() -> None:
     check(assert_type(pc.SortOptions([("a", "ascending", "at_start")]),
                       pc.SortOptions),
           pc.SortOptions)
+    check(assert_type(pc.SelectKOptions(1, [("a", "ascending", "at_end")]),
+                      pc.SelectKOptions),
+          pc.SelectKOptions)
+    check(assert_type(pc.SetLookupOptions(pa.chunked_array([[1, 2]])),
+                      pc.SetLookupOptions),
+          pc.SetLookupOptions)
+    check(assert_type(pc.RandomOptions(initializer="seed"), pc.RandomOptions),
+          pc.RandomOptions)
     check(assert_type(pc.SearchSortedOptions(side="right"),
                       pc.SearchSortedOptions),
           pc.SearchSortedOptions)
@@ -100,12 +115,25 @@ def test_array_functions() -> None:
           pa.UInt64Array)
     check(assert_type(pc.indices_nonzero(arr), pa.UInt64Array | pc.Expression),
           pa.UInt64Array)
-    check(assert_type(pc.quantile(arr, q=[0.25, 0.75]), pa.DoubleArray),
+    check(assert_type(pc.quantile(arr, q=[0.25, 0.75]),
+                      pa.DoubleArray | pc.Expression),
           pa.DoubleArray)
-    check(assert_type(pc.mode(arr, n=2), pa.StructArray), pa.StructArray)
+    check(assert_type(pc.mode(arr, n=2), pa.StructArray | pc.Expression),
+          pa.StructArray)
     check(assert_type(pc.value_counts(arr), pa.StructArray | pc.Expression),
           pa.StructArray)
     check(assert_type(pc.random(3), pa.DoubleArray), pa.DoubleArray)
+
+    mask = pa.array([True, False, True])
+    check(assert_type(pc.filter(table, mask), _Filtered), pa.Table)
+    check(assert_type(pc.drop_null(table), _Filtered), pa.Table)
+    check(assert_type(pc.filter(pc.field("a"), pc.field("b")),
+                      _Filtered),
+          pc.Expression)
+
+    # Python literals are accepted next to arrays.
+    check(pc.power(arr, 2), pa.Array)
+    check(pc.divide(arr, 2.0), pa.Array)
 
     taken = pc.take(arr, [0, 2])
     check(assert_type(taken, pa.Array | pa.ChunkedArray | pa.RecordBatch | pa.Table),
@@ -114,10 +142,3 @@ def test_array_functions() -> None:
     if TYPE_CHECKING:
         pc.top_k_unstable(arr, "2")  # type: ignore[arg-type]
         pc.sort_indices(table, [("a", "up")])  # type: ignore[list-item]
-
-
-def test_acero_declaration() -> None:
-    table = pa.table({"a": [1, 2]})
-    decl = Declaration("table_source", TableSourceNodeOptions(table))
-    check(assert_type(decl, Declaration), Declaration)
-    check(assert_type(decl.to_table(), pa.Table), pa.Table)

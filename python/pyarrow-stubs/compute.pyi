@@ -292,63 +292,63 @@ def array_take(
 # ========================= 1.1 functions =========================
 
 def all(
-    array: BooleanScalar | _ArrayOrChunkedArray,
+    array: BooleanScalar | _ArrayOrChunkedArray | Expression,
     /,
     *,
     skip_nulls: bool = True,
     min_count: int = 1,
     options: ScalarAggregateOptions | None = None,
     memory_pool: MemoryPool | None = None,
-) -> BooleanScalar: ...
+) -> BooleanScalar | Expression: ...
 
 any = _clone_signature(all)
 
 def approximate_median(
-    array: _NumericScalar | _ArrayOrChunkedArray,
+    array: _NumericScalar | _ArrayOrChunkedArray | Expression,
     /,
     *,
     skip_nulls: bool = True,
     min_count: int = 1,
     options: ScalarAggregateOptions | None = None,
     memory_pool: MemoryPool | None = None,
-) -> DoubleScalar: ...
+) -> DoubleScalar | Expression: ...
 def count(
-    array: _ArrayOrChunkedArray,
+    array: _ArrayOrChunkedArray | Expression,
     /,
     mode: _CountMode = "only_valid",
     *,
     options: CountOptions | None = None,
     memory_pool: MemoryPool | None = None,
-) -> Int64Scalar: ...
+) -> Int64Scalar | Expression: ...
 def count_distinct(
-    array: _ArrayOrChunkedArray,
+    array: _ArrayOrChunkedArray | Expression,
     /,
     mode: _CountMode = "only_valid",
     *,
     options: CountOptions | None = None,
     memory_pool: MemoryPool | None = None,
-) -> Int64Scalar: ...
+) -> Int64Scalar | Expression: ...
 def first(
-    array: _ArrayOrChunkedArray,
+    array: _ArrayOrChunkedArray | Expression,
     /,
     *,
     skip_nulls: bool = True,
     min_count: int = 1,
     options: ScalarAggregateOptions | None = None,
     memory_pool: MemoryPool | None = None,
-) -> Scalar: ...
+) -> Scalar | Expression: ...
 
 last = _clone_signature(first)
 
 def first_last(
-    array: _ArrayOrChunkedArray | list[Any],
+    array: _ArrayOrChunkedArray | list[Any] | Expression,
     /,
     *,
     skip_nulls: bool = True,
     min_count: int = 1,
     options: ScalarAggregateOptions | None = None,
     memory_pool: MemoryPool | None = None,
-) -> StructScalar: ...
+) -> StructScalar | Expression: ...
 def index(
     data: _ArrayOrChunkedArray,
     value: ScalarLike,
@@ -363,16 +363,16 @@ min = _clone_signature(first)
 min_max = _clone_signature(first_last)
 
 def mean(
-    array: _NumericScalar | _ArrayOrChunkedArray,
+    array: _NumericScalar | _ArrayOrChunkedArray | Expression,
     /,
     *,
     skip_nulls: bool = True,
     min_count: int = 1,
     options: ScalarAggregateOptions | None = None,
     memory_pool: MemoryPool | None = None,
-) -> Scalar: ...
+) -> Scalar | Expression: ...
 def mode(
-    array: _NumericScalar | _ArrayOrChunkedArray,
+    array: _NumericScalar | _ArrayOrChunkedArray | Expression,
     /,
     n: int = 1,
     *,
@@ -380,18 +380,18 @@ def mode(
     min_count: int = 0,
     options: ModeOptions | None = None,
     memory_pool: MemoryPool | None = None,
-) -> StructArray: ...
+) -> StructArray | Expression: ...
 def product(
-    array: _NumericScalar | _ArrayOrChunkedArray,
+    array: _NumericScalar | _ArrayOrChunkedArray | Expression,
     /,
     *,
     skip_nulls: bool = True,
     min_count: int = 1,
     options: ScalarAggregateOptions | None = None,
     memory_pool: MemoryPool | None = None,
-) -> _NumericScalar: ...
+) -> _NumericScalar | Expression: ...
 def quantile(
-    array: _NumericScalar | _ArrayOrChunkedArray,
+    array: _NumericScalar | _ArrayOrChunkedArray | Expression,
     /,
     q: float | Sequence[float] = 0.5,
     *,
@@ -402,9 +402,9 @@ def quantile(
     min_count: int = 0,
     options: QuantileOptions | None = None,
     memory_pool: MemoryPool | None = None,
-) -> DoubleArray: ...
+) -> DoubleArray | Expression: ...
 def stddev(
-    array: _NumericScalar | _ArrayOrChunkedArray,
+    array: _NumericScalar | _ArrayOrChunkedArray | Expression,
     /,
     *,
     ddof: float = 0,
@@ -412,7 +412,7 @@ def stddev(
     min_count: int = 0,
     options: VarianceOptions | None = None,
     memory_pool: MemoryPool | None = None,
-) -> DoubleScalar: ...
+) -> DoubleScalar | Expression: ...
 def sum(
     array: _NumericScalar | _ArrayOrChunkedArray | Expression,
     /,
@@ -423,7 +423,7 @@ def sum(
     memory_pool: MemoryPool | None = None,
 ) -> _NumericScalar | Expression: ...
 def tdigest(
-    array: _NumericScalar | _ArrayOrChunkedArray,
+    array: _NumericScalar | _ArrayOrChunkedArray | Expression,
     /,
     q: float | Sequence[float] = 0.5,
     *,
@@ -433,9 +433,9 @@ def tdigest(
     min_count: int = 0,
     options: TDigestOptions | None = None,
     memory_pool: MemoryPool | None = None,
-) -> DoubleArray: ...
+) -> DoubleArray | Expression: ...
 def variance(
-    array: _NumericScalar | _ArrayOrChunkedArray | ArrayLike,
+    array: _NumericScalar | _ArrayOrChunkedArray | ArrayLike | Expression,
     /,
     *,
     ddof: int = 0,
@@ -443,18 +443,18 @@ def variance(
     min_count: int = 0,
     options: VarianceOptions | None = None,
     memory_pool: MemoryPool | None = None,
-) -> DoubleScalar: ...
+) -> DoubleScalar | Expression: ...
 def winsorize(
-    array: _ArrayOrChunkedArray,
+    array: _ArrayOrChunkedArray | Expression,
     /,
     lower_limit: float,
     upper_limit: float,
     *,
     options: WinsorizeOptions | None = None,
     memory_pool: MemoryPool | None = None,
-) -> _NumericArray: ...
+) -> _NumericArray | Expression: ...
 def skew(
-    array: _NumericScalar | _ArrayOrChunkedArray | ArrayLike,
+    array: _NumericScalar | _ArrayOrChunkedArray | ArrayLike | Expression,
     /,
     *,
     skip_nulls: bool = True,
@@ -462,9 +462,9 @@ def skew(
     min_count: int = 0,
     options: SkewOptions | None = None,
     memory_pool: MemoryPool | None = None,
-) -> DoubleScalar: ...
+) -> DoubleScalar | Expression: ...
 def kurtosis(
-    array: _NumericScalar | _ArrayOrChunkedArray | ArrayLike,
+    array: _NumericScalar | _ArrayOrChunkedArray | ArrayLike | Expression,
     /,
     *,
     skip_nulls: bool = True,
@@ -472,7 +472,7 @@ def kurtosis(
     min_count: int = 0,
     options: SkewOptions | None = None,
     memory_pool: MemoryPool | None = None,
-) -> DoubleScalar: ...
+) -> DoubleScalar | Expression: ...
 def top_k_unstable(
     values: _ArrayOrChunkedArray | RecordBatch | Table,
     k: int,
@@ -494,7 +494,7 @@ def bottom_k_unstable(
 
 # ========================= 2.1 Arithmetic =========================
 def abs(
-    x: _NumericOrDurationScalar | _ArrayOrChunkedArray | Expression,
+    x: _NumericOrDurationScalar | _ArrayOrChunkedArray | Expression | float,
     /,
     *,
     memory_pool: MemoryPool | None = None,
@@ -513,8 +513,8 @@ def add(
 add_checked = _clone_signature(add)
 
 def divide(
-    x: _NumericOrTemporalScalar | _ArrayOrChunkedArray | Expression,
-    y: (_NumericOrTemporalScalar | _ArrayOrChunkedArray | Expression),
+    x: _NumericOrTemporalScalar | _ArrayOrChunkedArray | Expression | float,
+    y: _NumericOrTemporalScalar | _ArrayOrChunkedArray | Expression | float,
     /,
     *,
     memory_pool: MemoryPool | None = None,
@@ -557,7 +557,7 @@ multiply = _clone_signature(add)
 multiply_checked = _clone_signature(add)
 
 def negate(
-    x: _NumericOrDurationScalar | _ArrayOrChunkedArray | Expression,
+    x: _NumericOrDurationScalar | _ArrayOrChunkedArray | Expression | float,
     /,
     *,
     memory_pool: MemoryPool | None = None,
@@ -566,8 +566,8 @@ def negate(
 negate_checked = _clone_signature(negate)
 
 def power(
-    base: _NumericScalar | Expression | _ArrayOrChunkedArray,
-    exponent: _NumericScalar | Expression | _ArrayOrChunkedArray,
+    base: _NumericScalar | Expression | _ArrayOrChunkedArray | float,
+    exponent: _NumericScalar | Expression | _ArrayOrChunkedArray | float,
     /,
     *,
     memory_pool: MemoryPool | None = None,
@@ -576,13 +576,13 @@ def power(
 power_checked = _clone_signature(power)
 
 def sign(
-    x: _ArrayOrChunkedArray | _NumericOrDurationScalar | Expression,
+    x: _ArrayOrChunkedArray | _NumericOrDurationScalar | Expression | float,
     /,
     *,
     memory_pool: MemoryPool | None = None,
 ) -> Int8Scalar | _FloatScalar | NumericArray | ChunkedArray | Expression: ...
 def sqrt(
-    x: _ArrayOrChunkedArray | _NumericScalar | Expression,
+    x: _ArrayOrChunkedArray | _NumericScalar | Expression | float,
     /,
     *,
     memory_pool: MemoryPool | None = None,
@@ -596,14 +596,14 @@ subtract_checked = _clone_signature(add)
 # ========================= 2.1 Bit-wise functions =========================
 
 def bit_wise_and(
-    x: _NumericScalar | _ArrayOrChunkedArray | Expression,
-    y: _NumericScalar | _ArrayOrChunkedArray | Expression,
+    x: _NumericScalar | _ArrayOrChunkedArray | Expression | float,
+    y: _NumericScalar | _ArrayOrChunkedArray | Expression | float,
     /,
     *,
     memory_pool: MemoryPool | None = None,
 ) -> _NumericScalar | _NumericArray | Expression: ...
 def bit_wise_not(
-    x: _NumericScalar | _ArrayOrChunkedArray | Expression,
+    x: _NumericScalar | _ArrayOrChunkedArray | Expression | float,
     /,
     *,
     memory_pool: MemoryPool | None = None,
@@ -619,7 +619,7 @@ shift_right_checked = _clone_signature(bit_wise_and)
 # ========================= 2.2 Rounding functions =========================
 
 def ceil(
-    x: _FloatScalar | _ArrayOrChunkedArray | Expression,
+    x: _FloatScalar | _ArrayOrChunkedArray | Expression | float,
     /,
     *,
     memory_pool: MemoryPool | None = None,
@@ -628,7 +628,7 @@ def ceil(
 floor = _clone_signature(ceil)
 
 def round(
-    x: _NumericScalar | _ArrayOrChunkedArray | Expression,
+    x: _NumericScalar | _ArrayOrChunkedArray | Expression | float,
     /,
     ndigits: int = 0,
     round_mode: _RoundMode = "half_to_even",
@@ -637,7 +637,7 @@ def round(
     memory_pool: MemoryPool | None = None,
 ) -> _NumericScalar | _NumericArray | Expression: ...
 def round_to_multiple(
-    x: _NumericScalar | _ArrayOrChunkedArray | Expression,
+    x: _NumericScalar | _ArrayOrChunkedArray | Expression | float,
     /,
     multiple: float | _NumericScalar = 1.0,
     round_mode: _RoundMode = "half_to_even",
@@ -660,7 +660,7 @@ trunc = _clone_signature(ceil)
 # ========================= 2.3 Logarithmic functions =========================
 
 def ln(
-    x: _NumericScalar | _ArrayOrChunkedArray | Expression,
+    x: _NumericScalar | _ArrayOrChunkedArray | Expression | float,
     /,
     *,
     memory_pool: MemoryPool | None = None,
@@ -1427,7 +1427,7 @@ def value_counts(
 
 def array_filter(
     array: _ArrayOrChunkedArray | Expression,
-    selection_filter: Mask,
+    selection_filter: Mask | Expression,
     /,
     null_selection_behavior: Literal["drop", "emit_null"] = "drop",
     *,
@@ -1435,14 +1435,20 @@ def array_filter(
     memory_pool: MemoryPool | None = None,
 ) -> _ArrayOrChunkedArray | Expression: ...
 def drop_null(
-    input: _ArrayOrChunkedArray | Expression,
+    input: _ArrayOrChunkedArray | RecordBatch | Table | Expression,
     /,
     *,
     memory_pool: MemoryPool | None = None,
-) -> _ArrayOrChunkedArray | Expression: ...
-
-filter = array_filter
-
+) -> _ArrayOrChunkedArray | RecordBatch | Table | Expression: ...
+def filter(
+    input: _ArrayOrChunkedArray | RecordBatch | Table | Expression,
+    selection_filter: Mask | Expression,
+    /,
+    null_selection_behavior: Literal["drop", "emit_null"] = "drop",
+    *,
+    options: FilterOptions | None = None,
+    memory_pool: MemoryPool | None = None,
+) -> _ArrayOrChunkedArray | RecordBatch | Table | Expression: ...
 def inverse_permutation(
     indices: _ArrayOrChunkedArray | Expression,
     /,
@@ -1539,7 +1545,7 @@ def select_k_unstable(
     input: _ArrayOrChunkedArray | RecordBatch | Table | Expression,
     /,
     k: int,
-    sort_keys: Sequence[tuple[str | Expression, Order]],
+    sort_keys: Sequence[_SortKey],
     *,
     options: SelectKOptions | None = None,
     memory_pool: MemoryPool | None = None,

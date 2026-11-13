@@ -23,7 +23,7 @@ from typing import Literal, TypeAlias
 from pyarrow.__lib.ipc import RecordBatchReader
 from pyarrow.__lib.table import _AggregateOptions, _AggregationName
 from pyarrow._stubs_typing import NullPlacement, Order
-from pyarrow.lib import RecordBatch, Table, _Weakrefable
+from pyarrow.lib import Table, _Weakrefable
 
 from pyarrow.compute import Expression
 
@@ -61,7 +61,7 @@ class Declaration(_Weakrefable):
 class ExecNodeOptions(_Weakrefable): ...
 
 class TableSourceNodeOptions(ExecNodeOptions):
-    def __init__(self, table: Table | RecordBatch) -> None: ...
+    def __init__(self, table: Table) -> None: ...
 
 class RecordBatchReaderSourceNodeOptions(ExecNodeOptions):
     def __init__(self, reader: RecordBatchReader) -> None: ...
