@@ -689,9 +689,7 @@ tasks:
     params:
       env:
         JDK: 17
-      pr_number: Unset
       image: debian-docs
-      publish: false
     artifacts:
       - docs.tar.gz
 
@@ -797,14 +795,3 @@ tasks:
     params:
       type: tutorial_examples
       run: tutorial
-
-############################## Utility tasks ############################
-  preview-docs:
-    ci: github
-    template: docs/github.linux.yml
-    params:
-      env:
-        JDK: 17
-      pr_number: Unset
-      image: debian-docs
-      publish: true

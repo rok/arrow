@@ -17,6 +17,13 @@
 
 name: Docs
 
+# docs_preview.yml reads the pull request and commit of a requested preview
+# from this name
+run-name: >-
+  ${{ github.event_name == 'workflow_dispatch' &&
+  format('Docs preview for #{0} at {1}', inputs.pr_number, inputs.head_sha) ||
+  '' }}
+
 on:
   push:
     branches:
@@ -29,6 +36,20 @@ on:
       - '.github/workflows/docs.yml'
       - 'cpp/apidoc/**'
       - 'docs/**'
+  # Builds a docs preview for any pull request, requested with the
+  # "@github-actions docs-preview" comment, see comment_bot.yml. These runs
+  # build pull request code on the default branch: they must not use secrets
+  # and must not save caches.
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: Pull request to build a docs preview for
+        required: true
+        type: string
+      head_sha:
+        description: Head commit of the pull request
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -53,11 +74,32 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 0
+          ref: >-
+            ${{ github.event_name == 'workflow_dispatch' &&
+            format('refs/pull/{0}/head', inputs.pr_number) || '' }}
+      - name: Check Requested Commit
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          HEAD_SHA: ${{ inputs.head_sha }}
+        run: |
+          # Only build the commit the preview was requested for
+          if [ "$(git rev-parse HEAD)" != "${HEAD_SHA}" ]; then
+            echo "::error::Pull request head is no longer ${HEAD_SHA}"
+            exit 1
+          fi
       - name: Free up disk space
         run: |
           ci/scripts/util_free_space.sh
       - name: Cache Docker Volumes
+        if: github.event_name != 'workflow_dispatch'
         uses: actions/cache@v6
+        with:
+          path: .docker
+          key: debian-docs-${{ hashFiles('cpp/**') }}
+          restore-keys: debian-docs-
+      - name: Restore Docker Volumes
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/cache/restore@v6
         with:
           path: .docker
           key: debian-docs-${{ hashFiles('cpp/**') }}
@@ -70,10 +112,31 @@ jobs:
         run: pip install -e dev/archery[docker]
       - name: Execute Docker Build
         env:
-          ARCHERY_DOCKER_USER: ${{ secrets.DOCKERHUB_USER }}
-          ARCHERY_DOCKER_PASSWORD: ${{ secrets.DOCKERHUB_TOKEN }}
           JDK: 17
-        run: archery docker run debian-docs
+        run: |
+          # Keep the rendered docs on the runner so they can be uploaded below
+          mkdir -p "${RUNNER_TEMP}/docs"
+          archery docker run -v "${RUNNER_TEMP}/docs:/build/docs" debian-docs
+      - name: Prepare Docs Preview
+        if: >-
+          github.event_name == 'pull_request' ||
+          github.event_name == 'workflow_dispatch'
+        run: |
+          # build files are created by the docker user
+          sudo chown -R "${USER}:" "${RUNNER_TEMP}/docs"
+          # These are only used while generating the page
+          rm -rf "${RUNNER_TEMP}/docs/.doctrees"
+      # Published by docs_preview.yml, which has the credentials this job lacks
+      - name: Upload Docs Preview
+        if: >-
+          github.event_name == 'pull_request' ||
+          github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v7
+        with:
+          name: docs-preview
+          path: ${{ runner.temp }}/docs
+          retention-days: 3
+          if-no-files-found: error
       - name: Docker Push
         if: >-
           success() &&
