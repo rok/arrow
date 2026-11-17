@@ -1,0 +1,168 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
+# Publishes the docs built for a pull request by the "Docs" workflow to
+# nightlies.apache.org/arrow/pr_docs/<date>/<pull request>/.
+#
+# "Docs" builds pull request code, so it has no upload credentials and only
+# stores the docs as an artifact. This workflow has the credentials: it must
+# never check out or run pull request code, and the artifact is untrusted.
+
+name: Docs Preview
+
+on:
+  workflow_run:
+    workflows:
+      - Docs
+    types:
+      - completed
+
+permissions:
+  contents: read
+
+env:
+  PREVIEW_URL: https://nightlies.apache.org/arrow/pr_docs
+  # Previews are removed this many days after they were published
+  RETENTION_DAYS: 14
+  # Upper bound on what a pull request can publish, the docs are about 250 MB
+  MAX_SIZE_MB: 1024
+
+jobs:
+
+  publish:
+    name: Publish
+    if: >-
+      github.repository == 'apache/arrow' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      contains(fromJSON('["pull_request", "workflow_dispatch"]'),
+      github.event.workflow_run.event)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Find Pull Request
+        id: pr
+        env:
+          EVENT: ${{ github.event.workflow_run.event }}
+          HEAD_OWNER: ${{ github.event.workflow_run.head_repository.owner.login }}
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          TITLE: ${{ github.event.workflow_run.display_title }}
+        run: |
+          if [ "${EVENT}" = "workflow_dispatch" ]; then
+            # Requested with a comment: docs.yml names the run after the pull
+            # request and commit, pull request code can't change that.
+            pattern='^Docs preview for #([0-9]+) at ([0-9a-f]{40})$'
+            [[ "${TITLE}" =~ ${pattern} ]] || exit 0
+            number=${BASH_REMATCH[1]}
+            sha=${BASH_REMATCH[2]}
+          else
+            # The event doesn't list fork pull requests: find the open pull
+            # request whose head is the branch and commit that were built.
+            sha=${HEAD_SHA}
+            number=$(
+              gh api --method GET "repos/${GITHUB_REPOSITORY}/pulls" \
+                -f head="${HEAD_OWNER}:${HEAD_BRANCH}" \
+                -f per_page=100 \
+                --jq "[.[] | select(.head.sha == \"${sha}\")][0].number // empty"
+            )
+          fi
+          echo "number=${number}" >> "${GITHUB_OUTPUT}"
+          echo "sha=${sha}" >> "${GITHUB_OUTPUT}"
+      - name: Download Docs Preview
+        id: preview
+        if: steps.pr.outputs.number
+        env:
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+        run: |
+          date=$(date -u +%F)
+          path="${date}/${PR_NUMBER}"
+          gh run download "${RUN_ID}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --name docs-preview \
+            --dir "stage/${path}"
+          # Only publish plain files and directories, no dotfiles such as
+          # .htaccess, and only a plausible amount of them.
+          find stage \( ! -type f ! -type d -o -name '.*' \) -prune -exec rm -rf {} +
+          size_mb=$(du -sm stage | cut -f1)
+          if [ "${size_mb}" -gt "${MAX_SIZE_MB}" ] || [ ! -f "stage/${path}/index.html" ]; then
+            echo "::error::Docs preview is ${size_mb} MB (limit ${MAX_SIZE_MB}) or has no index.html"
+            exit 1
+          fi
+          # rsync filters, the first match wins: replace this preview, keep
+          # the other previews of today, of the last RETENTION_DAYS days and
+          # of tomorrow, in case another run publishes after midnight.
+          # Everything else on the remote is not matched and gets deleted,
+          # which is what removes old previews.
+          filters="--include=/${path}/*** --exclude=/${date}/*"
+          for days in +1 $(seq -1 -1 $((1 - RETENTION_DAYS))); do
+            filters+=" --exclude=/$(date -u -d "${date} ${days} days" +%F)/"
+          done
+          echo "path=${path}" >> "${GITHUB_OUTPUT}"
+          echo "filters=${filters}" >> "${GITHUB_OUTPUT}"
+      # The default branch, only for the sync-nightlies action
+      - name: Checkout Arrow
+        if: steps.preview.outputs.filters
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          path: arrow
+          sparse-checkout: .github/actions
+      - name: Sync to Remote
+        # This deletes on the remote, never run it without the filters
+        if: steps.preview.outputs.filters
+        uses: ./arrow/.github/actions/sync-nightlies
+        with:
+          upload: true
+          # Symlinks are not transferred
+          switches: -rtzh --delete --stats ${{ steps.preview.outputs.filters }}
+          local_path: stage
+          remote_path: ${{ secrets.NIGHTLIES_RSYNC_PATH }}/arrow/pr_docs
+          remote_host: ${{ secrets.NIGHTLIES_RSYNC_HOST }}
+          remote_port: ${{ secrets.NIGHTLIES_RSYNC_PORT }}
+          remote_user: ${{ secrets.NIGHTLIES_RSYNC_USER }}
+          remote_key: ${{ secrets.NIGHTLIES_RSYNC_KEY }}
+          remote_host_key: ${{ secrets.NIGHTLIES_RSYNC_HOST_KEY }}
+      - name: Comment on Pull Request
+        if: steps.preview.outputs.filters
+        env:
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+          PREVIEW_PATH: ${{ steps.preview.outputs.path }}
+          SHA: ${{ steps.pr.outputs.sha }}
+        run: |
+          marker="<!-- docs-preview -->"
+          body="${marker}
+          :open_book: Docs preview for ${SHA}: ${PREVIEW_URL}/${PREVIEW_PATH}/index.html
+          It is removed after ${RETENTION_DAYS} days."
+          # Keep a single comment per pull request up to date
+          comments="repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments"
+          comment_id=$(
+            gh api --paginate "${comments}" \
+              --jq ".[] | select(.user.login == \"github-actions[bot]\") | select(.body | startswith(\"${marker}\")) | .id" |
+              awk 'NR == 1'
+          )
+          if [ -n "${comment_id}" ]; then
+            gh api --method PATCH "repos/${GITHUB_REPOSITORY}/issues/comments/${comment_id}" -f body="${body}"
+          else
+            gh api --method POST "${comments}" -f body="${body}"
+          fi > /dev/null

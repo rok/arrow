@@ -16,7 +16,6 @@
 # under the License.
 
 {% import 'macros.jinja' as macros with context %}
-{% set pr_number = pr_number|replace("Unset", arrow.branch) %}
 {{ macros.github_header() }}
 
 jobs:
@@ -48,26 +47,6 @@ jobs:
           ref: {{ default_branch|default("main") }}
           path: crossbow
           fetch-depth: 1
-      {% if publish %}
-      - name: Prepare Docs Preview
-        run: |
-          # build files are created by the docker user
-          sudo chown -R ${USER}: build
-          # These are only used while generating the page
-          rm -rf build/docs/.doctrees
-      - name: Upload preview to S3
-        env:
-          {%- raw %}
-          AWS_ACCESS_KEY_ID: ${{ secrets.CROSSBOW_DOCS_ARROW_AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.CROSSBOW_DOCS_ARROW_AWS_SECRET_ACCESS_KEY }}
-          AWS_DEFAULT_REGION: ${{ secrets.CROSSBOW_DOCS_ARROW_S3_BUCKET_REGION }}
-          BUCKET: ${{ secrets.CROSSBOW_DOCS_ARROW_S3_BUCKET }}
-          {% endraw %}
-        run: |
-          aws s3 cp build/docs/ $BUCKET/pr_docs/{{ pr_number }}/ --recursive
-          echo ":open_book: You can find the preview here: https://s3.amazonaws.com/arrow-data/pr_docs/{{ pr_number }}/index.html" >> $GITHUB_STEP_SUMMARY
-
-      {% endif %}
       - name: Prepare Docs artifacts
         run: |
           cd build

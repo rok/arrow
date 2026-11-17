@@ -56,3 +56,36 @@ jobs:
           archery --debug trigger-bot \
             --event-name "${GITHUB_EVENT_NAME}" \
             --event-payload "${GITHUB_EVENT_PATH}"
+
+  docs-preview:
+    name: Docs Preview
+    # Like the Archery bot, only accept requests from the Apache org: the
+    # preview build runs the pull request's code on the default branch.
+    if: >-
+      github.event.action == 'created' &&
+      github.event.issue.pull_request &&
+      startsWith(github.event.comment.body, '@github-actions docs-preview') &&
+      contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'),
+      github.event.comment.author_association)
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      pull-requests: write
+    steps:
+      - name: Request Docs Preview
+        env:
+          GH_TOKEN: ${{ github.token }}
+          COMMENT_ID: ${{ github.event.comment.id }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          PR_NUMBER: ${{ github.event.issue.number }}
+        run: |
+          # Pin the commit that is the head now, see docs.yml
+          head_sha=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}" --jq '.head.sha')
+          gh workflow run docs.yml \
+            --repo "${GITHUB_REPOSITORY}" \
+            --ref "${DEFAULT_BRANCH}" \
+            -f pr_number="${PR_NUMBER}" \
+            -f head_sha="${head_sha}"
+          gh api --method POST \
+            "repos/${GITHUB_REPOSITORY}/issues/comments/${COMMENT_ID}/reactions" \
+            -f content='+1' > /dev/null
